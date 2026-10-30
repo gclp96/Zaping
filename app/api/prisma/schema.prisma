@@ -418,6 +418,7 @@ model Purchase {
   receipts PurchaseReceipt[]
   supplierDocumentAllocations PurchaseReceiptDocument[]
   supplierDocumentApprovals PurchaseReceiptReconciliationApproval[]
+  documentLinks PurchaseReceiptSupplierDocumentLink[]
 
   @@unique([id, companyId, supplierId])
   @@unique([companyId, folio])
@@ -464,7 +465,9 @@ model PurchaseReceipt {
   items PurchaseReceiptItem[]
   supplierDocumentAllocations PurchaseReceiptDocument[]
   supplierDocumentApprovals PurchaseReceiptReconciliationApproval[]
+  documentLinks PurchaseReceiptSupplierDocumentLink[]
 
+  @@unique([id, companyId])
   @@unique([id, companyId, purchaseId])
   @@unique([companyId, folio])
   @@index([companyId])
@@ -547,6 +550,7 @@ model Company {
   supplierDocuments                     SupplierDocument[]
   supplierDocumentAllocations           PurchaseReceiptDocument[]
   supplierDocumentApprovals             PurchaseReceiptReconciliationApproval[]
+  receiptDocumentLinks                  PurchaseReceiptSupplierDocumentLink[]
   purchaseReceipts                      PurchaseReceipt[]
   purchaseReceiptItems                  PurchaseReceiptItem[]
   products                              Product[]
@@ -689,6 +693,8 @@ model User {
   supplierDocumentAllocationCreators PurchaseReceiptDocument[] @relation("SupplierDocumentAllocationCreator")
   supplierDocumentCancellationActors SupplierDocument[] @relation("SupplierDocumentCancelledBy")
   supplierDocumentApprovalActors PurchaseReceiptReconciliationApproval[] @relation("SupplierDocumentApprovalActor")
+  receiptDocumentLinkCreators PurchaseReceiptSupplierDocumentLink[] @relation("ReceiptDocumentLinkCreatedBy")
+  receiptDocumentLinkRemovers PurchaseReceiptSupplierDocumentLink[] @relation("ReceiptDocumentLinkRemovedBy")
 
   equipmentInspections EquipmentInspection[] @relation("EquipmentInspectedBy")
   retiredEquipment     EquipmentAsset[]      @relation("EquipmentRetiredBy")
@@ -1959,6 +1965,7 @@ model SupplierDocument {
   taxBreakdowns SupplierDocumentTaxBreakdown[]
   audits SupplierDocumentAudit[]
   allocations PurchaseReceiptDocument[]
+  receiptLinks PurchaseReceiptSupplierDocumentLink[]
   cancelledBy User? @relation("SupplierDocumentCancelledBy", fields: [cancelledById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
   replacedBy SupplierDocument? @relation("SupplierDocumentReplacement", fields: [replacedByDocumentId, companyId, supplierId], references: [id, companyId, supplierId], onDelete: Restrict, onUpdate: Restrict)
   replaces SupplierDocument[] @relation("SupplierDocumentReplacement")
@@ -2059,4 +2066,32 @@ model PurchaseReceiptReconciliationApproval {
 
   @@index([companyId, receiptId, createdAt, id])
   @@unique([companyId, receiptId, allocationSnapshotHash], map: "PurchaseReceiptApproval_snapshot_key")
+}
+
+
+/// Nonmonetary document link. Financial allocations remain in PurchaseReceiptDocument.
+model PurchaseReceiptSupplierDocumentLink {
+  id          String    @id @default(uuid())
+  companyId   String
+  purchaseId  String
+  supplierId  String
+  receiptId   String
+  documentId  String
+  createdById String
+  createdAt   DateTime  @default(now())
+  removedById String?
+  removedAt   DateTime?
+  reason      String?   @db.VarChar(1000)
+
+  company   Company         @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "PRSDL_company_fkey")
+  purchase  Purchase        @relation(fields: [purchaseId, companyId, supplierId], references: [id, companyId, supplierId], onDelete: Restrict, onUpdate: Restrict, map: "PRSDL_purchase_fkey")
+  receipt   PurchaseReceipt @relation(fields: [receiptId, companyId, purchaseId], references: [id, companyId, purchaseId], onDelete: Restrict, onUpdate: Restrict, map: "PRSDL_receipt_fkey")
+  document  SupplierDocument @relation(fields: [documentId, companyId, supplierId], references: [id, companyId, supplierId], onDelete: Restrict, onUpdate: Restrict, map: "PRSDL_document_fkey")
+  createdBy User            @relation("ReceiptDocumentLinkCreatedBy", fields: [createdById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict, map: "PRSDL_created_by_fkey")
+  removedBy User?           @relation("ReceiptDocumentLinkRemovedBy", fields: [removedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict, map: "PRSDL_removed_by_fkey")
+
+  // One active link per pair, enforced by a partial unique index in migration SQL.
+  // Historical removed rows remain immutable for auditability.
+  @@index([companyId, receiptId, documentId], map: "PRSDL_company_receipt_document_idx")
+  @@index([companyId, documentId], map: "PRSDL_company_document_idx")
 }
