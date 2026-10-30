@@ -27,6 +27,28 @@ test('local committed candidate needs its exact authorized SHA', () =>
   ));
 test('another local branch is rejected before creating a server', () =>
   assert.throws(() => assertRepositoryTarget({ ...local, branch: 'main' })));
+
+test('receipt links QA requires its dedicated branch and explicit exact SHA', () => {
+  const links = {
+    branch: 'codex/zfiles-int-02a-receipt-links',
+    head: candidate,
+  };
+  assert.equal(
+    assertRepositoryTarget({ ...links, expectedHead: candidate }),
+    candidate,
+  );
+  assert.throws(() => assertRepositoryTarget(links));
+  assert.throws(() =>
+    assertRepositoryTarget({ ...links, expectedHead: baseline }),
+  );
+  assert.throws(() =>
+    assertRepositoryTarget({
+      ...links,
+      branch: 'main',
+      expectedHead: candidate,
+    }),
+  );
+});
 test('detached GitHub pull-request merge SHA is accepted exactly', () =>
   assert.equal(assertRepositoryTarget(actions), candidate));
 test('GitHub push checkout is accepted without a local branch dependency', () =>

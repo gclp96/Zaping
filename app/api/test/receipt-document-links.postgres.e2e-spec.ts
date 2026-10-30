@@ -499,7 +499,30 @@ describePg('UX-PDOC-01A receipt-document associations PostgreSQL', () => {
       const second = order === 'cancel-first' ? link() : cancel();
       // Attach rejection handlers before unlocking to avoid unhandled rejections.
       const results = Promise.allSettled([first, second]);
-      g.release();
+      try {
+        // Prove the second transaction actually reached the conflicting lock.
+        // Starting two promises alone would also pass with sequential scheduling.
+        const deadline = Date.now() + 10_000;
+        let waiting = false;
+        while (Date.now() < deadline) {
+          const rows = await db.$queryRaw<Array<{ waiting: boolean }>>`
+            SELECT EXISTS (
+              SELECT 1 FROM pg_stat_activity
+              WHERE datname = current_database()
+                AND pid <> pg_backend_pid()
+                AND wait_event_type = 'Lock'
+                AND query LIKE '%FOR NO KEY UPDATE%'
+            ) AS waiting`;
+          if (rows[0].waiting) {
+            waiting = true;
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        expect(waiting).toBe(true);
+      } finally {
+        g.release();
+      }
       const settled = await results;
       expect(settled[0].status).toBe('fulfilled');
       expect(settled[1].status).toBe(

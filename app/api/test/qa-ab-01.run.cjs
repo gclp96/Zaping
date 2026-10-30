@@ -162,9 +162,17 @@ function assertRepositoryTarget({
     assert.match(githubSha ?? '', /^[a-f0-9]{40}$/, 'GitHub SHA is required');
     assert.equal(head, githubSha, 'HEAD differs from the GitHub workflow SHA');
   } else {
-    assert.equal(
-      branch,
-      'codex/insap-auto-01b-foundation-receipts',
+    const receiptLinksBranch = branch === 'codex/zfiles-int-02a-receipt-links';
+    if (receiptLinksBranch) {
+      assert.match(
+        expectedHead ?? '',
+        /^[a-f0-9]{40}$/,
+        'Explicit QA SHA required',
+      );
+    }
+    assert.ok(
+      receiptLinksBranch ||
+        branch === 'codex/insap-auto-01b-foundation-receipts',
       'Unexpected local QA branch',
     );
   }

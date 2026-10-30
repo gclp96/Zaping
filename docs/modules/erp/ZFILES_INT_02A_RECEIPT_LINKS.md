@@ -23,7 +23,8 @@ servicio ni sus asignaciones monetarias. Si cancela primero, link devuelve 409;
 si link confirma primero, la cancelación posterior conserva el vínculo y la
 consulta expone status CANCELLED. La serialización es por proveedor y puede
 incrementar espera bajo contención; no se introduce un lock de inventario.
-Los E2E pausan tras adquirir el lock real para probar ambos órdenes con el
+Los E2E pausan tras adquirir el lock y comprueban en pg_stat_activity la espera
+real de la segunda transacción para probar ambos órdenes con el
 servicio real de cancelación. También cubren link/link, unlink/unlink y link/unlink.
 
 ## Migración e índices
@@ -46,16 +47,17 @@ PostgreSQL 16 descartable: contenedor zaping-zfiles-int02a-pg, datos tmpfs,
 - Prisma validate y generate: PASS.
 - Clean install, 51 migraciones: PASS.
 - Upgrade, 50 migraciones de main + una nueva: PASS.
-- Drift: el SQL de Prisma migrate diff es idéntico antes/después respecto a
+- Drift: la salida textual de Prisma migrate diff es idéntico antes/después respecto a
   cada datamodel. Hay drift heredado de nombres en healthcare y conciliación;
-  no es un esquema global sin drift. Evidencia local en .qa/drift-main.sql y
-  .qa/drift-candidate.sql (sin secretos).
+  no es un esquema global sin drift. Evidencia local en .qa/drift-main.txt y
+  .qa/drift-candidate.txt (sin secretos).
 - PostgreSQL y HTTP JWT/RBAC: 12/12 PASS, incluidos índice parcial, seis FK,
   dos triggers, historial, tenant/proveedor, folios duplicados y concurrencia.
 - Regresión API y Web, lint/typecheck/build: resultados finales pendientes
   de consolidación en esta misma nota.
-- Historical upgrade pre-S1: no ejecutado localmente; el launcher existente
-  restringe el nombre de rama local. Su job CI se conserva sin debilitar el guard.
+- Historical upgrade pre-S1: launcher habilitado exclusivamente para esta rama
+  adicional y SHA explícito exacto, con pruebas de rechazo de main/SHA incorrecto.
+  Resultado del upgrade pendiente de consolidación. El job CI se conserva.
 
 Las primeras ejecuciones bajo sandbox fallaron por permisos de caché/engine,
 y la primera inicialización HTTP de tests necesitó importar PrismaModule.
@@ -76,7 +78,7 @@ La suite está opt-in; no se conecta a DB cuando el gate está desactivado.
 Para drift se materializó schema.prisma y las 50 migraciones del SHA baseline
 en .qa/upgrade, se instaló en zfiles_upgrade y se ejecutó migrate diff contra
 ese datamodel; después migrate deploy del candidato y migrate diff contra
-el modelo candidato. Ambos SQL se compararon byte a byte. No se ejecutaron
+el modelo candidato. Ambas salidas se compararon byte a byte. No se ejecutaron
 migraciones inversas ni se alteraron los SQL históricos.
 
 ## Revisión pendiente
