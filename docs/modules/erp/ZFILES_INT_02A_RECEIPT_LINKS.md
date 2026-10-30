@@ -32,6 +32,8 @@ servicio real de cancelación. También cubren link/link, unlink/unlink y link/u
 Se añade exclusivamente 20261027000000_receipt_supplier_document_links.
 Se conservan las FK compuestas, índice parcial PRSDL_active_pair_key
 (companyId, receiptId, documentId) WHERE removedAt IS NULL y triggers de historia.
+El índice nuevo de PurchaseReceipt se crea sin CONCURRENTLY; el coste de locks
+con volumen operativo no se midió y debe revisarse antes de desplegar.
 Los nombres de las seis FK y dos índices normales se mapean explícitamente en
 Prisma. El índice parcial, CHECK y triggers se mantienen en SQL y se verifican
 contra pg_catalog: una comparación Prisma vacía no bastaría para acreditarlos.
@@ -53,17 +55,32 @@ PostgreSQL 16 descartable: contenedor zaping-zfiles-int02a-pg, datos tmpfs,
   .qa/drift-candidate.txt (sin secretos).
 - PostgreSQL y HTTP JWT/RBAC: 12/12 PASS, incluidos índice parcial, seis FK,
   dos triggers, historial, tenant/proveedor, folios duplicados y concurrencia.
-- Regresión API y Web, lint/typecheck/build: resultados finales pendientes
-  de consolidación en esta misma nota.
+- API: 155 suites / 2970 pruebas PASS, incluidas 14 unitarias de vínculos.
+- API typecheck, lint oficial sin autofix y build: PASS.
+  Los launchers .cjs se comprobaron con node --check y 10 pruebas del guard.
+- Web typecheck, lint y build: PASS con NEXT_PUBLIC_API_URL=https://api.example.test.
+- Web amplia: gate FAIL por timeouts/esperas; ejecución detenida tras confirmar
+  fallos en compras, productos, inventario, cotizaciones, usuarios y hospitales.
+  No se acredita el pase de la suite completa ni causalidad con este cambio.
+  La repetición usó pool=forks, maxWorkers=2 y testTimeout=10000 como CI.
+- Web focalizada en documentos/recepciones: 4 suites / 85 pruebas PASS,
+  maxWorkers=1, testTimeout=10000 y la misma URL sintética de CI.
+  Evidencia local: .qa/web-targeted.log.
 - Historical upgrade pre-S1: launcher habilitado exclusivamente para esta rama
   adicional y SHA explícito exacto, con pruebas de rechazo de main/SHA incorrecto.
-  Resultado del upgrade pendiente de consolidación. El job CI se conserva.
+  Guard 10/10 PASS; upgrade 9/9 PASS sobre ece0250204885e7d88dc8642301349082ff9e6b4.
+  El launcher verificó rol no-admin, servidor nuevo tmpfs y destruyó su contenedor.
+  El job CI se conserva.
 
 Las primeras ejecuciones bajo sandbox fallaron por permisos de caché/engine,
 y la primera inicialización HTTP de tests necesitó importar PrismaModule.
-La ejecución PostgreSQL corregida pasó. Web registró timeouts con el límite
-normal de cinco segundos; no deben interpretarse como una regresión demostrada
-ni omitirse del resultado final.
+La ejecución PostgreSQL final tipada pasó (12/12), incluyendo espera real de locks.
+La primera ejecución Web usó cinco segundos y el primer build omitió la URL
+requerida por producción; se repitieron con la configuración exacta de CI.
+El build corregido pasó. Persistieron fallos de tests Web: no se atribuyen
+a la implementación sin evidencia adicional y bloquean el gate. El frontend
+y los lockfiles son idénticos al baseline. No se amplió el alcance para corregirlos.
+Todos los contenedores creados por esta tarea se retiraron; sus datos eran tmpfs.
 
 ## Reproducción
 

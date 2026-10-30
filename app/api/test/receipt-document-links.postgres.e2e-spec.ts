@@ -1,3 +1,4 @@
+import type { Server } from 'node:http';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { Test } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
@@ -24,7 +25,7 @@ jest.setTimeout(30_000);
 describePg('UX-PDOC-01A receipt-document associations PostgreSQL', () => {
   let db: PrismaClient;
   let links: ReceiptDocumentLinksService;
-  let app: INestApplication;
+  let app: INestApplication<Server>;
 
   async function fixture() {
     const companyId = randomUUID();
@@ -145,7 +146,7 @@ describePg('UX-PDOC-01A receipt-document associations PostgreSQL', () => {
       .overrideProvider(PrismaService)
       .useValue(db)
       .compile();
-    app = module.createNestApplication();
+    app = module.createNestApplication<INestApplication<Server>>();
     app.useGlobalPipes(
       new ValidationPipe({ whitelist: true, transform: true }),
     );
@@ -440,17 +441,21 @@ describePg('UX-PDOC-01A receipt-document associations PostgreSQL', () => {
                           await gate;
                           return result;
                         };
-                      const value = Reflect.get(t, k);
+                      const value: unknown = Reflect.get(t, k);
                       return typeof value === 'function'
-                        ? value.bind(t)
+                        ? (...args: unknown[]): unknown =>
+                            Reflect.apply(value, t, args) as unknown
                         : value;
                     },
                   }),
                 ),
               options as never,
             );
-        const value = Reflect.get(target, key);
-        return typeof value === 'function' ? value.bind(target) : value;
+        const value: unknown = Reflect.get(target, key);
+        return typeof value === 'function'
+          ? (...args: unknown[]): unknown =>
+              Reflect.apply(value, target, args) as unknown
+          : value;
       },
     });
     return { client: client as unknown as PrismaService, locked, release };
