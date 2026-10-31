@@ -102,6 +102,25 @@ describe('ReceiptDocumentLinksService', () => {
     );
   });
 
+  it('uses ReadCommitted explicitly for both write operations', async () => {
+    await service.link(companyId, actorId, receiptId, documentId);
+    links.updateMany.mockResolvedValueOnce({ count: 1 });
+    await service.unlink(
+      companyId,
+      actorId,
+      receiptId,
+      documentId,
+      'Documento incorrecto',
+    );
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    for (const call of prisma.$transaction.mock.calls) {
+      expect(call).toEqual([
+        expect.any(Function),
+        { isolationLevel: 'ReadCommitted' },
+      ]);
+    }
+  });
+
   it('rejects linking when the supplier lock finds no tenant-owned supplier', async () => {
     tx.$queryRaw.mockResolvedValueOnce([]);
     await expect(

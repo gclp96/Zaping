@@ -38,69 +38,72 @@ export class ReceiptDocumentLinksService {
     receiptId: string,
     documentId: string,
   ) {
-    return this.prisma.$transaction(async (tx) => {
-      const receipt = await tx.purchaseReceipt.findFirst({
-        where: { id: receiptId, companyId },
-        select: {
-          id: true,
-          purchaseId: true,
-          purchase: { select: { supplierId: true } },
-        },
-      });
-      if (!receipt) {
-        throw new NotFoundException('Recepción no encontrada');
-      }
-
-      // Match reconciliation.execute: supplier lock before reading document status.
-      const locked = await tx.$queryRaw<Array<{ id: string }>>(
-        Prisma.sql`SELECT "id" FROM "Supplier" WHERE "id" = ${receipt.purchase.supplierId} AND "companyId" = ${companyId} FOR NO KEY UPDATE`,
-      );
-      if (locked.length !== 1)
-        throw new NotFoundException('Proveedor no encontrado');
-      const document = await tx.supplierDocument.findFirst({
-        where: { id: documentId, companyId },
-        select: { id: true, supplierId: true, status: true },
-      });
-      if (!document) {
-        throw new NotFoundException('Documento no encontrado');
-      }
-      if (receipt.purchase.supplierId !== document.supplierId) {
-        throw new ConflictException(
-          'El proveedor del documento no coincide con la recepción',
-        );
-      }
-      if (document.status !== 'ACTIVE') {
-        throw new ConflictException(
-          'No se puede vincular un documento cancelado',
-        );
-      }
-
-      // PostgreSQL's partial unique index serializes simultaneous inserts.
-      // createMany/skipDuplicates makes a replay return the existing active link.
-      await tx.purchaseReceiptSupplierDocumentLink.createMany({
-        data: [
-          {
-            companyId,
-            purchaseId: receipt.purchaseId,
-            supplierId: document.supplierId,
-            receiptId,
-            documentId,
-            createdById: actorId,
+    return this.prisma.$transaction(
+      async (tx) => {
+        const receipt = await tx.purchaseReceipt.findFirst({
+          where: { id: receiptId, companyId },
+          select: {
+            id: true,
+            purchaseId: true,
+            purchase: { select: { supplierId: true } },
           },
-        ],
-        skipDuplicates: true,
-      });
+        });
+        if (!receipt) {
+          throw new NotFoundException('Recepción no encontrada');
+        }
 
-      const current = await tx.purchaseReceiptSupplierDocumentLink.findFirst({
-        where: { companyId, receiptId, documentId, removedAt: null },
-      });
-      if (!current) {
-        throw new ConflictException(
-          'No fue posible recuperar el vínculo documental',
+        // Match reconciliation.execute: supplier lock before reading document status.
+        const locked = await tx.$queryRaw<Array<{ id: string }>>(
+          Prisma.sql`SELECT "id" FROM "Supplier" WHERE "id" = ${receipt.purchase.supplierId} AND "companyId" = ${companyId} FOR NO KEY UPDATE`,
         );
-      }
-      return current;
-    });
+        if (locked.length !== 1)
+          throw new NotFoundException('Proveedor no encontrado');
+        const document = await tx.supplierDocument.findFirst({
+          where: { id: documentId, companyId },
+          select: { id: true, supplierId: true, status: true },
+        });
+        if (!document) {
+          throw new NotFoundException('Documento no encontrado');
+        }
+        if (receipt.purchase.supplierId !== document.supplierId) {
+          throw new ConflictException(
+            'El proveedor del documento no coincide con la recepción',
+          );
+        }
+        if (document.status !== 'ACTIVE') {
+          throw new ConflictException(
+            'No se puede vincular un documento cancelado',
+          );
+        }
+
+        // PostgreSQL's partial unique index serializes simultaneous inserts.
+        // createMany/skipDuplicates makes a replay return the existing active link.
+        await tx.purchaseReceiptSupplierDocumentLink.createMany({
+          data: [
+            {
+              companyId,
+              purchaseId: receipt.purchaseId,
+              supplierId: document.supplierId,
+              receiptId,
+              documentId,
+              createdById: actorId,
+            },
+          ],
+          skipDuplicates: true,
+        });
+
+        const current = await tx.purchaseReceiptSupplierDocumentLink.findFirst({
+          where: { companyId, receiptId, documentId, removedAt: null },
+        });
+        if (!current) {
+          throw new ConflictException(
+            'No fue posible recuperar el vínculo documental',
+          );
+        }
+        return current;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+    );
   }
 
   async unlink(
@@ -117,27 +120,34 @@ export class ReceiptDocumentLinksService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const receipt = await tx.purchaseReceipt.findFirst({
-        where: { id: receiptId, companyId },
-        select: { purchase: { select: { supplierId: true } } },
-      });
-      if (!receipt) throw new NotFoundException('Recepción no encontrada');
-      await tx.$queryRaw(
-        Prisma.sql`SELECT "id" FROM "Supplier" WHERE "id" = ${receipt.purchase.supplierId} AND "companyId" = ${companyId} FOR NO KEY UPDATE`,
-      );
-      const changed = await tx.purchaseReceiptSupplierDocumentLink.updateMany({
-        where: { companyId, receiptId, documentId, removedAt: null },
-        data: {
-          removedAt: new Date(),
-          removedById: actorId,
-          reason: normalizedReason,
-        },
-      });
-      if (changed.count === 0)
-        throw new NotFoundException('Vínculo documental activo no encontrado');
-      return { unlinked: true };
-    });
+    return this.prisma.$transaction(
+      async (tx) => {
+        const receipt = await tx.purchaseReceipt.findFirst({
+          where: { id: receiptId, companyId },
+          select: { purchase: { select: { supplierId: true } } },
+        });
+        if (!receipt) throw new NotFoundException('Recepción no encontrada');
+        await tx.$queryRaw(
+          Prisma.sql`SELECT "id" FROM "Supplier" WHERE "id" = ${receipt.purchase.supplierId} AND "companyId" = ${companyId} FOR NO KEY UPDATE`,
+        );
+        const changed = await tx.purchaseReceiptSupplierDocumentLink.updateMany(
+          {
+            where: { companyId, receiptId, documentId, removedAt: null },
+            data: {
+              removedAt: new Date(),
+              removedById: actorId,
+              reason: normalizedReason,
+            },
+          },
+        );
+        if (changed.count === 0)
+          throw new NotFoundException(
+            'Vínculo documental activo no encontrado',
+          );
+        return { unlinked: true };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+    );
   }
 
   private async requireReceipt(companyId: string, receiptId: string) {

@@ -1,3 +1,11 @@
+import {
+  concurrencyActor,
+  ConcurrencyActor,
+  expectAcquired,
+  expectBlocked,
+  settled,
+} from './helpers/receipt-link-concurrency';
+import { SupplierDocumentsService } from '../src/supplier-documents/supplier-documents.service';
 import type { Server } from 'node:http';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { Test } from '@nestjs/testing';
@@ -13,7 +21,7 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaClient, SupplierDocumentType } from '@prisma/client';
+import { Prisma, PrismaClient, SupplierDocumentType } from '@prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ReceiptDocumentLinksService } from '../src/supplier-documents/receipt-document-links.service';
 
@@ -410,143 +418,314 @@ describePg('UX-PDOC-01A receipt-document associations PostgreSQL', () => {
     ).rejects.toThrow();
   });
 
-  // Pause immediately after the real supplier lock, without changing cancellation.
-  function gatedClient() {
-    let acquired!: () => void;
-    let release!: () => void;
-    const locked = new Promise<void>((resolve) => {
-      acquired = resolve;
-    });
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const client = new Proxy(db, {
-      get(target, key) {
-        if (key === '$transaction')
-          return (
-            callback: (tx: unknown) => Promise<unknown>,
-            options: unknown,
-          ) =>
-            target.$transaction(
-              async (tx) =>
-                callback(
-                  new Proxy(tx, {
-                    get(t, k) {
-                      if (k === '$queryRaw')
-                        return async (...args: unknown[]) => {
-                          const result = await (
-                            t.$queryRaw as (...a: unknown[]) => Promise<unknown>
-                          )(...args);
-                          acquired();
-                          await gate;
-                          return result;
-                        };
-                      const value: unknown = Reflect.get(t, k);
-                      return typeof value === 'function'
-                        ? (...args: unknown[]): unknown =>
-                            Reflect.apply(value, t, args) as unknown
-                        : value;
-                    },
-                  }),
-                ),
-              options as never,
-            );
-        const value: unknown = Reflect.get(target, key);
-        return typeof value === 'function'
-          ? (...args: unknown[]): unknown =>
-              Reflect.apply(value, target, args) as unknown
-          : value;
-      },
-    });
-    return { client: client as unknown as PrismaService, locked, release };
+  type Action = 'link' | 'unlink' | 'cancel';
+  const sessions: ConcurrencyActor[] = [];
+
+  afterEach(async () => {
+    await Promise.all(sessions.splice(0).map((session) => session.close()));
+  });
+
+  async function session(hold = false, lockTimeoutMs?: number) {
+    const actor = await concurrencyActor(
+      process.env.DATABASE_URL!,
+      hold,
+      lockTimeoutMs,
+    );
+    sessions.push(actor);
+    return actor;
   }
 
-  it.each(['cancel-first', 'link-first'])(
-    'serializes real cancellation and linking: %s',
-    async (order) => {
-      const f = await fixture();
-      const r = await makeReceipt(f.companyId, f.supplierId);
-      const docs = new (
-        await import('../src/supplier-documents/supplier-documents.service')
-      ).SupplierDocumentsService(db as unknown as PrismaService);
-      const d = await docs.create(f.companyId, f.actorId, randomUUID(), {
-        supplierId: f.supplierId,
-        type: 'FACTURA',
-        number: randomUUID(),
-        documentDate: '2026-10-30',
-        goodsNetAmount: '100.00',
-        currency: 'MXN',
-      });
-      const g = gatedClient();
-      const reconciliation = new SupplierDocumentReconciliationService(
-        order === 'cancel-first' ? g.client : (db as unknown as PrismaService),
+  async function concurrentFixture(initialLink = false) {
+    const f = await fixture();
+    const r = await makeReceipt(f.companyId, f.supplierId);
+    const docs = new SupplierDocumentsService(db as unknown as PrismaService);
+    const d = await docs.create(f.companyId, f.actorId, randomUUID(), {
+      supplierId: f.supplierId,
+      type: 'FACTURA',
+      number: randomUUID(),
+      documentDate: '2026-10-30',
+      goodsNetAmount: '100.00',
+      currency: 'MXN',
+    });
+    if (initialLink)
+      await links.link(f.companyId, f.actorId, r.receiptId, d.id);
+    return { ...f, ...r, documentId: d.id };
+  }
+
+  type ConcurrentFixture = Awaited<ReturnType<typeof concurrentFixture>>;
+
+  function perform(
+    action: Action,
+    actor: ConcurrencyActor,
+    f: ConcurrentFixture,
+  ): Promise<unknown> {
+    const service = new ReceiptDocumentLinksService(actor.client);
+    if (action === 'link')
+      return service.link(f.companyId, f.actorId, f.receiptId, f.documentId);
+    if (action === 'unlink')
+      return service.unlink(
+        f.companyId,
+        f.actorId,
+        f.receiptId,
+        f.documentId,
+        'Desvinculación concurrente revisada',
       );
-      const linkService =
-        order === 'link-first'
-          ? new ReceiptDocumentLinksService(g.client)
-          : links;
-      const cancel = () =>
-        reconciliation.cancelDocument(
-          f.companyId,
-          f.actorId,
-          randomUUID(),
-          d.id,
-          {
-            source: 'INTERNAL_RECORD_ERROR',
-            reason: 'Cancelación de prueba aislada',
-            expectedRevision: 0,
-          },
-        );
-      const link = () =>
-        linkService.link(f.companyId, f.actorId, r.receiptId, d.id);
-      const first = order === 'cancel-first' ? cancel() : link();
-      await g.locked;
-      const second = order === 'cancel-first' ? link() : cancel();
-      // Attach rejection handlers before unlocking to avoid unhandled rejections.
-      const results = Promise.allSettled([first, second]);
-      try {
-        // Prove the second transaction actually reached the conflicting lock.
-        // Starting two promises alone would also pass with sequential scheduling.
-        const deadline = Date.now() + 10_000;
-        let waiting = false;
-        while (Date.now() < deadline) {
-          const rows = await db.$queryRaw<Array<{ waiting: boolean }>>`
-            SELECT EXISTS (
-              SELECT 1 FROM pg_stat_activity
-              WHERE datname = current_database()
-                AND pid <> pg_backend_pid()
-                AND wait_event_type = 'Lock'
-                AND query LIKE '%FOR NO KEY UPDATE%'
-            ) AS waiting`;
-          if (rows[0].waiting) {
-            waiting = true;
-            break;
-          }
-          await new Promise((resolve) => setTimeout(resolve, 20));
-        }
-        expect(waiting).toBe(true);
-      } finally {
-        g.release();
+    return new SupplierDocumentReconciliationService(
+      actor.client,
+    ).cancelDocument(f.companyId, f.actorId, randomUUID(), f.documentId, {
+      source: 'INTERNAL_RECORD_ERROR',
+      expectedRevision: 0,
+      reason: 'Cancelación de prueba aislada',
+    });
+  }
+
+  async function state(f: ConcurrentFixture) {
+    const where = { companyId: f.companyId };
+    const [
+      rows,
+      audits,
+      claims,
+      monetary,
+      receipts,
+      positions,
+      movements,
+      batches,
+    ] = await Promise.all([
+      db.purchaseReceiptSupplierDocumentLink.findMany({
+        where,
+        orderBy: { id: 'asc' },
+      }),
+      db.supplierDocumentAudit.findMany({ where, orderBy: { id: 'asc' } }),
+      db.idempotencyRecord.findMany({ where, orderBy: { id: 'asc' } }),
+      db.purchaseReceiptDocument.findMany({ where, orderBy: { id: 'asc' } }),
+      db.purchaseReceipt.findMany({ where, orderBy: { id: 'asc' } }),
+      db.inventoryPosition.findMany({ where, orderBy: { id: 'asc' } }),
+      db.inventoryMovement.findMany({ where, orderBy: { id: 'asc' } }),
+      db.inventoryBatch.findMany({ where, orderBy: { id: 'asc' } }),
+    ]);
+    return {
+      rows,
+      audits,
+      claims,
+      unchanged: { monetary, receipts, positions, movements, batches },
+    };
+  }
+
+  function committedIsolation(label: string, actors: ConcurrencyActor[]) {
+    expect(new Set(actors.map((actor) => actor.pid)).size).toBe(actors.length);
+    for (const actor of actors) {
+      expect(actor.sessionIsolation).toBe('repeatable read');
+      expect(actor.transactions.length).toBeGreaterThan(0);
+      for (const tx of actor.transactions) {
+        expect(tx.pid).toBe(actor.pid);
+        expect(tx.isolation).toBe('read committed');
       }
-      const settled = await results;
-      expect(settled[0].status).toBe('fulfilled');
-      expect(settled[1].status).toBe(
-        order === 'cancel-first' ? 'rejected' : 'fulfilled',
-      );
-      if (order === 'cancel-first')
-        expect((settled[1] as PromiseRejectedResult).reason).toBeInstanceOf(
-          ConflictException,
-        );
-      const listed = await links.list(f.companyId, r.receiptId);
-      expect(listed).toHaveLength(order === 'cancel-first' ? 0 : 1);
-      if (listed.length) expect(listed[0].document.status).toBe('CANCELLED');
-      expect(
-        await db.purchaseReceiptDocument.count({
-          where: { companyId: f.companyId },
+    }
+    console.info(
+      'CONC_REVIEW_02_TX ' +
+        JSON.stringify({
+          label,
+          sessions: actors.map((actor) => ({
+            pid: actor.pid,
+            defaultIsolation: actor.sessionIsolation,
+            transactions: actor.transactions,
+          })),
         }),
-      ).toBe(0);
+    );
+  }
+
+  it.each([
+    ['link', 'cancel', false],
+    ['cancel', 'link', false],
+    ['unlink', 'cancel', true],
+    ['cancel', 'unlink', true],
+  ] as const)(
+    'uses independent PID barriers: %s before %s',
+    async (firstAction, secondAction, initialLink) => {
+      const f = await concurrentFixture(initialLink);
+      const before = await state(f);
+      const first = await session(true);
+      const second = await session();
+      const firstResult = settled(perform(firstAction, first, f));
+      let secondResult: ReturnType<typeof settled<unknown>> | undefined;
+      try {
+        await expectAcquired(first, firstResult);
+        secondResult = settled(perform(secondAction, second, f));
+        await expectBlocked(
+          db,
+          second,
+          [first],
+          firstAction + '-before-' + secondAction,
+        );
+      } finally {
+        first.release();
+        second.release();
+      }
+      expect((await firstResult).status).toBe('fulfilled');
+      const outcome = await secondResult;
+      const denied = firstAction === 'cancel' && secondAction === 'link';
+      expect(outcome.status).toBe(denied ? 'rejected' : 'fulfilled');
+      if (denied && outcome.status === 'rejected')
+        expect(outcome.reason).toBeInstanceOf(ConflictException);
+      committedIsolation(firstAction + '-before-' + secondAction, [
+        first,
+        second,
+      ]);
+      const after = await state(f);
+      expect(after.audits).toHaveLength(before.audits.length + 1);
+      expect(
+        after.audits.filter((row) => row.operation === 'DOCUMENT_CANCELLED'),
+      ).toHaveLength(1);
+      expect(after.claims).toHaveLength(before.claims.length + 1);
+      expect(after.unchanged).toEqual(before.unchanged);
+      expect(
+        (
+          await db.supplierDocument.findUniqueOrThrow({
+            where: { id: f.documentId },
+          })
+        ).status,
+      ).toBe('CANCELLED');
+      if (denied) expect(after.rows).toEqual([]);
+      else {
+        expect(after.rows).toHaveLength(1);
+        if (initialLink) {
+          expect(after.rows[0].id).toBe(before.rows[0].id);
+          expect(after.rows[0].removedAt).not.toBeNull();
+          expect(after.rows[0].removedById).toBe(f.actorId);
+          expect(after.rows[0].reason).toBe(
+            'Desvinculación concurrente revisada',
+          );
+          expect(await links.list(f.companyId, f.receiptId)).toEqual([]);
+        } else {
+          const listed = await links.list(f.companyId, f.receiptId);
+          expect(listed).toHaveLength(1);
+          expect(listed[0].document.status).toBe('CANCELLED');
+        }
+      }
     },
   );
+
+  it.each(['link', 'unlink'] as const)(
+    'rolls back %s after a real PostgreSQL lock timeout',
+    async (action) => {
+      const f = await concurrentFixture(action === 'unlink');
+      const before = await state(f);
+      const holder = await session(true);
+      const waiter = await session(false, 3_000);
+      const held = settled(
+        holder.client.$transaction(
+          (tx) =>
+            tx.$queryRaw(
+              Prisma.sql`SELECT "id" FROM "Supplier" WHERE "id" = ${f.supplierId} AND "companyId" = ${f.companyId} FOR NO KEY UPDATE`,
+            ),
+          { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+        ),
+      );
+      try {
+        await expectAcquired(holder, held);
+        const timed = settled(perform(action, waiter, f));
+        await expectBlocked(db, waiter, [holder], action + '-timeout');
+        const outcome = await timed;
+        expect(outcome.status).toBe('rejected');
+        if (outcome.status !== 'rejected')
+          throw new Error('Lock timeout was not rejected');
+        expect(outcome.reason).toBeInstanceOf(
+          Prisma.PrismaClientKnownRequestError,
+        );
+        const error = outcome.reason as Prisma.PrismaClientKnownRequestError;
+        expect(error.code).toBe('P2010');
+        expect(error.meta).toEqual(expect.objectContaining({ code: '55P03' }));
+        const [activity] = await db.$queryRaw<
+          Array<{ state: string; xactStart: Date | null }>
+        >`
+        SELECT state, xact_start AS "xactStart" FROM pg_stat_activity WHERE pid = ${waiter.pid}`;
+        expect(activity.state).toBe('idle');
+        expect(activity.xactStart).toBeNull();
+        expect(await state(f)).toEqual(before);
+        console.info(
+          'CONC_REVIEW_02_ROLLBACK ' +
+            JSON.stringify({
+              action,
+              waiterPid: waiter.pid,
+              holderPid: holder.pid,
+              prismaCode: error.code,
+              sqlState: '55P03',
+              idle: true,
+              unchanged: true,
+            }),
+        );
+      } finally {
+        holder.release();
+      }
+      expect((await held).status).toBe('fulfilled');
+      // A fresh operation can commit on the same connection after the rollback.
+      await perform(action, waiter, f);
+      committedIsolation(action + '-timeout-recovery', [holder, waiter]);
+      const after = await state(f);
+      expect(after.audits).toEqual(before.audits);
+      expect(after.claims).toEqual(before.claims);
+      expect(after.unchanged).toEqual(before.unchanged);
+      expect(after.rows).toHaveLength(1);
+      expect(after.rows[0].removedAt === null).toBe(action === 'link');
+    },
+  );
+
+  it('preserves integrity under a small queue of mixed independent operations', async () => {
+    const f = await concurrentFixture(true);
+    const before = await state(f);
+    const holder = await session(true);
+    const unlinker = await session();
+    const linker = await session();
+    const canceller = await session();
+    const outcomes: Array<ReturnType<typeof settled<unknown>>> = [
+      settled(perform('link', holder, f)),
+    ];
+    try {
+      await expectAcquired(holder, outcomes[0]);
+      outcomes.push(settled(perform('unlink', unlinker, f)));
+      await expectBlocked(db, unlinker, [holder], 'queue-unlink');
+      outcomes.push(settled(perform('link', linker, f)));
+      await expectBlocked(db, linker, [holder, unlinker], 'queue-link');
+      outcomes.push(settled(perform('cancel', canceller, f)));
+      await expectBlocked(
+        db,
+        canceller,
+        [holder, unlinker, linker],
+        'queue-cancel',
+      );
+    } finally {
+      holder.release();
+    }
+    const results = await Promise.all(outcomes);
+    expect(results[0].status).toBe('fulfilled');
+    expect(results[1].status).toBe('fulfilled');
+    expect(results[3].status).toBe('fulfilled');
+    if (results[2].status === 'rejected')
+      expect(results[2].reason).toBeInstanceOf(ConflictException);
+    committedIsolation('small-mixed-queue', [
+      holder,
+      unlinker,
+      linker,
+      canceller,
+    ]);
+    const after = await state(f);
+    expect(
+      after.rows.filter((row) => row.removedAt === null).length,
+    ).toBeLessThanOrEqual(1);
+    expect(after.rows.filter((row) => row.removedAt !== null)).toHaveLength(1);
+    expect(after.rows.length).toBeGreaterThanOrEqual(1);
+    expect(after.rows.length).toBeLessThanOrEqual(2);
+    expect(after.audits).toHaveLength(before.audits.length + 1);
+    expect(after.claims).toHaveLength(before.claims.length + 1);
+    expect(after.unchanged).toEqual(before.unchanged);
+    expect(
+      (
+        await db.supplierDocument.findUniqueOrThrow({
+          where: { id: f.documentId },
+        })
+      ).status,
+    ).toBe('CANCELLED');
+  });
 
   it('serializes overlapping link/unlink and allows a new audited link afterward', async () => {
     const f = await fixture();
