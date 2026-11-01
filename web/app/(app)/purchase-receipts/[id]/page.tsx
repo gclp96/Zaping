@@ -7,6 +7,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -41,6 +42,7 @@ import {
   getReceiptResponsibleLabel,
 } from '../receipt-display';
 import { getPurchaseReceiptInventoryHref } from '../receipt-navigation';
+import ReceiptSupplierDocuments from '../ReceiptSupplierDocuments';
 import type {
   PurchaseReceiptDetail,
   ReceiptEquipmentAsset,
@@ -101,8 +103,10 @@ export default function PurchaseReceiptDetailPage() {
   const [receipt, setReceipt] = useState<PurchaseReceiptDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const requestGeneration = useRef(0);
 
   const loadReceipt = useCallback(async () => {
+    const generation = ++requestGeneration.current;
     try {
       setLoading(true);
       setError('');
@@ -111,6 +115,7 @@ export default function PurchaseReceiptDetailPage() {
       const response = await api.get<PurchaseReceiptDetail>(
         `/purchase-receipts/${id}`,
       );
+      if (generation !== requestGeneration.current) return;
 
       // Do not render a partial detail or flatten missing related collections.
       const detail = response.data;
@@ -132,6 +137,7 @@ export default function PurchaseReceiptDetailPage() {
 
       setReceipt(response.data);
     } catch (requestError: unknown) {
+      if (generation !== requestGeneration.current) return;
       setError(
         getApiErrorMessage(
           requestError,
@@ -139,13 +145,14 @@ export default function PurchaseReceiptDetailPage() {
         ),
       );
     } finally {
-      setLoading(false);
+      if (generation === requestGeneration.current) setLoading(false);
     }
   }, [id]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadReceipt();
+    return () => { requestGeneration.current += 1; };
   }, [loadReceipt]);
 
   const equipmentRows = useMemo<EquipmentRow[]>(
@@ -413,9 +420,14 @@ export default function PurchaseReceiptDetailPage() {
           </DetailField>
           <DetailField label="Responsable">{responsible}</DetailField>
           <DetailField label="Documento proveedor">
-            {receipt.supplierDocumentType && receipt.supplierDocumentNumber
-              ? `${receipt.supplierDocumentType.replace('_', ' ')} · ${receipt.supplierDocumentNumber}`
-              : 'Sin documento registrado'}
+            <ReceiptSupplierDocuments
+              receiptId={receipt.id}
+              legacyReference={
+                receipt.supplierDocumentType && receipt.supplierDocumentNumber
+                  ? `${receipt.supplierDocumentType.replace('_', ' ')} · ${receipt.supplierDocumentNumber}`
+                  : null
+              }
+            />
           </DetailField>
           <DetailField label="Notas" wide>
             {receipt.notes || 'Sin notas'}
