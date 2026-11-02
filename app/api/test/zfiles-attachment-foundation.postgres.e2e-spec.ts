@@ -62,7 +62,8 @@ describePg('ZFILES-R2-01 private attachment PostgreSQL security', () => {
 
   beforeAll(async () => {
     const raw = process.env.DATABASE_URL;
-    const isCi = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true';
+    const isCi =
+      process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true';
     if (!raw || !isCi) {
       throw new Error('ZFILES E2E requires ephemeral GitHub Actions');
     }
