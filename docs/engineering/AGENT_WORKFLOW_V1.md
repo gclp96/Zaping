@@ -54,18 +54,18 @@ Estos estados **no** están sincronizados automáticamente por la V1.
 - Issue #196: el agente inició, pero su herramienta de ejecución fue rechazada por la implementación **Windows unelevated restricted-token**: `cannot enforce split writable root sets directly; refusing to run unsandboxed`.
 - El agente no pudo leer el repositorio ni agregar el test; ninguna validación se ejecutó y el worktree quedó sin cambios.
 - El lanzador anterior imprimió por error `Ejecución local terminada` pese al bloqueo. Esta revisión cambia la clasificación a `BLOCKED_OR_INCOMPLETE` si faltan cambios, hay eventos de error, termina con código no cero o no existe evento `turn.completed`. Conserva el worktree y devuelve exit code distinto de cero.
-- **La corrección del reporte no arregla el sandbox de Windows.** No desactivar las restricciones para hacer pasar la tarea.
+- La corrección distingue fallos reales y configura **MXC** para ejecuciones de Codex en Windows, conservando el sandbox `workspace-write`. MXC debe funcionar en el equipo antes de reintentar; no desactivar restricciones para hacer pasar la tarea.
 - Diagnóstico seguro recomendado: comprobar si el equipo soporta MXC, sin cambiar configuración permanente:
   ```powershell
   codex -c windows.sandbox=mxc sandbox --include-managed-config --permission-profile :workspace -- cmd.exe /d /c echo MXC_OK
   $LASTEXITCODE
   ```
-  Si imprime `MXC_OK` y código 0, revisar la posibilidad de usar MXC desde Codex CLI. Si no es compatible, considerar el sandbox `elevated` con configuración administrada o WSL2; nunca `danger-full-access` como solución.
-- Un reintento del mismo issue no debe sobrescribir el worktree anterior. Antes de liberar una rama, confirmar ausencia de cambios con `git -C <ruta-worktree> status --short` y revisar `git worktree list`. No eliminar resultados ni cambios de otros pilotos.
+  En el equipo del piloto #196, la comprobación devolvió **MXC_OK y código 0**. El lanzador actualizado selecciona `-c windows.sandbox=mxc` en Windows. La prueba de sandbox puntual **no equivale** a una ejecución `codex exec` de principio a fin. En otros equipos, comprobar compatibilidad; si MXC falla, considerar `elevated` con configuración administrada o WSL2, nunca `danger-full-access`.
+- Cada intento genera un archivo de instrucciones con nombre único, sin sobrescribir prompts previos. Un reintento del mismo issue no debe sobrescribir el worktree anterior. Antes de liberar una rama, confirmar ausencia de cambios con `git -C <ruta-worktree> status --short` y revisar `git worktree list`. No eliminar resultados ni cambios de otros pilotos.
 
 ## Evidencia y siguiente corte
 - Prueba de contrato: `node --test scripts/agents/issue-contract.test.mjs` (contrato, argumentos y resultados; comprobar en el equipo/CI antes de aceptar).
 - Sintaxis del lanzador: `node --check scripts/agents/run-task.mjs`.
-- **Verificado:** autenticación `gh`, contrato y argv Codex en Windows. **Bloqueado:** ejecución de herramientas por sandbox unelevated. Aún no hay implementación del issue #196, PR producido por el agente ni CI remota atribuible a una entrega suya.
+- **Verificado:** autenticación `gh`, contrato y argv Codex en Windows; MXC con `MXC_OK` y salida 0; worktree anterior limpio (`git status --short` sin salida). **Pendiente:** ensayo completo con Codex en MXC y validaciones del módulo. Aún no hay implementación del issue #196, PR producido por el agente ni CI remota atribuible a una entrega suya.
 - Medir por issue: minutos activos humanos, tiempo total, ejecuciones de pruebas, errores, intervenciones, costo y retrabajo.
 - Incremento posterior: revisión independiente de QA, creación autorizada de PR draft y eventualmente orquestación programática. No introducir esto antes de probar la V1.
