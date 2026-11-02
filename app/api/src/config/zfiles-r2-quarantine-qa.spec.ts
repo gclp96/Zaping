@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import {
   createSyntheticQuarantinePdf,
   createZfilesQuarantineQaClient,
@@ -40,10 +44,12 @@ describe('ZFILES-R2-03A quarantine QA transport', () => {
     { R2_JURISDICTION: 'fedramp-high' },
     { R2_ACCOUNT_ID: 'bad' },
   ])('rejects unsafe QA configuration %j', (patch) => {
-    expect(() => requireZfilesQuarantineQaConfig({
-      ...validEnv,
-      ...patch,
-    })).toThrow();
+    expect(() =>
+      requireZfilesQuarantineQaConfig({
+        ...validEnv,
+        ...patch,
+      }),
+    ).toThrow();
   });
 
   it('uses explicit credentials and does not create a live connection', () => {
@@ -61,10 +67,12 @@ describe('ZFILES-R2-03A quarantine QA transport', () => {
       { R2_QUARANTINE_WRITE_ACCESS_KEY_ID: '' },
       { R2_QUARANTINE_WRITE_SECRET_ACCESS_KEY: '' },
     ]) {
-      expect(() => createZfilesQuarantineQaClient({
-        ...validEnv,
-        ...patch,
-      })).toThrow();
+      expect(() =>
+        createZfilesQuarantineQaClient({
+          ...validEnv,
+          ...patch,
+        }),
+      ).toThrow();
     }
   });
 
@@ -119,7 +127,9 @@ describe('ZFILES-R2-03A quarantine QA transport', () => {
     expect(result.key).toBe(key);
     expect(result.sizeBytes).toBe(uploaded?.length);
     expect(result.sha256).toBe(
-      createHash('sha256').update(uploaded as Buffer).digest('hex'),
+      createHash('sha256')
+        .update(uploaded as Buffer)
+        .digest('hex'),
     );
   });
 
@@ -163,10 +173,10 @@ describe('ZFILES-R2-03A quarantine QA transport', () => {
     const config = requireZfilesQuarantineQaConfig(validEnv);
     const send = jest.fn();
     await expect(
-      writeAndVerifyQuarantineQaFixture(
-        { send } as unknown as S3Client,
-        { ...config, bucket: 'zaping-private-qa' as 'zaping-quarantine-qa' },
-      ),
+      writeAndVerifyQuarantineQaFixture({ send } as unknown as S3Client, {
+        ...config,
+        bucket: 'zaping-private-qa' as 'zaping-quarantine-qa',
+      }),
     ).rejects.toThrow('quarantine bucket');
     expect(send).not.toHaveBeenCalled();
   });
