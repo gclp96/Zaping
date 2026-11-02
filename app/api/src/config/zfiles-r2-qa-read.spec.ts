@@ -29,9 +29,7 @@ function fixtureEnvironment(patch: NodeJS.ProcessEnv = {}) {
     R2_QA_FIXTURE_COMPANY_ID: companyId,
     R2_QA_FIXTURE_OBJECT_KEY: objectKey,
     R2_QA_FIXTURE_SIZE_BYTES: String(payload.length),
-    R2_QA_FIXTURE_SHA256: createHash('sha256')
-      .update(payload)
-      .digest('hex'),
+    R2_QA_FIXTURE_SHA256: createHash('sha256').update(payload).digest('hex'),
     R2_READ_ACCESS_KEY_ID: accessKey,
     R2_READ_SECRET_ACCESS_KEY: secretKey,
     ...patch,
@@ -40,9 +38,8 @@ function fixtureEnvironment(patch: NodeJS.ProcessEnv = {}) {
 
 describe('ZFILES-R2-02B read-only R2 QA transport', () => {
   it('creates explicit-credential S3 client without any request', async () => {
-    const { client, fixture } = createZfilesR2QaReadClient(
-      fixtureEnvironment(),
-    );
+    const { client, fixture } =
+      createZfilesR2QaReadClient(fixtureEnvironment());
     try {
       expect(client).toBeInstanceOf(S3Client);
       expect(await client.config.region()).toBe('auto');
@@ -60,7 +57,9 @@ describe('ZFILES-R2-02B read-only R2 QA transport', () => {
     { R2_QA_FIXTURE_COMPANY_ID: documentId },
     { CI: 'true' },
   ])('fails closed before creating the SDK client: %j', (patch) => {
-    expect(() => createZfilesR2QaReadClient(fixtureEnvironment(patch))).toThrow();
+    expect(() =>
+      createZfilesR2QaReadClient(fixtureEnvironment(patch)),
+    ).toThrow();
   });
 
   it('does not print access credentials or the object key in errors', () => {
@@ -124,11 +123,10 @@ describe('ZFILES-R2-02B read-only R2 QA transport', () => {
   });
 
   it('requests only the exact synthetic QA key with read commands', async () => {
-    const { client, fixture } = createZfilesR2QaReadClient(
-      fixtureEnvironment(),
-    );
+    const { client, fixture } =
+      createZfilesR2QaReadClient(fixtureEnvironment());
     const bytes = Buffer.from('ZAPING-R2-QA-SYNTHETIC-ONLY');
-    const send = jest.fn(async (command: unknown) => {
+    const send = jest.fn((command: unknown) => {
       if (command instanceof ListObjectsV2Command) {
         expect(command.input).toEqual({
           Bucket: 'zaping-private-qa',
@@ -157,10 +155,9 @@ describe('ZFILES-R2-02B read-only R2 QA transport', () => {
   });
 
   it('refuses to fetch when exact synthetic object is absent', async () => {
-    const { client, fixture } = createZfilesR2QaReadClient(
-      fixtureEnvironment(),
-    );
-    const send = jest.fn(async () => ({ Contents: [{ Key: 'other' }] }));
+    const { client, fixture } =
+      createZfilesR2QaReadClient(fixtureEnvironment());
+    const send = jest.fn(() => ({ Contents: [{ Key: 'other' }] }));
     try {
       await expect(
         verifyZfilesR2QaObject({ send } as unknown as S3Client, fixture),
@@ -170,5 +167,4 @@ describe('ZFILES-R2-02B read-only R2 QA transport', () => {
       client.destroy();
     }
   });
-
 });
