@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Human-gated local dispatcher for one GitHub issue to one Codex worktree. */
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
@@ -78,7 +78,7 @@ function main() {
   const base = call('git', ['rev-parse', 'refs/remotes/origin/main']);
   mkdirSync(resolve(runDir, '..'), { recursive: true });
   call('git', ['worktree', 'add', '-b', branch, runDir, 'refs/remotes/origin/main']);
-  const promptPath = join(resolve(runDir, '..'), `issue-${number}-prompt.txt`);
+  const promptPath = join(resolve(runDir, '..'), `issue-${number}-${randomUUID()}-prompt.txt`);
   // Write outside the Git worktree to avoid accidental inclusion in a commit.
   writeFileSync(promptPath, prompt, { encoding: 'utf8', flag: 'wx' });
   process.stdout.write(`Issue #${number} | base ${base} | branch ${branch}\nWorktree: ${runDir}\nPrompt: ${promptPath}\n`);
