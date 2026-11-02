@@ -1,6 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { inspectSupplierAttachment } from '../supplier-documents/supplier-document-attachment-validation';
 import { verifyZfilesR2QaBody } from './zfiles-r2-qa-read';
 
@@ -77,8 +81,7 @@ export function createSyntheticQuarantinePdf(): {
   const companyId = randomUUID();
   const documentId = randomUUID();
   const attachmentId = randomUUID();
-  const key =
-    'quarantine/' + companyId + '/' + documentId + '/' + attachmentId;
+  const key = 'quarantine/' + companyId + '/' + documentId + '/' + attachmentId;
   const bytes = Buffer.from(
     '%PDF-1.4\n% ZAPING SYNTHETIC QA ' +
       randomUUID() +
