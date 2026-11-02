@@ -10,7 +10,7 @@ const describePg =
     ? describe
     : describe.skip;
 
-describePg('ZFILES-R2-01 private attachment foundation (disposable PostgreSQL)', () => {
+describePg('ZFILES-R2-01 private attachment PostgreSQL security', () => {
   let db: PrismaClient;
 
   async function fixture() {
@@ -62,8 +62,9 @@ describePg('ZFILES-R2-01 private attachment foundation (disposable PostgreSQL)',
 
   beforeAll(async () => {
     const raw = process.env.DATABASE_URL;
-    if (!raw || process.env.CI !== 'true' || process.env.GITHUB_ACTIONS !== 'true') {
-      throw new Error('ZFILES PostgreSQL E2E requires GitHub Actions ephemeral CI');
+    const isCi = process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true';
+    if (!raw || !isCi) {
+      throw new Error('ZFILES E2E requires ephemeral GitHub Actions');
     }
     const target = new URL(raw);
     if (
@@ -85,7 +86,7 @@ describePg('ZFILES-R2-01 private attachment foundation (disposable PostgreSQL)',
     await db?.$disconnect();
   });
 
-  it('creates PENDING_SCAN metadata, never bytes or a public URL', async () => {
+  it('creates pending metadata without bytes or URLs', async () => {
     const f = await fixture();
     const row = await db.supplierDocumentAttachment.create({
       data: metadata(f),
@@ -98,7 +99,7 @@ describePg('ZFILES-R2-01 private attachment foundation (disposable PostgreSQL)',
     expect(fields).not.toContain('publicUrl');
   });
 
-  it('rejects a forged AVAILABLE insert and forged pending scan fields', async () => {
+  it('rejects forged AVAILABLE and scan fields', async () => {
     const f = await fixture();
     await expect(
       db.supplierDocumentAttachment.create({
@@ -117,7 +118,7 @@ describePg('ZFILES-R2-01 private attachment foundation (disposable PostgreSQL)',
     ).rejects.toThrow();
   });
 
-  it('rejects spoofed scan promotion through both Prisma and raw SQL', async () => {
+  it('rejects forged promotion via Prisma and raw SQL', async () => {
     const f = await fixture();
     const row = await db.supplierDocumentAttachment.create({
       data: metadata(f),
@@ -143,11 +144,13 @@ describePg('ZFILES-R2-01 private attachment foundation (disposable PostgreSQL)',
     const persisted = await db.supplierDocumentAttachment.findUniqueOrThrow({
       where: { id: row.id },
     });
-    expect(persisted.status).toBe(SupplierDocumentAttachmentStatus.PENDING_SCAN);
+    expect(persisted.status).toBe(
+      SupplierDocumentAttachmentStatus.PENDING_SCAN,
+    );
     expect(persisted.scanEngine).toBeNull();
   });
 
-  it('rejects overwriting the object identity, hash, metadata or deleting a row', async () => {
+  it('rejects metadata changes and physical deletion', async () => {
     const f = await fixture();
     const row = await db.supplierDocumentAttachment.create({
       data: metadata(f),
@@ -189,7 +192,7 @@ describePg('ZFILES-R2-01 private attachment foundation (disposable PostgreSQL)',
     ).rejects.toThrow();
   });
 
-  it('denies invalid MIME, size, digest and duplicate private keys', async () => {
+  it('rejects invalid MIME, size, SHA and duplicate keys', async () => {
     const f = await fixture();
     const valid = metadata(f);
     await db.supplierDocumentAttachment.create({ data: valid });
