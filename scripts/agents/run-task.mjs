@@ -85,7 +85,7 @@ function main() {
   const expectedHead = call('git', ['rev-parse', 'HEAD'], { cwd: runDir });
   const start = Date.now();
   process.stdout.write('Codex iniciado. Se capturará su salida JSONL y se evaluará el resultado antes de declarar éxito.\n');
-  const result = spawnSync(codex, [...codexExecArgs().slice(0, -1), '--json', '-'], {
+  const result = spawnSync(codex, codexExecArgs(), {
     cwd: runDir, input: prompt, encoding: 'utf8', stdio: ['pipe','pipe','pipe'],
     maxBuffer: 32 * 1024 * 1024,
     shell: process.platform === 'win32',
