@@ -1,4 +1,6 @@
-import { SUPPLIER_ATTACHMENT_MAX_BYTES } from '../supplier-documents/supplier-document-attachment-validation';
+import {
+  SUPPLIER_ATTACHMENT_MAX_BYTES,
+} from '../supplier-documents/supplier-document-attachment-validation';
 
 const UUID =
   '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
