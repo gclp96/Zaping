@@ -75,6 +75,7 @@ function main() {
   // Write outside the Git worktree to avoid accidental inclusion in a commit.
   writeFileSync(promptPath, prompt, { encoding: 'utf8', flag: 'wx' });
   process.stdout.write(`Issue #${number} | base ${base} | branch ${branch}\nWorktree: ${runDir}\nPrompt: ${promptPath}\n`);
+  const expectedHead = call('git', ['rev-parse', 'HEAD'], { cwd: runDir });
   const start = Date.now();
   const result = spawnSync(codex, ['exec', '--sandbox', 'workspace-write', '--ask-for-approval', 'never', '-'], {
     cwd: runDir, input: prompt, encoding: 'utf8', stdio: ['pipe','inherit','inherit'],
@@ -83,6 +84,8 @@ function main() {
   process.stdout.write(`\nDuración: ${Math.round((Date.now() - start) / 1000)} s\n`);
   const status = spawnSync('git', ['status', '--short'], {cwd: runDir, encoding: 'utf8'});
   process.stdout.write(`Estado del worktree:\n${status.stdout ?? '(no disponible)'}\n`);
+  const actualHead = call('git', ['rev-parse', 'HEAD'], { cwd: runDir });
+  if (actualHead !== expectedHead) fail('Codex cambió HEAD (commit/rebase/checkout). Detener y revisar manualmente; no publicar.');
   if (result.error) fail(`Error al iniciar Codex: ${result.error.message}`);
   if (result.status !== 0) fail(`Codex terminó con código ${result.status}; conservar worktree para diagnóstico`);
   process.stdout.write('Ejecución local terminada. Revisar diff y CI antes de cualquier PR/merge.\n');
