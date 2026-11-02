@@ -62,7 +62,10 @@ describe('ZFILES-R2-02A QA-only R2 fixture policy', () => {
     { R2_QA_FIXTURE_OBJECT_KEY: `quarantine/${objectKey}` },
     { R2_QA_FIXTURE_OBJECT_KEY: 'https://example.invalid/a.pdf' },
     { R2_QA_FIXTURE_OBJECT_KEY: `${objectKey}/../evil` },
-    { R2_QA_FIXTURE_OBJECT_KEY: `private/${documentId}/${documentId}/${attachmentId}` },
+    {
+      R2_QA_FIXTURE_OBJECT_KEY:
+        `private/${documentId}/${documentId}/${attachmentId}`,
+    },
     { R2_QA_FIXTURE_OBJECT_KEY: `${objectKey} ` },
     { R2_QA_FIXTURE_SIZE_BYTES: '0' },
     { R2_QA_FIXTURE_SIZE_BYTES: '1e3' },
