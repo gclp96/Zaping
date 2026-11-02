@@ -9,7 +9,7 @@
 
 El validador acepta:
 - Opt-in local explícito `RUN_CLOUDFLARE_R2_QA_SMOKE=1`; rechaza `CI=true` o `GITHUB_ACTIONS=true`.
-- Account ID hexadecimal de 32 caracteres y `R2_JURISDICTION` permitido (`default`, `eu`, `us`, `fedramp`, `fedramp-high`).
+- Account ID hexadecimal de 32 caracteres y `R2_JURISDICTION` permitido (`default`, `eu`, `us`, `fedramp`).
 - Buckets exactos `zaping-private-qa` y `zaping-quarantine-qa`.
 - Clave del objeto `private/<companyUUID>/<documentUUID>/<attachmentUUID>` con Company exacta.
 - Hash SHA-256 minúsculo de 64 caracteres y tamaño de **1 a 10 MiB**.
