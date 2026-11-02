@@ -4,9 +4,7 @@ import {
 } from '../src/config/zfiles-r2-qa-read';
 
 const describeQa =
-  process.env.RUN_CLOUDFLARE_R2_QA_SMOKE === '1'
-    ? describe
-    : describe.skip;
+  process.env.RUN_CLOUDFLARE_R2_QA_SMOKE === '1' ? describe : describe.skip;
 
 /**
  * Optional, local-only network smoke test. Must NEVER run in CI or with
