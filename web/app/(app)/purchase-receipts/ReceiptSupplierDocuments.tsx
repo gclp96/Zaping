@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useAuthenticatedSession } from '@/app/auth-session';
 import { hasRole, MANAGEMENT_ROLES } from '@/app/erp-role-access';
@@ -9,46 +9,8 @@ import Button from '@/app/components/ui/Button';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 
-type LinkedSupplierDocument = {
-  id: string;
-  receiptId: string;
-  documentId: string;
-  document: {
-    id: string;
-    type: 'FACTURA' | 'REMISION' | 'NOTA_ENTREGA';
-    series: string | null;
-    number: string;
-    status: 'ACTIVE' | 'CANCELLED';
-  };
-};
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function nonempty(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
-function validLinks(value: unknown, receiptId: string): value is LinkedSupplierDocument[] {
-  if (!Array.isArray(value)) return false;
-  const ids = new Set<string>();
-  const documents = new Set<string>();
-  return value.every((link: unknown) => {
-    if (!isRecord(link) || !isRecord(link.document)) return false;
-    const doc = link.document;
-    if (!nonempty(link.id) || !nonempty(doc.id) ||
-      link.receiptId !== receiptId || link.documentId !== doc.id ||
-      !nonempty(doc.number) || !(doc.series === null || typeof doc.series === 'string') ||
-      typeof doc.type !== 'string' || !['FACTURA', 'REMISION', 'NOTA_ENTREGA'].includes(doc.type) ||
-      typeof doc.status !== 'string' || !['ACTIVE', 'CANCELLED'].includes(doc.status) ||
-      (link.removedAt !== undefined && link.removedAt !== null) ||
-      ids.has(link.id) || documents.has(doc.id)) return false;
-    ids.add(link.id);
-    documents.add(doc.id);
-    return true;
-  });
-}
+import { validLinks, type LinkedSupplierDocument } from './receipt-document-contract';
+import ExistingSupplierDocumentPicker from './ExistingSupplierDocumentPicker';
 
 function documentLabel(document: LinkedSupplierDocument['document']) {
   const number = [document.series, document.number].filter(Boolean).join('-');
@@ -58,8 +20,10 @@ function documentLabel(document: LinkedSupplierDocument['document']) {
 export default function ReceiptSupplierDocuments({
   receiptId,
   legacyReference,
+  supplierId,
 }: {
   receiptId: string;
+  supplierId: string;
   legacyReference: string | null;
 }) {
   const session = useAuthenticatedSession();
@@ -67,18 +31,29 @@ export default function ReceiptSupplierDocuments({
   const canView = hasRole(role, MANAGEMENT_ROLES);
   // Reset synchronously on receipt, actor, tenant and permission changes.
   const identity = session.status === 'success'
-    ? JSON.stringify([receiptId, session.user.companyId, session.user.id, role])
+    ? JSON.stringify([receiptId, supplierId, session.user.companyId, session.user.id, role])
     : session.status;
   return <DocumentLinks key={identity} receiptId={receiptId}
-    legacyReference={legacyReference} session={session} canView={canView} />;
+    supplierId={supplierId} legacyReference={legacyReference} session={session} canView={canView} />;
 }
 
-function DocumentLinks({ receiptId, legacyReference, session, canView }: {
+function DocumentLinks({ receiptId, supplierId, legacyReference, session, canView }: {
   receiptId: string;
+  supplierId: string;
   legacyReference: string | null;
   session: ReturnType<typeof useAuthenticatedSession>;
   canView: boolean;
 }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const restoreFocus = useRef(false);
+  useEffect(() => {
+    if (restoreFocus.current && trigger.current && !pickerOpen) {
+      trigger.current.focus();
+      restoreFocus.current = false;
+    }
+  });
+  const closePicker = () => { restoreFocus.current = true; setPickerOpen(false); };
   const [links, setLinks] = useState<LinkedSupplierDocument[] | null>(null);
   const [error, setError] = useState('');
   const [reload, setReload] = useState(0);
@@ -167,6 +142,22 @@ function DocumentLinks({ receiptId, legacyReference, session, canView }: {
             ? 'Referencia documental sin vínculo por ID. No se puede abrir por folio.'
             : 'Sin documento vinculado por ID.'}
         </p>
+      )}
+
+      {canView && session.status === 'success' && !error && links !== null && (
+        <div className="mt-3 space-y-3 border-t border-border pt-3">
+          <button ref={trigger} type="button" disabled={pickerOpen}
+            className="rounded-lg border border-border px-3 py-2 font-medium text-blue-700 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-4"
+            onClick={() => setPickerOpen(true)}>
+            Vincular documento existente
+          </button>
+          {pickerOpen && <ExistingSupplierDocumentPicker
+            receiptId={receiptId} supplierId={supplierId} companyId={session.user.companyId}
+            onClose={closePicker}
+            onLinksLoaded={setLinks}
+            onLinked={() => { closePicker(); setLinks(null); setReload(value => value + 1); }}
+          />}
+        </div>
       )}
 
       {canView && !error && links && links.length > 0 && (
