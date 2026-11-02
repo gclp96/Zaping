@@ -1,5 +1,6 @@
 import {
   cleanup,
+  act,
   render,
   screen,
   within,
@@ -29,13 +30,24 @@ vi.mock('@/services/api', () => ({
   },
 }));
 
+vi.mock('../ReceiptSupplierDocuments', () => ({
+  default: ({ legacyReference }: { legacyReference: string | null }) => (
+    <span>
+      {legacyReference
+        ? `Referencia registrada: ${legacyReference}`
+        : 'Sin documento vinculado por ID.'}
+    </span>
+  ),
+}));
+
 vi.mock('@/services/errors', () => ({
   getApiErrorMessage: (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback,
 }));
 
+const route = vi.hoisted(() => ({ id: 'receipt-quantity' }));
 vi.mock('next/navigation', () => ({
-  useParams: () => ({ id: 'receipt-quantity' }),
+  useParams: () => ({ id: route.id }),
 }));
 
 const product = {
@@ -189,6 +201,7 @@ let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 describe('PurchaseReceiptDetailPage', () => {
   beforeEach(() => {
+    route.id = 'receipt-quantity';
     vi.clearAllMocks();
     vi.mocked(api.get).mockResolvedValue({ data: quantityReceipt } as never);
     consoleErrorSpy = vi
@@ -200,6 +213,25 @@ describe('PurchaseReceiptDetailPage', () => {
     consoleErrorSpy.mockRestore();
     cleanup();
     vi.unstubAllEnvs();
+  });
+
+  it.each(['success', 'failure'] as const)('ignores late receipt %s after navigating to another reception', async (outcome) => {
+    let resolve!: (value: unknown) => void;
+    let reject!: (error: Error) => void;
+    const pending = new Promise((yes, no) => { resolve = yes; reject = no; });
+    vi.mocked(api.get).mockReturnValueOnce(pending as never)
+      .mockResolvedValueOnce({ data: { ...quantityReceipt, id: 'receipt-next', folio: 'REC-NEXT' } } as never);
+    const view = render(<PurchaseReceiptDetailPage />);
+    route.id = 'receipt-next';
+    view.rerender(<PurchaseReceiptDetailPage />);
+    await screen.findByRole('heading', { name: 'Recepción REC-NEXT' });
+    await act(async () => {
+      if (outcome === 'success') resolve({ data: quantityReceipt });
+      else reject(new Error('late receipt HTTP error'));
+      await pending.catch(() => undefined);
+    });
+    expect(screen.getByRole('heading', { name: 'Recepción REC-NEXT' })).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('oculta Zaping Files cuando la bandera no está habilitada', async () => {
@@ -374,7 +406,7 @@ describe('PurchaseReceiptDetailPage', () => {
     const table = await screen.findByRole('table', { name: 'Partidas recibidas' });
     expect(within(table).getByText(lotLabel!)).toBeTruthy();
     expect(within(table).getByText(expiryLabel!)).toBeTruthy();
-    expect(screen.getByText('Sin documento registrado')).toBeTruthy();
+    expect(screen.getByText('Sin documento vinculado por ID.')).toBeTruthy();
     expect(screen.getByRole('region', { name: 'Partidas recibidas desplazables' }).getAttribute('tabindex')).toBe('0');
   });
 
@@ -386,7 +418,7 @@ describe('PurchaseReceiptDetailPage', () => {
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.queryByText('BLUNT TIP')).toBeNull();
     resolveReceipt({ data: { ...quantityReceipt, supplierDocumentType: 'FACTURA', supplierDocumentNumber: null } });
-    expect(await screen.findByText('Sin documento registrado')).toBeTruthy();
+    expect(await screen.findByText('Sin documento vinculado por ID.')).toBeTruthy();
     expect(screen.queryByText('FACTURA')).toBeNull();
   });
 
@@ -420,7 +452,7 @@ it('presenta caducidad conocida sin lote ni Batch, conservando documento del pro
     items: [{ ...quantityReceipt.items[0], lotNumber: null, batchId: null, batch: null, expirationDate: '2028-12-31T00:00:00.000Z' }],
   } } as never);
   render(<PurchaseReceiptDetailPage />);
-  await screen.findByText('REMISION · REM-77');
+  await screen.findByText('Referencia registrada: REMISION · REM-77');
   expect(screen.queryByText('BATCH-LOT-PREFERRED')).toBeNull();
   expect(screen.queryByText('ITEM-LOT-IGNORED')).toBeNull();
   expect(screen.getAllByText('31 dic 2028').length).toBeGreaterThan(0);
