@@ -64,7 +64,7 @@ describe('ReceiptSupplierDocuments', () => {
       data: [link('association-1', 'document-actual-1')],
     } as never);
     render(
-      <ReceiptSupplierDocuments
+      <ReceiptSupplierDocuments supplierId="supplier-1"
         receiptId="receipt-1"
         legacyReference="REMISION · 000123"
       />,
@@ -92,7 +92,7 @@ describe('ReceiptSupplierDocuments', () => {
         link('association-2', 'second-document'),
       ],
     } as never);
-    render(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
+    render(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-1" legacyReference={null} />);
 
     await screen.findByRole('list', {
       name: 'Documentos vinculados a esta recepción',
@@ -109,7 +109,7 @@ describe('ReceiptSupplierDocuments', () => {
 
   it('does not construct a document link from a legacy textual reference', async () => {
     render(
-      <ReceiptSupplierDocuments
+      <ReceiptSupplierDocuments supplierId="supplier-1"
         receiptId="receipt-1"
         legacyReference="REMISION · 000123"
       />,
@@ -125,7 +125,7 @@ describe('ReceiptSupplierDocuments', () => {
     (role) => {
       setRole(role);
       render(
-        <ReceiptSupplierDocuments
+        <ReceiptSupplierDocuments supplierId="supplier-1"
           receiptId="receipt-1"
           legacyReference="FACTURA · 451"
         />,
@@ -140,7 +140,7 @@ describe('ReceiptSupplierDocuments', () => {
     vi.mocked(api.get).mockResolvedValue({
       data: [{ ...link('association-1', 'doc-1'), documentId: 'different-id' }],
     } as never);
-    render(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
+    render(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-1" legacyReference={null} />);
     expect((await screen.findByRole('alert')).textContent).toContain(
       'La respuesta de vínculos documentales no es válida.',
     );
@@ -155,7 +155,7 @@ describe('ReceiptSupplierDocuments', () => {
       } as never);
 
     const user = userEvent.setup();
-    render(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
+    render(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-1" legacyReference={null} />);
     expect(
       await screen.findByText('No fue posible consultar los documentos vinculados.'),
     ).toBeTruthy();
@@ -172,7 +172,7 @@ describe('ReceiptSupplierDocuments', () => {
 it.each(['ADMIN', 'MANAGER'] as const)('queries links for %s and encodes exact IDs', async (role) => {
   setRole(role);
   vi.mocked(api.get).mockResolvedValue({ data: [{ ...link('a', 'doc/a ?'), receiptId: 'receipt/a' }] } as never);
-  render(<ReceiptSupplierDocuments receiptId="receipt/a" legacyReference={null} />);
+  render(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt/a" legacyReference={null} />);
   expect((await screen.findByRole('link')).getAttribute('href')).toBe('/supplier-documents/doc%2Fa%20%3F');
   expect(api.get).toHaveBeenCalledWith('/supplier-documents/receipts/receipt%2Fa/links');
 });
@@ -181,7 +181,7 @@ it('labels cancelled documents while retaining historical navigation', async () 
   const item = link('a', 'cancelled-doc');
   item.document.status = 'CANCELLED' as never;
   vi.mocked(api.get).mockResolvedValue({ data: [item] } as never);
-  render(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
+  render(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-1" legacyReference={null} />);
   expect((await screen.findByText(/registro cancelado/)).textContent).toContain('REMISION');
   expect(screen.getByRole('link').getAttribute('href')).toBe('/supplier-documents/cancelled-doc');
 });
@@ -196,7 +196,7 @@ it.each([
   [link('a', 'doc'), link('a', 'doc2')], [link('a', 'doc'), link('b', 'doc')],
 ].map((data) => ({ data })))('rejects malformed or inconsistent payload %#', async ({ data }) => {
   vi.mocked(api.get).mockResolvedValue({ data } as never);
-  render(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
+  render(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-1" legacyReference={null} />);
   expect((await screen.findByRole('alert')).textContent).toContain('no es válida');
   expect(screen.queryByRole('link')).toBeNull();
 });
@@ -212,9 +212,9 @@ it('shows loading and ignores late success after changing receipt', async () => 
   const old = deferred();
   const next = deferred();
   vi.mocked(api.get).mockReturnValueOnce(old.promise as never).mockReturnValueOnce(next.promise as never);
-  const view = render(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
+  const view = render(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-1" legacyReference={null} />);
   expect(screen.getByRole('status').textContent).toContain('Cargando');
-  view.rerender(<ReceiptSupplierDocuments receiptId="receipt-2" legacyReference={null} />);
+  view.rerender(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-2" legacyReference={null} />);
   next.resolve({ data: [{ ...link('new', 'new-doc'), receiptId: 'receipt-2' }] });
   await screen.findByRole('link');
   await act(async () => {
@@ -227,8 +227,8 @@ it('shows loading and ignores late success after changing receipt', async () => 
 it('resets errors when changing receipt and ignores late failures', async () => {
   const old = deferred();
   vi.mocked(api.get).mockReturnValueOnce(old.promise as never).mockResolvedValueOnce({ data: [] } as never);
-  const view = render(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
-  view.rerender(<ReceiptSupplierDocuments receiptId="receipt-2" legacyReference={null} />);
+  const view = render(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-1" legacyReference={null} />);
+  view.rerender(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-2" legacyReference={null} />);
   await screen.findByText('Sin documento vinculado por ID.');
   await act(async () => {
     old.reject(new Error('late HTTP failure'));
@@ -240,9 +240,9 @@ it('resets errors when changing receipt and ignores late failures', async () => 
 it.each(['SALES', 'WAREHOUSE'] as const)('hides loaded links and discards pending responses on transition to %s', async (role) => {
   const pending = deferred();
   vi.mocked(api.get).mockReturnValueOnce(pending.promise as never).mockResolvedValueOnce({ data: [] } as never);
-  const view = render(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
+  const view = render(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-1" legacyReference={null} />);
   setRole(role);
-  view.rerender(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
+  view.rerender(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-1" legacyReference={null} />);
   await act(async () => {
     pending.resolve({ data: [link('a', 'old-doc')] });
     await pending.promise;
@@ -250,25 +250,25 @@ it.each(['SALES', 'WAREHOUSE'] as const)('hides loaded links and discards pendin
   await waitFor(() => expect(screen.queryByRole('link')).toBeNull());
   expect(api.get).toHaveBeenCalledTimes(1);
   setRole('ADMIN');
-  view.rerender(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
+  view.rerender(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-1" legacyReference={null} />);
   await screen.findByText('Sin documento vinculado por ID.');
   expect(api.get).toHaveBeenCalledTimes(2);
 });
 
 it('clears loaded links on actor or tenant change', async () => {
   vi.mocked(api.get).mockResolvedValueOnce({ data: [link('a', 'old-doc')] } as never).mockResolvedValueOnce({ data: [] } as never);
-  const view = render(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
+  const view = render(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-1" legacyReference={null} />);
   await screen.findByRole('link');
   const session = vi.mocked(useAuthenticatedSession).mock.results.at(-1)!.value;
   vi.mocked(useAuthenticatedSession).mockReturnValue({ ...session, user: { ...session.user, id: 'actor-2', companyId: 'tenant-2' } });
-  view.rerender(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
+  view.rerender(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-1" legacyReference={null} />);
   expect(screen.queryByRole('link')).toBeNull();
   await screen.findByText('Sin documento vinculado por ID.');
 });
 
 it.each(['loading', 'unauthenticated', 'error'] as const)('does not query without a verified session: %s', (status) => {
   vi.mocked(useAuthenticatedSession).mockReturnValue({ status, message: 'HTTP failure', retry: vi.fn() } as ReturnType<typeof useAuthenticatedSession>);
-  render(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference="FACTURA 12" />);
+  render(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-1" legacyReference="FACTURA 12" />);
   expect(screen.getByText('Referencia registrada: FACTURA 12')).toBeTruthy();
   expect(api.get).not.toHaveBeenCalled();
   expect(screen.queryByRole('link')).toBeNull();
@@ -276,19 +276,19 @@ it.each(['loading', 'unauthenticated', 'error'] as const)('does not query withou
 
 it.each(['SALES', 'WAREHOUSE'] as const)('removes already loaded navigation immediately when role becomes %s', async (role) => {
   vi.mocked(api.get).mockResolvedValueOnce({ data: [link('a', 'old-doc')] } as never);
-  const view = render(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
+  const view = render(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-1" legacyReference={null} />);
   await screen.findByRole('link');
   setRole(role);
-  view.rerender(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
+  view.rerender(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-1" legacyReference={null} />);
   expect(screen.queryByRole('link')).toBeNull();
   expect(api.get).toHaveBeenCalledTimes(1);
 });
 
 it('clears a previous error when changing receipt', async () => {
   vi.mocked(api.get).mockRejectedValueOnce(new Error('HTTP 500')).mockResolvedValueOnce({ data: [] } as never);
-  const view = render(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
+  const view = render(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-1" legacyReference={null} />);
   await screen.findByRole('alert');
-  view.rerender(<ReceiptSupplierDocuments receiptId="receipt-2" legacyReference={null} />);
+  view.rerender(<ReceiptSupplierDocuments supplierId="supplier-1" receiptId="receipt-2" legacyReference={null} />);
   expect(screen.queryByRole('alert')).toBeNull();
   await screen.findByText('Sin documento vinculado por ID.');
 });
