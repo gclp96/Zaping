@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Human-gated local dispatcher for one GitHub issue to one Codex worktree. */
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
@@ -19,14 +20,14 @@ function call(binary, args, opts = {}) {
 }
 function main() {
   const args = process.argv.slice(2);
-  const index = args.indexOf('--issue');
-  if (index < 0 || index + 1 >= args.length || !/^\d+$/.test(args[index + 1])) {
-    fail('Uso: node scripts/agents/run-task.mjs --issue <N> [--execute]');
+  const preview = args.length === 2 && args[0] === '--issue' && /^\d+$/.test(args[1]);
+  const execute = args.length === 5 && args[0] === '--issue' && /^\d+$/.test(args[1])
+    && args[2] === '--execute' && args[3] === '--approval-sha' && /^[a-f0-9]{64}$/.test(args[4]);
+  if (!preview && !execute) {
+    fail('Uso: node scripts/agents/run-task.mjs --issue <N> [--execute --approval-sha <SHA256>]');
   }
-  const number = Number(args[index + 1]);
+  const number = Number(args[1]);
   if (!Number.isSafeInteger(number) || number <= 0) fail('Número de issue inválido');
-  if (args.some((a) => !['--issue', String(number), '--execute'].includes(a))) fail('Argumentos desconocidos');
-  const execute = args.includes('--execute');
   const gh = process.platform === 'win32' ? 'gh.exe' : 'gh';
   const raw = call(gh, ['issue', 'view', String(number), '--repo', REPO, '--json', 'number,title,body,labels,state,url']);
   let issue;
@@ -37,11 +38,15 @@ function main() {
   const validated = validateIssue(issue);
   if (!validated.ok) fail(validated.errors.join('; '));
   const prompt = createCodexPrompt(issue, validated.sections);
+  // Approval fingerprint binds the operator's reviewed title/body to this exact issue.
+  const approvalSha = createHash('sha256').update(JSON.stringify([issue.number, issue.title, issue.body])).digest('hex');
   if (!execute) {
-    process.stdout.write(`Tarea aprobada #${number}. Vista previa: NO se ha ejecutado Codex.\n\n${prompt}`);
-    process.stdout.write(`\nPara iniciar en una rama/worktree aislados: node scripts/agents/run-task.mjs --issue ${number} --execute\n`);
+    process.stdout.write(`Issue #${number} con etiqueta agent:ready. Vista previa: NO se ha ejecutado Codex.\n\n${prompt}`);
+    process.stdout.write(`\nHuella SHA-256 del ticket revisado: ${approvalSha}\n`);
+    process.stdout.write(`Si estás de acuerdo con el contenido, ejecuta:\nnode scripts/agents/run-task.mjs --issue ${number} --execute --approval-sha ${approvalSha}\n`);
     return;
   }
+  if (args[4] !== approvalSha) fail('El issue fue editado o la huella no corresponde; revisar y aprobar nuevamente');
 
   const remote = call('git', ['remote', 'get-url', 'origin']);
   if (!/^(https:\/\/github\.com\/gclp96\/zaping(?:\.git)?|git@github\.com:gclp96\/zaping(?:\.git)?)$/.test(remote)) {
