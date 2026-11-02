@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createCodexPrompt, validateIssue } from './issue-contract.mjs';
+import { codexExecArgs } from './codex-command.mjs';
 
 const REPO = 'gclp96/zaping';
 const repoDir = resolve(fileURLToPath(new URL('../..', import.meta.url)));
@@ -82,7 +83,7 @@ function main() {
   process.stdout.write(`Issue #${number} | base ${base} | branch ${branch}\nWorktree: ${runDir}\nPrompt: ${promptPath}\n`);
   const expectedHead = call('git', ['rev-parse', 'HEAD'], { cwd: runDir });
   const start = Date.now();
-  const result = spawnSync(codex, ['exec', '--sandbox', 'workspace-write', '--ask-for-approval', 'never', '-'], {
+  const result = spawnSync(codex, codexExecArgs(), {
     cwd: runDir, input: prompt, encoding: 'utf8', stdio: ['pipe','inherit','inherit'],
     shell: process.platform === 'win32',
   });
