@@ -1,0 +1,60 @@
+name: "Agente de programación — tarea autorizable"
+description: "Crear una tarea acotada para el flujo GitHub Issues → Codex, sin ejecución automática."
+title: "[AGENT] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        La apertura del issue **no autoriza ejecutar** un agente. Un mantenedor debe revisar el alcance y aplicar manualmente la etiqueta agent:ready para habilitar el lanzador local. No incluir datos reales, secretos ni credenciales.
+  - type: dropdown
+    id: change-level
+    attributes:
+      label: Tipo de cambio
+      options:
+        - "A — Cambio menor"
+        - "B — Funcionalidad estándar"
+        - "C — Crítico / arquitectónico (no elegible para ejecución automática V1)"
+    validations:
+      required: true
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objetivo
+      description: "Problema, resultado esperado y por qué importa."
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Alcance permitido
+      description: "Módulos, archivos y comportamientos que puede modificar el agente."
+    validations:
+      required: true
+  - type: textarea
+    id: exclusions
+    attributes:
+      label: Fuera de alcance
+      description: "Indicar límites explícitos (sin migraciones, sin cambios de negocio, etc.)."
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Criterios de aceptación
+      description: "Comprobaciones objetivas que permitan revisar la entrega."
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validaciones esperadas
+      description: "Pruebas focales y gates pertinentes según alcance."
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Dependencias y riesgos
+      description: "PR, otros tickets, bloqueos, áreas delicadas; escribir Ninguno si procede."
+    validations:
+      required: true
