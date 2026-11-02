@@ -9,6 +9,7 @@ test('Codex CLI approval flag precedes exec and workspace sandbox remains enable
     'exec',
     '--sandbox',
     'workspace-write',
+    '--json',
     '-',
   ]);
 });
