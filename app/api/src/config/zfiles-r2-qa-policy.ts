@@ -3,12 +3,7 @@ import { SUPPLIER_ATTACHMENT_MAX_BYTES } from '../supplier-documents/supplier-do
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const UUID_PATTERN = new RegExp(`^${UUID}$`);
 const KEY_PATTERN = new RegExp(`^private/(${UUID})/(${UUID})/(${UUID})$`);
-const ALLOWED_JURISDICTIONS = new Set([
-  'default',
-  'eu',
-  'us',
-  'fedramp',
-]);
+const ALLOWED_JURISDICTIONS = new Set(['default', 'eu', 'us', 'fedramp']);
 
 export type ZfilesR2QaFixture = {
   accountId: string;
