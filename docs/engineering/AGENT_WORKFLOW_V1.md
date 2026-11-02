@@ -9,9 +9,9 @@ ChatGPT y el fundador siguen definiendo arquitectura y prioridades; Codex sigue 
 1. Crear un issue con la plantilla **Agente de programación — tarea autorizable**.
 2. Completar objetivo, clasificación A/B, alcance, fuera de alcance, criterios de aceptación, validaciones, dependencias y riesgos.
 3. Un mantenedor revisa el issue. Crear una sola vez la etiqueta de GitHub `agent:ready` si no existe y aplicarla **manualmente** solo a tickets aprobados.
-4. Ejecutar el lanzador en modo vista previa. Debe rechazar issues cerrados, sin campos requeridos, sin etiqueta o de nivel C.
-5. Con `--execute`, el script verifica el `origin`, obtiene `origin/main` sin cambiar `main` local y crea una nueva rama/worktree separados en la carpeta temporal. Rechaza nombres preexistentes sin sobrescribirlos.
-6. El script inicia **un Codex CLI** en sandbox `workspace-write` con la tarea aprobada y le prohíbe realizar commit, push, PR, merge o deploy.
+4. Ejecutar el lanzador en modo vista previa. Debe rechazar issues cerrados, sin campos requeridos, sin etiqueta o de nivel C. La vista previa imprime la huella SHA-256 del número, título y contenido exactos del ticket; el responsable revisa también el contenido antes de aprobar.
+5. Con `--execute --approval-sha <SHA256>`, el script vuelve a leer el issue y rechaza modificaciones posteriores del contenido revisado. Después verifica el `origin`, obtiene `origin/main` sin cambiar `main` local y crea una nueva rama/worktree separados en la carpeta temporal. Rechaza nombres preexistentes sin sobrescribirlos.
+6. El script inicia **un Codex CLI** en sandbox `workspace-write` con la tarea aprobada y le prohíbe realizar commit, push, PR, merge o deploy. Compara HEAD antes/después de ejecutar y bloquea el éxito si el agente lo cambió; no sustituye una revisión de diff.
 7. El responsable revisa diff, pruebas y bloqueos. Cualquier commit, PR o despliegue es **otro paso bajo control humano**.
 
 **Dependencia bloqueante:** la ejecución requiere que las reglas ampliadas de `AGENTS.md` del PR #193 estén disponibles en `origin/main`. No asumir que ese PR ya fue fusionado.
@@ -33,7 +33,7 @@ codex --version
 node scripts/agents/run-task.mjs --issue NUMERO
 
 # Solo después de aprobar el issue con agent:ready y revisar el alcance
-node scripts/agents/run-task.mjs --issue NUMERO --execute
+node scripts/agents/run-task.mjs --issue NUMERO --execute --approval-sha SHA256_DE_LA_VISTA_PREVIA
 ```
 
 ## Estados conceptuales
@@ -44,13 +44,14 @@ Estos estados **no** están sincronizados automáticamente por la V1.
 ## Seguridad y limitaciones
 - Los campos del issue son entrada de **menor confianza** y no pueden anular las reglas de seguridad del repositorio.
 - No hay ejecutor en GitHub Actions ni disparadores por issue. El script no recibe tokens de producción ni publica cambios.
+- Antes de ejecutar, revisar la vista previa y proporcionar su SHA-256; cualquier cambio del título o contenido obliga a aprobarlo de nuevo. La etiqueta por sí sola no basta.
 - El sandbox `workspace-write` no es una garantía de aislamiento fuerte de datos sensibles. Revisar permisos del entorno antes de permitir tareas con credenciales.
 - Sin migraciones, sin escritura a DB productiva, sin acceso a R2 productivo, sin modificación automática de CI, sin merge/deploy automático.
 - Un agente por tarea. Tareas críticas/arquitectónicas (nivel C) quedan fuera del lanzador V1.
 - La guía exige revisión humana e informes PASS/FAIL reales. Los fallos preexistentes se reportan separadamente.
 
 ## Evidencia y siguiente corte
-- Prueba de contrato: `node --test scripts/agents/issue-contract.test.mjs` (6 casos unitarios).
+- Prueba de contrato: `node --test scripts/agents/issue-contract.test.mjs` (6 casos unitarios, verificar en el equipo/CI antes de aceptar).
 - Sintaxis del lanzador: `node --check scripts/agents/run-task.mjs`.
 - **Pendiente:** ensayo real en Windows con `gh`, Codex y un issue A/B aprobado. Todavía no hay entrega funcional de usuario, PR producido por el agente ni CI remota atribuible al lanzador.
 - Medir por issue: minutos activos humanos, tiempo total, ejecuciones de pruebas, errores, intervenciones, costo y retrabajo.
