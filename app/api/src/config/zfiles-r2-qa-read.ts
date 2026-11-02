@@ -15,9 +15,10 @@ import { SUPPLIER_ATTACHMENT_MAX_BYTES } from '../supplier-documents/supplier-do
  * QA-only R2 S3 client. No Nest provider or HTTP route imports this module.
  * Credentials are supplied explicitly; never use the default AWS provider chain.
  */
-export function createZfilesR2QaReadClient(
-  env: NodeJS.ProcessEnv,
-): { client: S3Client; fixture: ZfilesR2QaFixture } {
+export function createZfilesR2QaReadClient(env: NodeJS.ProcessEnv): {
+  client: S3Client;
+  fixture: ZfilesR2QaFixture;
+} {
   const fixture = requireZfilesR2QaFixture(env);
   const accessKeyId = env.R2_READ_ACCESS_KEY_ID ?? '';
   const secretAccessKey = env.R2_READ_SECRET_ACCESS_KEY ?? '';
@@ -59,7 +60,10 @@ export async function verifyZfilesR2QaBody(
     }
     digest.update(bytes);
   }
-  if (length !== expected.sizeBytes || digest.digest('hex') !== expected.sha256) {
+  if (
+    length !== expected.sizeBytes ||
+    digest.digest('hex') !== expected.sha256
+  ) {
     throw new Error('R2 QA object size or SHA-256 does not match');
   }
 }
