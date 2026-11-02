@@ -8,7 +8,6 @@ const ALLOWED_JURISDICTIONS = new Set([
   'eu',
   'us',
   'fedramp',
-  'fedramp-high',
 ]);
 
 export type ZfilesR2QaFixture = {
