@@ -123,6 +123,11 @@ jobs:
           RUN_RECEIPT_DOCUMENT_LINKS_PG: "1"
         run: npm run test:e2e -- --runInBand test/receipt-document-links.postgres.e2e-spec.ts
 
+      - name: Verify ZFILES-R2-01 private attachment gate on ephemeral PostgreSQL
+        env:
+          RUN_ZFILES_ATTACHMENT_FOUNDATION_PG: "1"
+        run: npm run test:e2e -- --runInBand test/zfiles-attachment-foundation.postgres.e2e-spec.ts
+
       - name: Verify R2A-01 supplier documents on ephemeral PostgreSQL
         env:
           RUN_SUPPLIER_DOC_PG: "1"
