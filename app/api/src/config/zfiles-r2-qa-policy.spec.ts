@@ -57,6 +57,7 @@ describe('ZFILES-R2-02A QA-only R2 fixture policy', () => {
     { R2_ACCOUNT_ID: 'not-an-account' },
     { R2_ACCOUNT_ID: 'A'.repeat(32) },
     { R2_JURISDICTION: 'other' },
+    { R2_JURISDICTION: 'fedramp-high' },
     { R2_QA_FIXTURE_COMPANY_ID: documentId },
     { R2_QA_FIXTURE_COMPANY_ID: 'not-uuid' },
     { R2_QA_FIXTURE_OBJECT_KEY: `quarantine/${objectKey}` },
