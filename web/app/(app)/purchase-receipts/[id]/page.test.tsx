@@ -31,8 +31,8 @@ vi.mock('@/services/api', () => ({
 }));
 
 vi.mock('../ReceiptSupplierDocuments', () => ({
-  default: ({ legacyReference }: { legacyReference: string | null }) => (
-    <span>
+  default: ({ receiptId, supplierId, legacyReference }: { receiptId: string; supplierId: string; legacyReference: string | null }) => (
+    <span data-testid="receipt-documents" data-receipt-id={receiptId} data-supplier-id={supplierId}>
       {legacyReference
         ? `Referencia registrada: ${legacyReference}`
         : 'Sin documento vinculado por ID.'}
@@ -232,6 +232,13 @@ describe('PurchaseReceiptDetailPage', () => {
     });
     expect(screen.getByRole('heading', { name: 'Recepción REC-NEXT' })).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('passes supplier identity from the loaded purchase to the document UI', async () => {
+    render(<PurchaseReceiptDetailPage />);
+    const documents = await screen.findByTestId('receipt-documents');
+    expect(documents.getAttribute('data-receipt-id')).toBe(quantityReceipt.id);
+    expect(documents.getAttribute('data-supplier-id')).toBe(quantityReceipt.purchase.supplier.id);
   });
 
   it('oculta Zaping Files cuando la bandera no está habilitada', async () => {

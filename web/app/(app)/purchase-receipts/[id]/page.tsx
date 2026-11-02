@@ -422,6 +422,7 @@ export default function PurchaseReceiptDetailPage() {
           <DetailField label="Documento proveedor">
             <ReceiptSupplierDocuments
               receiptId={receipt.id}
+              supplierId={receipt.purchase.supplier.id}
               legacyReference={
                 receipt.supplierDocumentType && receipt.supplierDocumentNumber
                   ? `${receipt.supplierDocumentType.replace('_', ' ')} · ${receipt.supplierDocumentNumber}`
