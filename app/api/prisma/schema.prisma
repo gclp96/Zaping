@@ -548,6 +548,7 @@ model Company {
   companySequences                      CompanySequence[]
   idempotencyRecords                    IdempotencyRecord[]
   supplierDocuments                     SupplierDocument[]
+  supplierDocumentAttachments           SupplierDocumentAttachment[]
   supplierDocumentAllocations           PurchaseReceiptDocument[]
   supplierDocumentApprovals             PurchaseReceiptReconciliationApproval[]
   receiptDocumentLinks                  PurchaseReceiptSupplierDocumentLink[]
@@ -687,6 +688,8 @@ model User {
   company Company @relation(fields: [companyId], references: [id])
 
   receivedPurchaseReceipts PurchaseReceipt[] @relation("PurchaseReceiptReceivedBy")
+  supplierAttachmentUploaders SupplierDocumentAttachment[] @relation("SupplierAttachmentUploadedBy")
+  supplierAttachmentRemovers SupplierDocumentAttachment[] @relation("SupplierAttachmentRemovedBy")
   supplierDocumentsCreated SupplierDocument[] @relation("SupplierDocumentCreatedBy")
   supplierDocumentExceptionsReviewed SupplierDocument[] @relation("SupplierDocumentExceptionReviewer")
   supplierDocumentAuditActions SupplierDocumentAudit[] @relation("SupplierDocumentAuditActor")
@@ -1870,6 +1873,13 @@ model HealthcareCaseDispatchCorrectionItem {
 }
 
 
+enum SupplierDocumentAttachmentStatus {
+  PENDING_SCAN
+  AVAILABLE
+  REJECTED
+  REMOVED
+}
+
 enum SupplierDocumentType {
   FACTURA
   REMISION
@@ -1966,6 +1976,7 @@ model SupplierDocument {
   audits SupplierDocumentAudit[]
   allocations PurchaseReceiptDocument[]
   receiptLinks PurchaseReceiptSupplierDocumentLink[]
+  attachments SupplierDocumentAttachment[]
   cancelledBy User? @relation("SupplierDocumentCancelledBy", fields: [cancelledById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
   replacedBy SupplierDocument? @relation("SupplierDocumentReplacement", fields: [replacedByDocumentId, companyId, supplierId], references: [id, companyId, supplierId], onDelete: Restrict, onUpdate: Restrict)
   replaces SupplierDocument[] @relation("SupplierDocumentReplacement")
@@ -2094,4 +2105,33 @@ model PurchaseReceiptSupplierDocumentLink {
   // Historical removed rows remain immutable for auditability.
   @@index([companyId, receiptId, documentId], map: "PRSDL_company_receipt_document_idx")
   @@index([companyId, documentId], map: "PRSDL_company_document_idx")
+}
+
+/// UX-PDOC-01B: private object metadata. Never stores bytes or a public URL.
+/// No attachment is downloadable until an external scanner marks it AVAILABLE.
+model SupplierDocumentAttachment {
+  id            String @id @default(uuid())
+  companyId     String
+  documentId    String
+  storageKey    String @db.VarChar(300)
+  originalName  String @db.VarChar(255)
+  contentType   String @db.VarChar(32)
+  sizeBytes     Int
+  sha256        String @db.VarChar(64)
+  status        SupplierDocumentAttachmentStatus @default(PENDING_SCAN)
+  scanEngine    String? @db.VarChar(80)
+  scannedAt     DateTime?
+  rejectionReason String? @db.VarChar(1000)
+  uploadedById  String
+  createdAt     DateTime @default(now())
+  removedById   String?
+  removedAt     DateTime?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  document SupplierDocument @relation(fields: [documentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  uploadedBy User @relation("SupplierAttachmentUploadedBy", fields: [uploadedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  removedBy User? @relation("SupplierAttachmentRemovedBy", fields: [removedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([companyId, storageKey])
+  @@index([companyId, documentId, status, createdAt])
 }
