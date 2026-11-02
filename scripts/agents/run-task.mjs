@@ -64,6 +64,10 @@ function main() {
   if (ver.error || ver.status !== 0) fail('Codex CLI no disponible. Instálalo e inicia sesión antes de ejecutar.');
 
   call('git', ['fetch', '--no-tags', 'origin', 'main']);
+  const rules = call('git', ['show', 'refs/remotes/origin/main:AGENTS.md']);
+  if (!rules.includes('# Zaping — instrucciones para agentes de programación')) {
+    fail('AGENTS.md en origin/main no contiene las guardas de Zaping (PR #193 pendiente). No ejecutar.');
+  }
   const base = call('git', ['rev-parse', 'refs/remotes/origin/main']);
   mkdirSync(resolve(runDir, '..'), { recursive: true });
   call('git', ['worktree', 'add', '-b', branch, runDir, 'refs/remotes/origin/main']);
