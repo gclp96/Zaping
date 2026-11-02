@@ -1,9 +1,14 @@
 import { createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
-import { S3Client } from '@aws-sdk/client-s3';
+import {
+  GetObjectCommand,
+  ListObjectsV2Command,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import {
   createZfilesR2QaReadClient,
   verifyZfilesR2QaBody,
+  verifyZfilesR2QaObject,
 } from './zfiles-r2-qa-read';
 
 const companyId = '11111111-1111-4111-8111-111111111111';
@@ -117,4 +122,53 @@ describe('ZFILES-R2-02B read-only R2 QA transport', () => {
     ).rejects.toThrow();
     body.destroy();
   });
+
+  it('requests only the exact synthetic QA key with read commands', async () => {
+    const { client, fixture } = createZfilesR2QaReadClient(
+      fixtureEnvironment(),
+    );
+    const bytes = Buffer.from('ZAPING-R2-QA-SYNTHETIC-ONLY');
+    const send = jest.fn(async (command: unknown) => {
+      if (command instanceof ListObjectsV2Command) {
+        expect(command.input).toEqual({
+          Bucket: 'zaping-private-qa',
+          Prefix: objectKey,
+          MaxKeys: 1,
+        });
+        return { Contents: [{ Key: objectKey }] };
+      }
+      if (command instanceof GetObjectCommand) {
+        expect(command.input).toEqual({
+          Bucket: 'zaping-private-qa',
+          Key: objectKey,
+        });
+        return { Body: Readable.from([bytes]), ContentLength: bytes.length };
+      }
+      throw new Error('Unexpected S3 command');
+    });
+    try {
+      await expect(
+        verifyZfilesR2QaObject({ send } as unknown as S3Client, fixture),
+      ).resolves.toBeUndefined();
+      expect(send).toHaveBeenCalledTimes(2);
+    } finally {
+      client.destroy();
+    }
+  });
+
+  it('refuses to fetch when exact synthetic object is absent', async () => {
+    const { client, fixture } = createZfilesR2QaReadClient(
+      fixtureEnvironment(),
+    );
+    const send = jest.fn(async () => ({ Contents: [{ Key: 'other' }] }));
+    try {
+      await expect(
+        verifyZfilesR2QaObject({ send } as unknown as S3Client, fixture),
+      ).rejects.toThrow('R2 QA synthetic object is not listed');
+      expect(send).toHaveBeenCalledTimes(1);
+    } finally {
+      client.destroy();
+    }
+  });
+
 });
