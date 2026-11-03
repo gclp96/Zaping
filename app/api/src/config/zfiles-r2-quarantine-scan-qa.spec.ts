@@ -100,10 +100,10 @@ describe('ZFILES-R2-03B3 read-only quarantine verified scan lab', () => {
   it('GETs exactly once, verifies the bytes before scan, and never promotes', async () => {
     const f = setup();
     const events: string[] = [];
-    const originalSend = f.send.getMockImplementation();
-    f.send.mockImplementation(async (...args) => {
+    f.send.mockImplementation(async (command: unknown) => {
       events.push('get');
-      return originalSend!(...args);
+      if (!(command instanceof GetObjectCommand)) throw new Error('unexpected command');
+      return { ContentLength: bytes.length, Body: Readable.from([bytes]) };
     });
     (f.readiness.check as jest.Mock).mockReset()
       .mockImplementationOnce(() => { events.push('pre'); return Promise.resolve(base); })
@@ -141,9 +141,6 @@ describe('ZFILES-R2-03B3 read-only quarantine verified scan lab', () => {
     { label: 'private bucket', patch: { bucket: 'zaping-private-qa' as 'zaping-quarantine-qa' }, body: bytes },
   ])('rejects $label without scanning', async ({ patch, body }) => {
     const f = setup(patch, body);
-    // Cross-tenant keys require trusted job binding later; the QA fixture
-    // has no independent job identity to authorize against.
-    if (patch.key?.startsWith('quarantine/')) return;
     await expect(scanVerifiedQuarantineQaObject(
       { send: f.send } as unknown as S3Client,
       f.fixture, f.scanner, f.readiness,
