@@ -17,7 +17,10 @@ function daemonCommand(command: 'PING' | 'VERSION'): Promise<string> {
     const socket = createConnection({ path: SOCKET_PATH });
     let settled = false;
     let reply = Buffer.alloc(0);
-    const timer = setTimeout(() => finish(new Error('ClamAV not ready')), 5_000);
+    const timer = setTimeout(
+      () => finish(new Error('ClamAV not ready')),
+      5_000,
+    );
 
     function finish(value: string | Error): void {
       if (settled) return;
@@ -94,8 +97,8 @@ describeReal('ZFILES-R2-03B2 real ClamAV Unix INSTREAM lab', () => {
       'ascii',
     );
     const jpeg = Buffer.from([
-      0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00,
-      0xff, 0xd9,
+      0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0xff,
+      0xd9,
     ]);
 
     expect(await scanner.scan(pdf)).toBe('CLAMD_OK_UNATTESTED');
@@ -126,6 +129,8 @@ describeReal('ZFILES-R2-03B2 real ClamAV Unix INSTREAM lab', () => {
 
   it('rejects empty and oversized input before scanner invocation', async () => {
     await expect(scanner.scan(Buffer.alloc(0))).rejects.toThrow();
-    await expect(scanner.scan(Buffer.alloc(10 * 1024 * 1024 + 1))).rejects.toThrow();
+    await expect(
+      scanner.scan(Buffer.alloc(10 * 1024 * 1024 + 1)),
+    ).rejects.toThrow();
   });
 });
