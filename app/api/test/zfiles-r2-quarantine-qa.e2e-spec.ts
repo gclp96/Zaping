@@ -22,7 +22,9 @@ describeQa('ZFILES-R2-03A conditional quarantine QA write', () => {
       const result = await writeAndVerifyQuarantineQaFixture(
         client,
         config,
-        (next) => { phase = next; },
+        (next) => {
+          phase = next;
+        },
       );
       expect(result.key.startsWith('quarantine/')).toBe(true);
       expect(result.sizeBytes).toBeGreaterThan(0);
