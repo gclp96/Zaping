@@ -29,6 +29,7 @@ const validEnv: NodeJS.ProcessEnv = {
   R2_QUARANTINE_SCAN_READ_ACCESS_KEY_ID: 'synthetic-read-only-key',
   R2_QUARANTINE_SCAN_READ_SECRET_ACCESS_KEY: 'synthetic-read-only-secret',
 };
+
 const base: ScannerReadinessSnapshot = {
   engineVersion: '1.4.3',
   databaseVersion: 27654,
@@ -47,18 +48,23 @@ function setup(
     ...requireQuarantineScannerQaFixture(validEnv),
     ...patch,
   };
-  const send = jest.fn(async (command: unknown) => {
-    if (!(command instanceof GetObjectCommand)) throw new Error('unexpected write/list command');
-    return {
+  const send = jest.fn((command: unknown) => {
+    if (!(command instanceof GetObjectCommand)) {
+      throw new Error('Unexpected write/list command');
+    }
+    return Promise.resolve({
       ContentLength: body.length,
       Body: Readable.from([body]),
-    };
+    });
   });
   const scanner: QaClamAvScanner = {
-    scan: jest.fn(async () => 'CLAMD_OK_UNATTESTED' as const),
+    scan: jest.fn(() => Promise.resolve('CLAMD_OK_UNATTESTED' as const)),
   };
   const readiness: QaScannerReadiness = {
-    check: jest.fn().mockResolvedValueOnce(before).mockResolvedValueOnce(after),
+    check: jest
+      .fn()
+      .mockResolvedValueOnce(before)
+      .mockResolvedValueOnce(after),
   };
   return { fixture, send, scanner, readiness };
 }
@@ -68,9 +74,13 @@ describe('ZFILES-R2-03B3 read-only quarantine verified scan lab', () => {
     const { client, fixture } = createQuarantineScannerQaClient(validEnv);
     try {
       expect(client).toBeInstanceOf(S3Client);
-      expect(fixture.key).toBe('quarantine/' + company + '/' + document + '/' + attachment);
+      expect(fixture.key).toBe(
+        'quarantine/' + company + '/' + document + '/' + attachment,
+      );
       expect(fixture.bucket).toBe('zaping-quarantine-qa');
-      expect(JSON.stringify(fixture)).not.toContain('synthetic-read-only-secret');
+      expect(JSON.stringify(fixture)).not.toContain(
+        'synthetic-read-only-secret',
+      );
     } finally {
       client.destroy();
     }
@@ -92,80 +102,148 @@ describe('ZFILES-R2-03B3 read-only quarantine verified scan lab', () => {
     { R2_QUARANTINE_SCAN_READ_ACCESS_KEY_ID: '' },
     { R2_QUARANTINE_SCAN_READ_SECRET_ACCESS_KEY: '' },
   ])('fails closed on unsafe config %j', (patch) => {
-    expect(() => createQuarantineScannerQaClient({ ...validEnv, ...patch })).toThrow(
-      'Quarantine QA scan was not verified',
-    );
+    expect(() =>
+      createQuarantineScannerQaClient({ ...validEnv, ...patch }),
+    ).toThrow('Quarantine QA scan was not verified');
   });
 
-  it('GETs exactly once, verifies the bytes before scan, and never promotes', async () => {
+  it('GETs exactly once, verifies bytes before scan, never promotes', async () => {
     const f = setup();
     const events: string[] = [];
-    f.send.mockImplementation(async (command: unknown) => {
+    f.send.mockImplementation((command: unknown) => {
       events.push('get');
-      if (!(command instanceof GetObjectCommand)) throw new Error('unexpected command');
-      return { ContentLength: bytes.length, Body: Readable.from([bytes]) };
+      if (!(command instanceof GetObjectCommand)) {
+        throw new Error('Unexpected command');
+      }
+      return Promise.resolve({
+        ContentLength: bytes.length,
+        Body: Readable.from([bytes]),
+      });
     });
-    (f.readiness.check as jest.Mock).mockReset()
-      .mockImplementationOnce(() => { events.push('pre'); return Promise.resolve(base); })
-      .mockImplementationOnce(() => { events.push('post'); return Promise.resolve(base); });
-    (f.scanner.scan as jest.Mock).mockImplementation(async (input: Buffer) => {
+    (f.readiness.check as jest.Mock)
+      .mockReset()
+      .mockImplementationOnce(() => {
+        events.push('pre');
+        return Promise.resolve(base);
+      })
+      .mockImplementationOnce(() => {
+        events.push('post');
+        return Promise.resolve(base);
+      });
+    (f.scanner.scan as jest.Mock).mockImplementation((input: Buffer) => {
       events.push('scan');
       expect(input).toEqual(bytes);
-      return 'CLAMD_OK_UNATTESTED';
+      return Promise.resolve('CLAMD_OK_UNATTESTED');
     });
-    await expect(scanVerifiedQuarantineQaObject(
-      { send: f.send } as unknown as S3Client,
-      f.fixture, f.scanner, f.readiness,
-    )).resolves.toBe('CLAMD_OK_UNATTESTED');
+
+    await expect(
+      scanVerifiedQuarantineQaObject(
+        { send: f.send },
+        f.fixture,
+        f.scanner,
+        f.readiness,
+      ),
+    ).resolves.toBe('CLAMD_OK_UNATTESTED');
     expect(events).toEqual(['pre', 'get', 'scan', 'post']);
     expect(f.send).toHaveBeenCalledTimes(1);
     const [command] = f.send.mock.calls[0] as unknown as [GetObjectCommand];
-    expect(command.input).toEqual({ Bucket: 'zaping-quarantine-qa', Key: f.fixture.key });
+    expect(command.input).toEqual({
+      Bucket: 'zaping-quarantine-qa',
+      Key: f.fixture.key,
+    });
   });
 
-  it('passes detected EICAR result without reclassifying as CLEAN', async () => {
+  it('passes EICAR detection without reclassifying as CLEAN', async () => {
     const f = setup();
     (f.scanner.scan as jest.Mock).mockResolvedValue('MALWARE_DETECTED');
-    await expect(scanVerifiedQuarantineQaObject(
-      { send: f.send } as unknown as S3Client,
-      f.fixture, f.scanner, f.readiness,
-    )).resolves.toBe('MALWARE_DETECTED');
+    await expect(
+      scanVerifiedQuarantineQaObject(
+        { send: f.send },
+        f.fixture,
+        f.scanner,
+        f.readiness,
+      ),
+    ).resolves.toBe('MALWARE_DETECTED');
   });
 
   it.each([
     { label: 'modified hash', patch: { sha256: 'f'.repeat(64) }, body: bytes },
     { label: 'truncated stream', patch: {}, body: bytes.subarray(0, 8) },
-    { label: 'oversized stream', patch: {}, body: Buffer.concat([bytes, bytes]) },
-    { label: 'private key', patch: { key: 'private/' + company + '/' + document + '/' + attachment }, body: bytes },
-    { label: 'cross-tenant key', patch: { key: 'quarantine/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/' + document + '/' + attachment }, body: bytes },
-    { label: 'private bucket', patch: { bucket: 'zaping-private-qa' as 'zaping-quarantine-qa' }, body: bytes },
+    {
+      label: 'oversized stream',
+      patch: {},
+      body: Buffer.concat([bytes, bytes]),
+    },
+    {
+      label: 'private key',
+      patch: { key: 'private/' + company + '/' + document + '/' + attachment },
+      body: bytes,
+    },
+    {
+      label: 'cross-tenant key',
+      patch: {
+        key:
+          'quarantine/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/' +
+          document +
+          '/' +
+          attachment,
+      },
+      body: bytes,
+    },
+    {
+      label: 'private bucket',
+      patch: { bucket: 'zaping-private-qa' as 'zaping-quarantine-qa' },
+      body: bytes,
+    },
   ])('rejects $label without scanning', async ({ patch, body }) => {
     const f = setup(patch, body);
-    await expect(scanVerifiedQuarantineQaObject(
-      { send: f.send } as unknown as S3Client,
-      f.fixture, f.scanner, f.readiness,
-    )).rejects.toThrow('Quarantine QA scan was not verified');
-    expect(f.scanner.scan).not.toHaveBeenCalled();
+    await expect(
+      scanVerifiedQuarantineQaObject(
+        { send: f.send },
+        f.fixture,
+        f.scanner,
+        f.readiness,
+      ),
+    ).rejects.toThrow('Quarantine QA scan was not verified');
+    expect((f.scanner.scan as jest.Mock).mock.calls).toHaveLength(0);
   });
 
-  it('rejects changed daemon version and never interprets it as clean', async () => {
+  it('rejects a changed daemon version instead of returning clean', async () => {
     const f = setup({}, bytes, base, { ...base, databaseVersion: 27655 });
-    await expect(scanVerifiedQuarantineQaObject(
-      { send: f.send } as unknown as S3Client,
-      f.fixture, f.scanner, f.readiness,
-    )).rejects.toThrow('Quarantine QA scan was not verified');
+    await expect(
+      scanVerifiedQuarantineQaObject(
+        { send: f.send },
+        f.fixture,
+        f.scanner,
+        f.readiness,
+      ),
+    ).rejects.toThrow('Quarantine QA scan was not verified');
   });
 
-  it('rejects unavailable R2, daemon and readiness without leaking SDK errors', async () => {
+  it('fails closed for R2, daemon and readiness errors', async () => {
     for (const phase of ['r2', 'daemon', 'readiness'] as const) {
       const f = setup();
-      if (phase === 'r2') f.send.mockRejectedValue(new Error('secret-r2-key'));
-      if (phase === 'daemon') (f.scanner.scan as jest.Mock).mockRejectedValue(new Error('secret-signature'));
-      if (phase === 'readiness') (f.readiness.check as jest.Mock).mockReset().mockRejectedValue(new Error('secret-socket'));
-      await expect(scanVerifiedQuarantineQaObject(
-        { send: f.send } as unknown as S3Client,
-        f.fixture, f.scanner, f.readiness,
-      )).rejects.toThrow('Quarantine QA scan was not verified');
+      if (phase === 'r2') {
+        f.send.mockRejectedValue(new Error('secret-r2-key'));
+      }
+      if (phase === 'daemon') {
+        (f.scanner.scan as jest.Mock).mockRejectedValue(
+          new Error('secret-signature'),
+        );
+      }
+      if (phase === 'readiness') {
+        (f.readiness.check as jest.Mock)
+          .mockReset()
+          .mockRejectedValue(new Error('secret-socket'));
+      }
+      await expect(
+        scanVerifiedQuarantineQaObject(
+          { send: f.send },
+          f.fixture,
+          f.scanner,
+          f.readiness,
+        ),
+      ).rejects.toThrow('Quarantine QA scan was not verified');
     }
   });
 });
