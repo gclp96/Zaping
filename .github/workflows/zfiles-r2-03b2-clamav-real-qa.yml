@@ -1,0 +1,131 @@
+name: ZFILES-R2-03B2 ClamAV real isolated lab
+
+on:
+  push:
+    branches:
+      - feat/zfiles-r2-03b2-clamav-real-qa-20261103
+    paths:
+      - .github/workflows/zfiles-r2-03b2-clamav-real-qa.yml
+      - app/api/test/zfiles-clamav-real-lab.qa.e2e-spec.ts
+      - app/api/src/config/zfiles-clamav-instream-lab.ts
+      - docs/modules/erp/ZFILES_R2_03B2_REAL_CLAMAV_QA.md
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zfiles-r2-03b2-clamav-real-lab
+  cancel-in-progress: true
+
+jobs:
+  real-clamav-lab:
+    name: ClamAV actual Unix socket + synthetic PDF/JPEG/EICAR
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout only source, without persisted credentials
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node for test dependencies only
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: app/api/package-lock.json
+
+      - name: Install API dependencies (no R2 or DB)
+        working-directory: app/api
+        run: npm ci
+
+      - name: Prepare isolated socket directory and pull official image
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/zaping-clamd-b2-socket"
+          # Disposable CI runner directory; the socket is later restricted.
+          chmod 1777 "$RUNNER_TEMP/zaping-clamd-b2-socket"
+          docker pull clamav/clamav-debian:stable
+          # Record resolved image digest for reproducibility review.
+          docker image inspect --format='{{index .RepoDigests 0}}' clamav/clamav-debian:stable
+
+      - name: Start offline clamd with preloaded signatures and no published port
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach \
+            --name zaping-clamd-b2-real-lab \
+            --network none \
+            --memory 4g --memory-swap 4g --cpus 2 \
+            --pids-limit 256 \
+            --security-opt no-new-privileges \
+            --env CLAMAV_NO_FRESHCLAMD=true \
+            --env TZ=UTC \
+            --mount type=bind,source="$RUNNER_TEMP/zaping-clamd-b2-socket",target=/tmp \
+            clamav/clamav-debian:stable
+
+      - name: Wait for real clamd Unix socket and restrict socket permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          ready=false
+          for attempt in $(seq 1 75); do
+            if docker exec zaping-clamd-b2-real-lab test -S /tmp/clamd.sock; then
+              ready=true
+              break
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' zaping-clamd-b2-real-lab)" != true ]; then
+              break
+            fi
+            sleep 3
+          done
+          if [ "$ready" != true ]; then
+            echo 'ClamAV lab unavailable; failing closed.'
+            exit 1
+          fi
+          socket="$RUNNER_TEMP/zaping-clamd-b2-socket/clamd.sock"
+          test -S "$socket"
+          sudo chgrp "$(id -gn)" "$socket"
+          sudo chmod 0660 "$socket"
+
+      - name: Run actual ClamAV tests from separate networkless read-only client
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --network none \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=128m \
+            --pids-limit 128 \
+            --memory 1g --cpus 2 \
+            --user "$(id -u):$(id -g)" \
+            --env CI=true \
+            --env GITHUB_ACTIONS=true \
+            --env TZ=UTC \
+            --env RUN_ZFILES_CLAMAV_REAL_QA=1 \
+            --env CLAMD_SOCKET=/run/zaping-clamd/clamd.sock \
+            --mount type=bind,source="$GITHUB_WORKSPACE",target=/work,readonly \
+            --mount type=bind,source="$RUNNER_TEMP/zaping-clamd-b2-socket",target=/run/zaping-clamd,readonly \
+            --workdir /work/app/api \
+            node:24-bookworm-slim \
+            ./node_modules/.bin/jest --config ./test/jest-e2e.json --runInBand \
+              test/zfiles-clamav-real-lab.qa.e2e-spec.ts
+
+      - name: Redacted failure-only diagnostic
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          docker inspect --format='{{.State.Status}} / health={{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}' zaping-clamd-b2-real-lab
+          # Do not print daemon logs, malware signatures, file bytes, URLs or credentials.
+
+      - name: Remove disposable container and Unix socket
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          docker rm -f zaping-clamd-b2-real-lab >/dev/null 2>&1
+          sudo rm -rf "$RUNNER_TEMP/zaping-clamd-b2-socket"
