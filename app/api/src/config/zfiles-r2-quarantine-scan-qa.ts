@@ -12,6 +12,9 @@ export type QuarantineScannerQaFixture = Readonly<{
   bucket: 'zaping-quarantine-qa';
   endpoint: string;
   key: string;
+  companyId: string;
+  documentId: string;
+  attachmentId: string;
   sizeBytes: number;
   sha256: string;
 }>;
@@ -85,6 +88,9 @@ export function requireQuarantineScannerQaFixture(
       'https://' + accountId + '.' + jurisdictionPrefix +
       'r2.cloudflarestorage.com',
     key: ['quarantine', company, document, attachment].join('/'),
+    companyId: company,
+    documentId: document,
+    attachmentId: attachment,
     sizeBytes,
     sha256,
   };
@@ -160,6 +166,8 @@ export async function scanVerifiedQuarantineQaObject(
       parts.length !== 4 ||
       parts[0] !== 'quarantine' ||
       !parts.slice(1).every((part) => UUID.test(part)) ||
+      ![fixture.companyId, fixture.documentId, fixture.attachmentId].every((id) => UUID.test(id)) ||
+      fixture.key !== ['quarantine', fixture.companyId, fixture.documentId, fixture.attachmentId].join('/') ||
       !Number.isSafeInteger(fixture.sizeBytes) ||
       fixture.sizeBytes < 1 ||
       fixture.sizeBytes > SUPPLIER_ATTACHMENT_MAX_BYTES ||
