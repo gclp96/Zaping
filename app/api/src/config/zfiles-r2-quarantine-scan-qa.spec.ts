@@ -161,7 +161,7 @@ describe('ZFILES-R2-03B3 read-only quarantine verified scan lab', () => {
       const f = setup();
       if (phase === 'r2') f.send.mockRejectedValue(new Error('secret-r2-key'));
       if (phase === 'daemon') (f.scanner.scan as jest.Mock).mockRejectedValue(new Error('secret-signature'));
-      if (phase === 'readiness') (f.readiness.check as jest.Mock).mockRejectedValue(new Error('secret-socket'));
+      if (phase === 'readiness') (f.readiness.check as jest.Mock).mockReset().mockRejectedValue(new Error('secret-socket'));
       await expect(scanVerifiedQuarantineQaObject(
         { send: f.send } as unknown as S3Client,
         f.fixture, f.scanner, f.readiness,
