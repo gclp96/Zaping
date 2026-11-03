@@ -9,6 +9,8 @@ import {
   createSyntheticQuarantinePdf,
   createZfilesQuarantineQaClient,
   requireZfilesQuarantineQaConfig,
+  summarizeZfilesQuarantineQaError,
+  type ZfilesQuarantineQaPhase,
   writeAndVerifyQuarantineQaFixture,
 } from './zfiles-r2-quarantine-qa';
 
@@ -23,6 +25,27 @@ const validEnv: NodeJS.ProcessEnv = {
 };
 
 describe('ZFILES-R2-03A quarantine QA transport', () => {
+
+  it('reports only allowlisted failures without leaking SDK messages', () => {
+    const secret = 'synthetic-only-secret';
+    const key = 'quarantine/private-fixture-secret-key';
+    expect(
+      summarizeZfilesQuarantineQaError({
+        name: 'AccessDenied',
+        message: secret + key,
+        $metadata: { httpStatusCode: 403, requestId: secret },
+      }),
+    ).toBe('AccessDenied HTTP 403');
+    expect(
+      summarizeZfilesQuarantineQaError({
+        name: secret,
+        message: key,
+        $metadata: { httpStatusCode: 500, requestId: secret },
+      }),
+    ).toBe('UNCLASSIFIED HTTP 500');
+    expect(summarizeZfilesQuarantineQaError(null)).toBe('UNCLASSIFIED');
+  });
+
   it('requires explicit local-only opt-in and quarantine scope', () => {
     const config = requireZfilesQuarantineQaConfig(validEnv);
     expect(config).toEqual({
@@ -119,10 +142,13 @@ describe('ZFILES-R2-03A quarantine QA transport', () => {
       throw new Error('Unexpected S3 command');
     });
 
+    const phases: ZfilesQuarantineQaPhase[] = [];
     const result = await writeAndVerifyQuarantineQaFixture(
       { send } as unknown as S3Client,
       config,
+      (phase) => phases.push(phase),
     );
+    expect(phases).toEqual(['prepare', 'put', 'get', 'verify']);
     expect(send).toHaveBeenCalledTimes(2);
     expect(result.key).toBe(key);
     expect(result.sizeBytes).toBe(uploaded?.length);
