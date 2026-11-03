@@ -1,5 +1,7 @@
 import {
   createZfilesQuarantineQaClient,
+  summarizeZfilesQuarantineQaError,
+  type ZfilesQuarantineQaPhase,
   writeAndVerifyQuarantineQaFixture,
 } from '../src/config/zfiles-r2-quarantine-qa';
 
@@ -15,14 +17,20 @@ const describeQa =
 describeQa('ZFILES-R2-03A conditional quarantine QA write', () => {
   it('writes one new synthetic PDF and verifies its bytes', async () => {
     const { client, config } = createZfilesQuarantineQaClient(process.env);
+    let phase: ZfilesQuarantineQaPhase = 'prepare';
     try {
-      const result = await writeAndVerifyQuarantineQaFixture(client, config);
+      const result = await writeAndVerifyQuarantineQaFixture(
+        client,
+        config,
+        (next) => { phase = next; },
+      );
       expect(result.key.startsWith('quarantine/')).toBe(true);
       expect(result.sizeBytes).toBeGreaterThan(0);
       expect(result.sha256).toMatch(/^[0-9a-f]{64}$/);
-    } catch {
-      // Never expose credentials, bucket keys or SDK request details.
-      throw new Error('R2 QA quarantine write failed; verify local QA scope');
+    } catch (error) {
+      // Stage and allowlisted HTTP status only. No SDK message or object key.
+      const reason = summarizeZfilesQuarantineQaError(error);
+      throw new Error(`R2 QA quarantine ${phase} failed: ${reason}`);
     } finally {
       client.destroy();
     }
