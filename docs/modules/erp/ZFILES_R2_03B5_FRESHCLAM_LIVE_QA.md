@@ -16,7 +16,7 @@ Se mantienen los módulos ClamAvReadinessProbe de 03B4 y ClamAvInstreamScanner d
 
 El workflow no usa workflow_dispatch porque una rama nueva no está registrada como workflow en main. Usa un **push sólo en rama 03B5** con condición explícita de mensaje de commit:
 
-    [run-zfiles-b5-freshclam-once]
+    [run-zfiles-b5-freshclam-reviewed-fix]
 
 Sin esa marca el job se omite. No hay eventos pull_request ni schedule en el workflow dedicado. CI general API/Web/Historical sí se ejecuta sin contactar FreshClam. Ejecutar el marcador **únicamente** tras revisión de código y checks normales. No repetir automáticamente cuando haya rate limits del CDN.
 
@@ -45,3 +45,10 @@ Se autorizó **un solo intento de FreshClam real** desde CI efímero de la rama 
 ## Diagnóstico sin red después del primer fallo
 
 Se añadió una comprobación aislada que sólo ejecuta freshclam --version, inspecciona configuración y verifica permisos de volúmenes usando el mismo digest, sin descargar firmas ni conectar a servidores antivirus. La activación es explícita y separada de la prueba real anterior. Nunca debe interpretarse como aprobación del gate de actualización.
+
+## Revisión de seguridad tras el primer intento (03/11/2026)
+
+- El primer marcador produjo fallo en FreshClam antes de iniciar clamd; no se conoce el mensaje interno exacto porque el log fue destruido deliberadamente.
+- Preflight offline #41739397102 confirmó comando/opciones válidos y escritura en DB/tmp, pero observó UpdateLogFile configurado con directorio de logs de sólo lectura. Es una **causa probable**, no diagnóstico de causalidad definitivo.
+- Para el segundo intento *expresamente revisado* se monta /var/log/clamav sobre tmpfs sinexec/no-suid y se imprimirá sólo una categoría segura basada en código de salida; los logs crudos continúan sin publicarse.
+- El primer marcador ya no dispara el workflow. El nuevo marcador únicamente se usará en un commit revisado tras CI general; **no hay retries en el job**. Si vuelve a fallar, queda BLOCKED y se detiene la automatización.
