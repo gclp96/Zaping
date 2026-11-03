@@ -61,10 +61,7 @@ function setup(
     scan: jest.fn(() => Promise.resolve('CLAMD_OK_UNATTESTED' as const)),
   };
   const readiness: QaScannerReadiness = {
-    check: jest
-      .fn()
-      .mockResolvedValueOnce(before)
-      .mockResolvedValueOnce(after),
+    check: jest.fn().mockResolvedValueOnce(before).mockResolvedValueOnce(after),
   };
   return { fixture, send, scanner, readiness };
 }
