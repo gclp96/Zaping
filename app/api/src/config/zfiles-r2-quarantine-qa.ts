@@ -17,6 +17,46 @@ export type ZfilesQuarantineQaConfig = {
   region: 'auto';
 };
 
+export type ZfilesQuarantineQaPhase = 'prepare' | 'put' | 'get' | 'verify';
+
+const SAFE_QA_CODES = new Set([
+  'AccessDenied',
+  'BadDigest',
+  'CredentialsProviderError',
+  'Forbidden',
+  'InvalidAccessKeyId',
+  'InvalidArgument',
+  'InvalidDigest',
+  'InvalidRequest',
+  'NoSuchBucket',
+  'NoSuchKey',
+  'NotImplemented',
+  'PreconditionFailed',
+  'RequestTimeout',
+  'SignatureDoesNotMatch',
+  'TimeoutError',
+]);
+
+/** Expose only an allowlisted S3 code and numeric status, never SDK messages. */
+export function summarizeZfilesQuarantineQaError(error: unknown): string {
+  if (!error || typeof error !== 'object') return 'UNCLASSIFIED';
+  const raw = error as { name?: unknown; $metadata?: unknown };
+  const code =
+    typeof raw.name === 'string' && SAFE_QA_CODES.has(raw.name)
+      ? raw.name
+      : 'UNCLASSIFIED';
+  const metadata = raw.$metadata as { httpStatusCode?: unknown } | undefined;
+  const status = metadata?.httpStatusCode;
+  const safeStatus =
+    typeof status === 'number' &&
+    Number.isInteger(status) &&
+    status >= 400 &&
+    status <= 599
+      ? ` HTTP ${status}`
+      : '';
+  return code + safeStatus;
+}
+
 export function requireZfilesQuarantineQaConfig(
   env: NodeJS.ProcessEnv,
 ): ZfilesQuarantineQaConfig {
@@ -103,10 +143,12 @@ export function createSyntheticQuarantinePdf(): {
 export async function writeAndVerifyQuarantineQaFixture(
   client: S3Client,
   config: ZfilesQuarantineQaConfig,
+  onPhase?: (phase: ZfilesQuarantineQaPhase) => void,
 ): Promise<{ key: string; sizeBytes: number; sha256: string }> {
   if (config.bucket !== 'zaping-quarantine-qa') {
     throw new Error('QA write can only target the quarantine bucket');
   }
+  onPhase?.('prepare');
   const fixture = createSyntheticQuarantinePdf();
   const keyParts = fixture.key.split('/');
   if (
@@ -121,6 +163,7 @@ export async function writeAndVerifyQuarantineQaFixture(
 
   // R2 evaluates If-None-Match: * atomically. Do not overwrite or retry
   // ambiguous writes. Content-MD5 detects transport corruption.
+  onPhase?.('put');
   await client.send(
     new PutObjectCommand({
       Bucket: config.bucket,
@@ -134,6 +177,7 @@ export async function writeAndVerifyQuarantineQaFixture(
     { abortSignal: AbortSignal.timeout(10_000) },
   );
 
+  onPhase?.('get');
   const result = await client.send(
     new GetObjectCommand({ Bucket: config.bucket, Key: fixture.key }),
     { abortSignal: AbortSignal.timeout(10_000) },
@@ -146,6 +190,7 @@ export async function writeAndVerifyQuarantineQaFixture(
     if (result.ContentLength !== sizeBytes) {
       throw new Error('Quarantine QA object length mismatch');
     }
+    onPhase?.('verify');
     await verifyZfilesR2QaBody(body, {
       sizeBytes,
       sha256: fixture.sha256,
