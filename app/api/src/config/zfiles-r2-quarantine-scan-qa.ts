@@ -85,7 +85,10 @@ export function requireQuarantineScannerQaFixture(
   return {
     bucket: 'zaping-quarantine-qa',
     endpoint:
-      'https://' + accountId + '.' + jurisdictionPrefix +
+      'https://' +
+      accountId +
+      '.' +
+      jurisdictionPrefix +
       'r2.cloudflarestorage.com',
     key: ['quarantine', company, document, attachment].join('/'),
     companyId: company,
@@ -101,9 +104,10 @@ export function requireQuarantineScannerQaFixture(
  * Cloudflare token privileges; verify them externally before live QA.
  * Never reuse R2_QUARANTINE_WRITE_* or R2_READ_* credentials.
  */
-export function createQuarantineScannerQaClient(
-  env: NodeJS.ProcessEnv,
-): { client: S3Client; fixture: QuarantineScannerQaFixture } {
+export function createQuarantineScannerQaClient(env: NodeJS.ProcessEnv): {
+  client: S3Client;
+  fixture: QuarantineScannerQaFixture;
+} {
   const fixture = requireQuarantineScannerQaFixture(env);
   const accessKeyId = env.R2_QUARANTINE_SCAN_READ_ACCESS_KEY_ID ?? '';
   const secretAccessKey = env.R2_QUARANTINE_SCAN_READ_SECRET_ACCESS_KEY ?? '';
@@ -166,8 +170,16 @@ export async function scanVerifiedQuarantineQaObject(
       parts.length !== 4 ||
       parts[0] !== 'quarantine' ||
       !parts.slice(1).every((part) => UUID.test(part)) ||
-      ![fixture.companyId, fixture.documentId, fixture.attachmentId].every((id) => UUID.test(id)) ||
-      fixture.key !== ['quarantine', fixture.companyId, fixture.documentId, fixture.attachmentId].join('/') ||
+      ![fixture.companyId, fixture.documentId, fixture.attachmentId].every(
+        (id) => UUID.test(id),
+      ) ||
+      fixture.key !==
+        [
+          'quarantine',
+          fixture.companyId,
+          fixture.documentId,
+          fixture.attachmentId,
+        ].join('/') ||
       !Number.isSafeInteger(fixture.sizeBytes) ||
       fixture.sizeBytes < 1 ||
       fixture.sizeBytes > SUPPLIER_ATTACHMENT_MAX_BYTES ||
@@ -199,10 +211,7 @@ export async function scanVerifiedQuarantineQaObject(
       }
       const actual = hash.digest();
       const expected = Buffer.from(fixture.sha256, 'hex');
-      if (
-        length !== fixture.sizeBytes ||
-        !timingSafeEqual(actual, expected)
-      ) {
+      if (length !== fixture.sizeBytes || !timingSafeEqual(actual, expected)) {
         throw failed();
       }
       bytes = Buffer.concat(chunks, length);
