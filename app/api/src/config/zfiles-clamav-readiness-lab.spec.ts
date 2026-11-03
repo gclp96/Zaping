@@ -179,12 +179,9 @@ describe('ClamAV ZFILES-R2-03B4 readiness gate (unattested)', () => {
     const probe = new ClamAvReadinessProbe(f.socket, policy);
     try {
       await expect(
-        scanVerifiedQuarantineQaObject(
-          { send },
-          qa,
-          scanner,
-          { check: () => probe.check(at) },
-        ),
+        scanVerifiedQuarantineQaObject({ send }, qa, scanner, {
+          check: () => probe.check(at),
+        }),
       ).resolves.toBe('CLAMD_OK_UNATTESTED');
       expect(send).toHaveBeenCalledTimes(1);
       expect(scanner.scan).toHaveBeenCalledTimes(1);
