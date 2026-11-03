@@ -25,7 +25,6 @@ const validEnv: NodeJS.ProcessEnv = {
 };
 
 describe('ZFILES-R2-03A quarantine QA transport', () => {
-
   it('reports only allowlisted failures without leaking SDK messages', () => {
     const secret = 'synthetic-only-secret';
     const key = 'quarantine/private-fixture-secret-key';
