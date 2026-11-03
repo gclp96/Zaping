@@ -1,0 +1,84 @@
+name: ZFILES-R2-03B5 offline FreshClam preflight only
+
+on:
+  push:
+    branches:
+      - feat/zfiles-r2-03b5-freshclam-real-qa-20261103
+    paths:
+      - .github/workflows/zfiles-r2-03b5-offline-preflight.yml
+      - docs/modules/erp/ZFILES_R2_03B5_FRESHCLAM_LIVE_QA.md
+
+permissions:
+  contents: read
+
+jobs:
+  offline-preflight:
+    if: contains(github.event.head_commit.message, '[run-zfiles-b5-offline-preflight]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLAMAV_IMAGE: clamav/clamav-debian@sha256:c21aa18cc0a358678255a3dfb343a4555b58f71b97d7b869df8fdf7ea0a5b4b1
+    steps:
+      - name: Reproduce database mount and ownership offline
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="$RUNNER_TEMP/zfiles-b5-preflight"
+          mkdir -p "$base/db"
+          docker pull "$CLAMAV_IMAGE" >/dev/null
+          container="$(docker create --network none "$CLAMAV_IMAGE")"
+          trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+          docker cp "$container:/var/lib/clamav/." "$base/db/"
+          test -f "$base/db/main.cvd"
+          uid="$(docker run --rm --network none --entrypoint id "$CLAMAV_IMAGE" -u clamav)"
+          gid="$(docker run --rm --network none --entrypoint id "$CLAMAV_IMAGE" -g clamav)"
+          sudo chown -R "$uid:$gid" "$base/db"
+          echo 'PINNED_IMAGE_AND_DB_SEED_OK'
+
+      - name: Verify executable, config and writable locations without updates or network
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --network none \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --read-only \
+            --tmpfs /tmp:rw,nosuid,noexec,size=256m \
+            --user clamav \
+            --pids-limit 128 \
+            --memory 1g \
+            --env TZ=UTC \
+            --mount type=bind,source="$RUNNER_TEMP/zfiles-b5-preflight/db",target=/var/lib/clamav \
+            --entrypoint /bin/sh "$CLAMAV_IMAGE" -eu -c '
+              test -r /etc/clamav/freshclam.conf
+              echo CONFIG_READABLE_OK
+              freshclam --version >/dev/null 2>&1
+              freshclam --stdout --version >/dev/null 2>&1
+              echo FRESHCLAM_OPTIONS_ACCEPTED
+              test -w /var/lib/clamav
+              touch /var/lib/clamav/.zfiles-write-probe
+              rm /var/lib/clamav/.zfiles-write-probe
+              echo SIGNATURE_DB_WRITABLE_OK
+              test -w /tmp
+              echo TMP_WRITABLE_OK
+
+              if grep -Eq "^UpdateLogFile[[:space:]]+" /etc/clamav/freshclam.conf; then
+                echo UPDATE_LOG_TARGET_CONFIGURED
+                if test -w /var/log/clamav; then
+                  echo UPDATE_LOG_DIRECTORY_WRITABLE
+                else
+                  echo UPDATE_LOG_DIRECTORY_READ_ONLY
+                fi
+              else
+                echo UPDATE_LOG_TARGET_NOT_CONFIGURED
+              fi
+              echo OFFLINE_PREFLIGHT_DONE_NO_UPDATE
+            '
+
+      - name: Clean offline fixture
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          sudo rm -rf "$RUNNER_TEMP/zfiles-b5-preflight"
