@@ -76,6 +76,28 @@ describe('PurchasesController', () => {
     );
   });
 
+  it('cancels a purchase with companyId from the authenticated request', async () => {
+    const response = { id: 'purchase-1', status: 'CANCELLED' };
+    purchasesServiceMock.cancel.mockResolvedValue(response);
+
+    await expect(
+      controller.cancel(
+        {
+          user: {
+            companyId: 'company-1',
+          },
+        },
+        'purchase-1',
+      ),
+    ).resolves.toBe(response);
+
+    expect(purchasesServiceMock.cancel).toHaveBeenCalledTimes(1);
+    expect(purchasesServiceMock.cancel).toHaveBeenCalledWith(
+      'company-1',
+      'purchase-1',
+    );
+  });
+
   it('keeps inventory movements routed to the existing service method', async () => {
     const response = [{ id: 'movement-1' }];
     purchasesServiceMock.findInventoryMovements.mockResolvedValue(response);
