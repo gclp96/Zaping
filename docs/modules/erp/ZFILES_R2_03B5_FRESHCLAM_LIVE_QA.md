@@ -52,3 +52,7 @@ Se añadió una comprobación aislada que sólo ejecuta freshclam --version, ins
 - Preflight offline #41739397102 confirmó comando/opciones válidos y escritura en DB/tmp, pero observó UpdateLogFile configurado con directorio de logs de sólo lectura. Es una **causa probable**, no diagnóstico de causalidad definitivo.
 - Para el segundo intento *expresamente revisado* se monta /var/log/clamav sobre tmpfs sinexec/no-suid y se imprimirá sólo una categoría segura basada en código de salida; los logs crudos continúan sin publicarse.
 - El primer marcador ya no dispara el workflow. El nuevo marcador únicamente se usará en un commit revisado tras CI general; **no hay retries en el job**. Si vuelve a fallar, queda BLOCKED y se detiene la automatización.
+
+## Segundo intento revisado
+
+Tras el diagnóstico offline de la ruta de logs y el CI general 3/3 PASS de la corrección, se autorizó un único intento adicional, identificado por marcador nuevo. Este intento tampoco se repite automáticamente: ante un fallo, mantener el PR en Draft/BLOCKED.
