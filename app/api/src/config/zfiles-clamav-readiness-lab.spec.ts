@@ -1,7 +1,10 @@
+import { createHash } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, type Server } from 'node:net';
+import { Readable } from 'node:stream';
+import { GetObjectCommand, type S3Client } from '@aws-sdk/client-s3';
 import {
   BadRequestException,
   ServiceUnavailableException,
@@ -11,6 +14,10 @@ import {
   evaluateClamAvVersion,
   type ClamAvReadinessPolicy,
 } from './zfiles-clamav-readiness-lab';
+import {
+  scanVerifiedQuarantineQaObject,
+  type QuarantineScannerQaFixture,
+} from './zfiles-r2-quarantine-scan-qa';
 
 const policy: ClamAvReadinessPolicy = {
   policyVersion: 'zfiles-b4-lab-v1',
@@ -135,6 +142,58 @@ describe('ClamAV ZFILES-R2-03B4 readiness gate (unattested)', () => {
       await expect(
         new ClamAvReadinessProbe(f.socket, policy).check(at),
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    } finally {
+      await f.stop();
+    }
+  });
+  it('uses actual Unix PING/VERSION before and after an exact in-memory QA scan', async () => {
+    const f = await fixture((command) =>
+      command === 'zPING' ? 'PONG' : command === 'zVERSION' ? valid : null,
+    );
+    const bytes = Buffer.from('%PDF-1.4\\nsynthetic\\n%%EOF\\n');
+    const companyId = '11111111-1111-4111-8111-111111111111';
+    const documentId = '22222222-2222-4222-8222-222222222222';
+    const attachmentId = '33333333-3333-4333-8333-333333333333';
+    const qa: QuarantineScannerQaFixture = {
+      bucket: 'zaping-quarantine-qa',
+      endpoint: 'https://example.invalid',
+      companyId,
+      documentId,
+      attachmentId,
+      key: ['quarantine', companyId, documentId, attachmentId].join('/'),
+      sizeBytes: bytes.length,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    };
+    const send = jest.fn((command: unknown) => {
+      if (!(command instanceof GetObjectCommand)) {
+        throw new Error('Only GetObject is permitted in QA');
+      }
+      return Promise.resolve({
+        Body: Readable.from([bytes]),
+        ContentLength: bytes.length,
+      });
+    });
+    const scanner = {
+      scan: jest.fn(() => Promise.resolve('CLAMD_OK_UNATTESTED' as const)),
+    };
+    const probe = new ClamAvReadinessProbe(f.socket, policy);
+    try {
+      await expect(
+        scanVerifiedQuarantineQaObject(
+          { send } as unknown as S3Client,
+          qa,
+          scanner,
+          { check: () => probe.check(at) },
+        ),
+      ).resolves.toBe('CLAMD_OK_UNATTESTED');
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(scanner.scan).toHaveBeenCalledTimes(1);
+      expect(f.commands).toEqual([
+        'zPING',
+        'zVERSION',
+        'zPING',
+        'zVERSION',
+      ]);
     } finally {
       await f.stop();
     }
