@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, type Server } from 'node:net';
 import { Readable } from 'node:stream';
-import { GetObjectCommand, type S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
 import {
   BadRequestException,
   ServiceUnavailableException,
@@ -180,7 +180,7 @@ describe('ClamAV ZFILES-R2-03B4 readiness gate (unattested)', () => {
     try {
       await expect(
         scanVerifiedQuarantineQaObject(
-          { send } as unknown as S3Client,
+          { send },
           qa,
           scanner,
           { check: () => probe.check(at) },
@@ -188,12 +188,7 @@ describe('ClamAV ZFILES-R2-03B4 readiness gate (unattested)', () => {
       ).resolves.toBe('CLAMD_OK_UNATTESTED');
       expect(send).toHaveBeenCalledTimes(1);
       expect(scanner.scan).toHaveBeenCalledTimes(1);
-      expect(f.commands).toEqual([
-        'zPING',
-        'zVERSION',
-        'zPING',
-        'zVERSION',
-      ]);
+      expect(f.commands).toEqual(['zPING', 'zVERSION', 'zPING', 'zVERSION']);
     } finally {
       await f.stop();
     }
