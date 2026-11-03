@@ -41,3 +41,7 @@ Sin tokens R2, PostgreSQL, .env, paquetes INSAP, documentos reales, endpoints, p
 ## Intento de QA autorizado
 
 Se autorizó **un solo intento de FreshClam real** desde CI efímero de la rama 03B5 tras comprobar que el CI general inicial fue API/Web/Historical PASS. El resultado se registrará en el PR con SHA exacto; cualquier problema de CDN/red/frescura implica BLOCKED hasta revisión, sin reintento automático.
+
+## Diagnóstico sin red después del primer fallo
+
+Se añadió una comprobación aislada que sólo ejecuta freshclam --version, inspecciona configuración y verifica permisos de volúmenes usando el mismo digest, sin descargar firmas ni conectar a servidores antivirus. La activación es explícita y separada de la prueba real anterior. Nunca debe interpretarse como aprobación del gate de actualización.
