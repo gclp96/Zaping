@@ -20,7 +20,7 @@ jobs:
   opt-in-freshclam-lab:
     # Only one deliberately marked push may contact ClamAV's update CDN.
     # Do not use on pull_request or a recurring schedule.
-    if: contains(github.event.head_commit.message, '[run-zfiles-b5-freshclam-once]')
+    if: contains(github.event.head_commit.message, '[run-zfiles-b5-freshclam-reviewed-fix]')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -86,6 +86,7 @@ jobs:
             --security-opt no-new-privileges \
             --read-only \
             --tmpfs /tmp:rw,nosuid,noexec,size=256m \
+            --tmpfs /var/log/clamav:rw,nosuid,noexec,size=16m,mode=1777 \
             --user clamav \
             --pids-limit 128 \
             --memory 3g --cpus 2 \
@@ -97,7 +98,14 @@ jobs:
           update_status=$?
           set -e
           if [ "$update_status" -ne 0 ]; then
-            echo 'FreshClam update failed; no daemon scan or retry permitted.'
+            case "$update_status" in
+              40) echo 'FreshClam failed: invalid CLI option' ;;
+              50|53|57|62) echo 'FreshClam failed: local I/O or logger initialization' ;;
+              52|58|59) echo 'FreshClam failed: network or mirror' ;;
+              54) echo 'FreshClam failed: database integrity check' ;;
+              *) echo 'FreshClam failed: unclassified failure' ;;
+            esac
+            echo 'No scan or automatic update retry permitted.'
             exit 1
           fi
           echo 'FreshClam one-shot completed; freshness still requires real UTC daemon VERSION'
