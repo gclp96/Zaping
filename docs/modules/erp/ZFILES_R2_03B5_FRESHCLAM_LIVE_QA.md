@@ -37,3 +37,7 @@ Sin tokens R2, PostgreSQL, .env, paquetes INSAP, documentos reales, endpoints, p
 - https://github.com/Cisco-Talos/clamav-docker/blob/main/clamav/README-debian.md
 - https://docs.clamav.net/faq/faq-freshclam
 - https://docs.clamav.net/manual/Usage/ClamdProtocol.html
+
+## Intento de QA autorizado
+
+Se autorizó **un solo intento de FreshClam real** desde CI efímero de la rama 03B5 tras comprobar que el CI general inicial fue API/Web/Historical PASS. El resultado se registrará en el PR con SHA exacto; cualquier problema de CDN/red/frescura implica BLOCKED hasta revisión, sin reintento automático.
