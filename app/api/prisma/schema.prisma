@@ -2132,6 +2132,37 @@ model SupplierDocumentAttachment {
   uploadedBy User @relation("SupplierAttachmentUploadedBy", fields: [uploadedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
   removedBy User? @relation("SupplierAttachmentRemovedBy", fields: [removedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
 
+  scanJobs SupplierAttachmentScanJob[]
+
+  @@unique([id, companyId], map: "ZSATT_id_company_key")
   @@unique([companyId, storageKey])
   @@index([companyId, documentId, status, createdAt])
+}
+
+enum SupplierAttachmentScanJobStatus {
+  ISSUED
+  CONSUMED
+  EXPIRED
+}
+
+/// 03C2A: database-issued scan challenges, not trusted evidence.
+/// No consumer, upload endpoint or release authority is registered.
+model SupplierAttachmentScanJob {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String
+  documentId String
+  attachmentId String
+  requestNonce String @unique(map: "ZSASJ_nonce_key") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  quarantineKey String @db.VarChar(300)
+  contentSizeBytes Int
+  contentSha256 String @db.VarChar(64)
+  status SupplierAttachmentScanJobStatus @default(ISSUED)
+  issuedAt DateTime @default(now()) @db.Timestamp(3)
+  expiresAt DateTime @db.Timestamp(3)
+  consumedAt DateTime? @db.Timestamp(3)
+
+  attachment SupplierDocumentAttachment @relation(fields: [attachmentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict, map: "ZSASJ_attachment_company_fkey")
+
+  // SQL partial unique index: at most one ISSUED job per Company/attachment.
+  @@index([companyId, attachmentId, status, expiresAt], map: "ZSASJ_company_attachment_status_expires_idx")
 }
