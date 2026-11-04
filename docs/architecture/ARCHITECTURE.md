@@ -6,6 +6,8 @@
 **Última actualización:** 2026-08-27
 **Responsable:** Zaping Architecture Team
 
+> **Addendum propuesto (2026-11-03, no implementado):** [Zaping Smart Station — arquitectura objetivo y discovery](SMART_STATION_ARCHITECTURE.md) y [ADR-SMART-STATION-001](adr/ADR-SMART-STATION-001.md). La nueva capa de captura con cámaras, lector 2D y posible RFID no modifica el monolito modular ni traslada la autoridad de Purchase Receipts, CaseKit, Dispatch, Custody o Return/Reconciliation. Sus observaciones solo originan propuestas revisables y las confirmaciones quedan en los dominios existentes. Este addendum no implica despliegue ni cambios en Prisma.
+
 ---
 
 # 1. Propósito
