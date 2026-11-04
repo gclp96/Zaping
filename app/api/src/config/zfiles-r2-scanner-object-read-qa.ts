@@ -151,7 +151,7 @@ export async function verifyScannerObjectReadQaScope(
   if (
     head.ContentLength !== fixture.sizeBytes ||
     typeof head.ETag !== 'string' ||
-    !/^"[^"\\r\\n]{1,128}"$/u.test(head.ETag)
+    !/^"[^"]{1,128}"$/u.test(head.ETag)
   ) {
     throw new ZfilesR2QaSafeDiagnosticError('Q_HEAD_METADATA');
   }
