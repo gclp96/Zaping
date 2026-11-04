@@ -212,7 +212,12 @@ describe('ZFILES-R2-03C1 isolated scanner: fail-closed, no persistence', () => {
     const f = fixture();
     const envelope = await f.worker.scan(job);
     expect(() =>
-      verifyScanEvidence(envelope, { ...job, companyId: NONCE }, verification, T),
+      verifyScanEvidence(
+        envelope,
+        { ...job, companyId: NONCE },
+        verification,
+        T,
+      ),
     ).toThrow(ServiceUnavailableException);
     expect(() =>
       verifyScanEvidence(
