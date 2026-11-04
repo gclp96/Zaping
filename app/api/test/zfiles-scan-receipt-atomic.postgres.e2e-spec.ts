@@ -219,12 +219,7 @@ describePg('ZFILES-R2-03C2B2 atomic signed receipt PostgreSQL QA', () => {
         companyId,
         documentId,
         uploadedById: userId,
-        storageKey: [
-          'private',
-          companyId,
-          documentId,
-          attachmentId,
-        ].join('/'),
+        storageKey: ['private', companyId, documentId, attachmentId].join('/'),
         originalName: 'synthetic.jpg',
         contentType: 'image/jpeg',
         sizeBytes: 64,
@@ -240,8 +235,10 @@ describePg('ZFILES-R2-03C2B2 atomic signed receipt PostgreSQL QA', () => {
     return { companyId, documentId, attachmentId, ...issued };
   }
 
-  function evidence(f: Awaited<ReturnType<typeof fixture>>, verdict:
-    'CLEAN_CANDIDATE' | 'MALWARE_DETECTED' = 'CLEAN_CANDIDATE') {
+  function evidence(
+    f: Awaited<ReturnType<typeof fixture>>,
+    verdict: 'CLEAN_CANDIDATE' | 'MALWARE_DETECTED' = 'CLEAN_CANDIDATE',
+  ) {
     const now = Date.now();
     const claims: ScanEvidenceClaims = {
       protocol: 'zaping-scan-evidence-v1',
@@ -337,7 +334,9 @@ describePg('ZFILES-R2-03C2B2 atomic signed receipt PostgreSQL QA', () => {
   it('atomically saves an intact Ed25519 envelope and consumes the nonce', async () => {
     const f = await fixture();
     const signed = evidence(f);
-    await expect(gateway(verifierA).verifyAndCommit(f.jobId, signed)).resolves.toEqual({
+    await expect(
+      gateway(verifierA).verifyAndCommit(f.jobId, signed),
+    ).resolves.toEqual({
       status: 'VERIFIED_UNRELEASED',
       verdict: 'CLEAN_CANDIDATE',
     });
@@ -352,9 +351,10 @@ describePg('ZFILES-R2-03C2B2 atomic signed receipt PostgreSQL QA', () => {
     expect(receipts).toHaveLength(1);
     expect(receipts[0].verdict).toBe('CLEAN_CANDIDATE');
     expect(receipts[0].signedEnvelope).toEqual(signed);
-    const attachment = await ownerDb.supplierDocumentAttachment.findUniqueOrThrow({
-      where: { id: f.attachmentId },
-    });
+    const attachment =
+      await ownerDb.supplierDocumentAttachment.findUniqueOrThrow({
+        where: { id: f.attachmentId },
+      });
     expect(attachment.status).toBe('PENDING_SCAN');
     await expect(
       gateway(verifierA).verifyAndCommit(f.jobId, signed),
@@ -369,8 +369,12 @@ describePg('ZFILES-R2-03C2B2 atomic signed receipt PostgreSQL QA', () => {
   it('serializes physically separate verifier connections; one winner', async () => {
     const f = await fixture();
     const signed = evidence(f);
-    const pidA = await verifierA.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
-    const pidB = await verifierB.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+    const pidA = await verifierA.$queryRaw<
+      { pid: number }[]
+    >`SELECT pg_backend_pid() AS pid`;
+    const pidB = await verifierB.$queryRaw<
+      { pid: number }[]
+    >`SELECT pg_backend_pid() AS pid`;
     expect(pidA[0].pid).not.toBe(pidB[0].pid);
     const attempts = await Promise.allSettled([
       gateway(verifierA).verifyAndCommit(f.jobId, signed),
@@ -399,9 +403,10 @@ describePg('ZFILES-R2-03C2B2 atomic signed receipt PostgreSQL QA', () => {
       status: 'VERIFIED_UNRELEASED',
       verdict: 'MALWARE_DETECTED',
     });
-    const attachment = await ownerDb.supplierDocumentAttachment.findUniqueOrThrow({
-      where: { id: f.attachmentId },
-    });
+    const attachment =
+      await ownerDb.supplierDocumentAttachment.findUniqueOrThrow({
+        where: { id: f.attachmentId },
+      });
     expect(attachment.status).toBe('PENDING_SCAN');
     await expect(
       ownerDb.supplierDocumentAttachment.update({
@@ -431,9 +436,11 @@ describePg('ZFILES-R2-03C2B2 atomic signed receipt PostgreSQL QA', () => {
       }),
     ).toBe(0);
     expect(
-      (await ownerDb.supplierAttachmentScanJob.findUniqueOrThrow({
-        where: { id: f.jobId },
-      })).status,
+      (
+        await ownerDb.supplierAttachmentScanJob.findUniqueOrThrow({
+          where: { id: f.jobId },
+        })
+      ).status,
     ).toBe('ISSUED');
   });
 
@@ -459,9 +466,11 @@ describePg('ZFILES-R2-03C2B2 atomic signed receipt PostgreSQL QA', () => {
       ) AS accepted
     `;
     expect(nonceWrong).toEqual([{ accepted: false }]);
-    expect(await ownerDb.supplierAttachmentScanReceipt.count({
-      where: { jobId: f.jobId },
-    })).toBe(0);
+    expect(
+      await ownerDb.supplierAttachmentScanReceipt.count({
+        where: { jobId: f.jobId },
+      }),
+    ).toBe(0);
   });
 
   it('keeps receipts immutable and prevents reissue after consumption', async () => {
