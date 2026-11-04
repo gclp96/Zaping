@@ -81,11 +81,11 @@ function setup(override: Partial<TrustedIssuedScanChallenge> = {}) {
   const committed = new Set<string>();
   const load = jest.fn(() => Promise.resolve(job));
   const commit = jest.fn((request: { jobId: string; requestNonce: string }) => {
-      const id = request.jobId + '/' + request.requestNonce;
-      if (committed.has(id)) return Promise.resolve(false);
-      committed.add(id);
-      return Promise.resolve(true);
-    });
+    const id = request.jobId + '/' + request.requestNonce;
+    if (committed.has(id)) return Promise.resolve(false);
+    committed.add(id);
+    return Promise.resolve(true);
+  });
   const repository: ZfilesChallengeEvidenceRepository = {
     loadChallengeById: load,
     commitVerifiedAndConsumeOnce: commit,
@@ -232,7 +232,7 @@ describe('ZFILES-R2-03C2B1 signed evidence and issued challenge gateway lab', ()
 
   it('fails closed when the trusted job lookup is unavailable', async () => {
     const f = setup();
-    (f.load as jest.Mock).mockRejectedValue(
+    f.load.mockRejectedValue(
       new Error('db credentials would be secret'),
     );
     const evidence = signScanEvidence(
@@ -248,7 +248,7 @@ describe('ZFILES-R2-03C2B1 signed evidence and issued challenge gateway lab', ()
 
   it('fails closed on an ambiguous or rejected transaction', async () => {
     const f = setup();
-    (f.commit as jest.Mock).mockResolvedValue(
+    f.commit.mockResolvedValue(
       false,
     );
     const evidence = signScanEvidence(
