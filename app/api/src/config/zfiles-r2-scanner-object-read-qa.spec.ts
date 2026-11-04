@@ -42,7 +42,7 @@ const blocked = () =>
 
 function fixtureClient(options?: {
   badBytes?: boolean;
-  privateResponse?: 'denied' | 'missing' | 'allowed';
+  privateResponse?: 'denied' | 'generic403' | 'missing' | 'allowed' | 'unauthorized';
   headLength?: number;
 }) {
   const commands: string[] = [];
@@ -57,6 +57,18 @@ function fixtureClient(options?: {
           throw Object.assign(new Error('fixture not found'), {
             name: 'NotFound',
             $metadata: { httpStatusCode: 404 },
+          });
+        }
+        if (options?.privateResponse === 'unauthorized') {
+          throw Object.assign(new Error('unauthorized'), {
+            name: 'Unauthorized',
+            $metadata: { httpStatusCode: 401 },
+          });
+        }
+        if (options?.privateResponse === 'generic403') {
+          throw Object.assign(new Error('generic HEAD error'), {
+            name: 'UnknownError',
+            $metadata: { httpStatusCode: 403 },
           });
         }
         throw blocked();
@@ -103,6 +115,25 @@ describe('ZFILES-R2-03C3A scanner Object Read QA (offline)', () => {
       'HEAD_PRIVATE',
     ]);
     expect(x.send).toHaveBeenCalledTimes(3);
+  });
+
+  it('accepts generic 403 from HeadObject only after verified quarantine bytes', async () => {
+    const x = fixtureClient({ privateResponse: 'generic403' });
+    await expect(
+      verifyScannerObjectReadQaScope(x.client, scope),
+    ).resolves.toBeUndefined();
+    expect(x.commands).toEqual([
+      'HEAD_QUARANTINE',
+      'GET_QUARANTINE',
+      'HEAD_PRIVATE',
+    ]);
+  });
+
+  it('does not accept private 401 as a scoped permission denial', async () => {
+    const x = fixtureClient({ privateResponse: 'unauthorized' });
+    await expect(
+      verifyScannerObjectReadQaScope(x.client, scope),
+    ).rejects.toThrow('[P_HEAD_HTTP_401]');
   });
 
   it('fails closed for a private object which is readable', async () => {

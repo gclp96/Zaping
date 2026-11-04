@@ -85,6 +85,14 @@ git -C C:\dev\zaping-r2-03c3a switch --detach FETCH_HEAD
 ```
 No usar `reset --hard` ni modificar tokens; después ejecutar de nuevo el bloque local de prueba, que solicitará credenciales ocultas y limpiará variables al terminar.
 
+## Ajuste de interpretación de HEAD 403 (04/11/2026)
+
+La ejecución real con el token Object Read de cuarentena obtuvo `P_HEAD_HTTP_403`. Esto confirma que el HEAD+GET anterior sobre cuarentena y el chequeo de bytes/SHA-256 se completaron; el HEAD privado devolvió 403, pero la prueba lo rechazó por exigir además un nombre de error `AccessDenied` o `Forbidden`. La operación S3 `HeadObject` devuelve errores HTTP genéricos, sin cuerpo para identificar el tipo S3; el SDK puede reportar `UnknownError` con `$metadata.httpStatusCode === 403`. Referencia: https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/command/HeadObjectCommand/
+
+La política 03C3A ahora acepta **HTTP 403 en la operación HEAD de objeto privado exacto** sin exigir un nombre de excepción S3, siempre **después** del HEAD+GET autenticado en cuarentena y validación estricta de bytes SHA-256. Los fixtures son sintéticos, el objeto privado fue comprobado como existente por el propietario y la política del token se revisó en Cloudflare Dashboard. `401`, `404`, otros errores HTTP/red y lectura privada exitosa siguen siendo bloqueo. No se modifica el token ni se añade PUT/DELETE/COPY/LIST.
+
+Esta corrección de interpretación requiere PASS del CI sobre el SHA actualizado y una nueva ejecución local para registrar el resultado. No equivale a autorización de promoción, AVAILABLE o descarga.
+
 ## Criterios de aceptación
 
 | Gate | Evidencia | Estado |

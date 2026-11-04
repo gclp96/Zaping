@@ -94,14 +94,15 @@ export function createScannerObjectReadQaClient(env: NodeJS.ProcessEnv): {
 
 function deniedPrivateRead(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
+  // S3 HeadObject can return a generic HTTP 403 without an S3 error name:
+  // HEAD responses do not carry the response body used to decode S3 errors.
+  // This check occurs ONLY after a successful authenticated quarantine
+  // HEAD+GET and full SHA-256 validation, against an independently confirmed
+  // existing synthetic object in the private QA bucket.
   const data = error as {
-    name?: unknown;
     $metadata?: { httpStatusCode?: unknown };
   };
-  return (
-    (data.name === 'AccessDenied' || data.name === 'Forbidden') &&
-    data.$metadata?.httpStatusCode === 403
-  );
+  return data.$metadata?.httpStatusCode === 403;
 }
 
 /**
