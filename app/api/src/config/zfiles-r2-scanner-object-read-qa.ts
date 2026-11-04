@@ -39,8 +39,11 @@ function safeRequestFailure(stage: QaStage, error: unknown) {
       : undefined;
   const status = metadata?.httpStatusCode;
   const category =
-    status === 401 || status === 403 || status === 404 ||
-    status === 412 || status === 429
+    status === 401 ||
+    status === 403 ||
+    status === 404 ||
+    status === 412 ||
+    status === 429
       ? `HTTP_${status}`
       : 'OTHER';
   return new ZfilesR2QaSafeDiagnosticError(`${stage}_${category}`);
@@ -126,7 +129,8 @@ export async function verifyScannerObjectReadQaScope(
     !UUID.test(fixture.companyId) ||
     !UUID.test(fixture.documentId) ||
     !UUID.test(fixture.attachmentId) ||
-    !/^private\\/(?:[0-9a-f-]+\\/){2}[0-9a-f-]+$/u.test(privateFixtureKey) ||
+    privateFixtureKey.split('/').length !== 4 ||
+    privateFixtureKey.split('/')[0] !== 'private' ||
     !privateFixtureKey
       .split('/')
       .slice(1)
