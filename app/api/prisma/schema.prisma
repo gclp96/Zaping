@@ -2164,7 +2164,28 @@ model SupplierAttachmentScanJob {
 
   attachment SupplierDocumentAttachment @relation(fields: [attachmentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict, map: "ZSASJ_attachment_company_fkey")
   document SupplierDocument @relation(fields: [documentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict, map: "ZSASJ_document_company_fkey")
+  receipt SupplierAttachmentScanReceipt?
 
   // SQL partial unique index: at most one ISSUED job per Company/attachment.
   @@index([companyId, attachmentId, status, expiresAt], map: "ZSASJ_company_attachment_status_expires_idx")
+}
+
+/// 03C2B2: immutable signed envelope stored alongside a DB-consumed nonce.
+/// No release authority. SQL SECURITY DEFINER commits only after an external
+/// isolated verifier has validated the Ed25519 signature.
+model SupplierAttachmentScanReceipt {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId String @unique(map: "ZSASR_job_unique") @db.Uuid
+  companyId String
+  documentId String
+  attachmentId String
+  requestNonce String @unique(map: "ZSASR_nonce_unique") @db.Uuid
+  verdict String @db.VarChar(24)
+  signedEnvelope Json @db.JsonB
+  createdAt DateTime @default(now()) @db.Timestamp(3)
+
+  job SupplierAttachmentScanJob @relation(fields: [jobId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "ZSASR_job_fk")
+
+  @@unique([companyId, attachmentId], map: "ZSASR_attachment_unique")
+  @@index([companyId, documentId, createdAt], map: "ZSASR_company_document_idx")
 }
