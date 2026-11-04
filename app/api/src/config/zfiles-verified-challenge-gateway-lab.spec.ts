@@ -141,8 +141,18 @@ describe('ZFILES-R2-03C2B1 signed evidence and issued challenge gateway lab', ()
     { label: 'sha mismatch', patch: { contentSha256: 'c'.repeat(64) } },
   ])('rejects signed $label before any commit', async ({ patch }) => {
     const f = setup();
+    const changed = { ...cleanClaims, ...patch };
     const forged = signScanEvidence(
-      { ...cleanClaims, ...patch },
+      {
+        ...changed,
+        reservationId: changed.attachmentId,
+        quarantineKey: [
+          'quarantine',
+          changed.companyId,
+          changed.documentId,
+          changed.attachmentId,
+        ].join('/'),
+      },
       'qa-signer',
       keys.privateKey,
     );
