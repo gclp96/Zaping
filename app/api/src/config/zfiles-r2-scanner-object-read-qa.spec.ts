@@ -137,6 +137,27 @@ describe('ZFILES-R2-03C3A scanner Object Read QA (offline)', () => {
     expect(x.commands).toEqual(['HEAD_QUARANTINE']);
   });
 
+  it('reports a safe hash-verification stage without the SDK error or fixture key', async () => {
+    const x = fixtureClient({ badBytes: true });
+    await expect(
+      verifyScannerObjectReadQaScope(x.client, scope),
+    ).rejects.toThrow('[Q_BODY_VERIFICATION]');
+  });
+
+  it('reports private 404 as inconclusive rather than successful denial', async () => {
+    const x = fixtureClient({ privateResponse: 'missing' });
+    await expect(
+      verifyScannerObjectReadQaScope(x.client, scope),
+    ).rejects.toThrow('[P_HEAD_HTTP_404]');
+  });
+
+  it('reports private object readability as a security failure', async () => {
+    const x = fixtureClient({ privateResponse: 'allowed' });
+    await expect(
+      verifyScannerObjectReadQaScope(x.client, scope),
+    ).rejects.toThrow('[P_HEAD_ALLOWED]');
+  });
+
   it('does not send a network request for an invalid key or bucket', async () => {
     for (const altered of [
       { fixture: { ...scope.fixture, bucket: 'zaping-private-qa' } },
