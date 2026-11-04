@@ -23,11 +23,11 @@ describeQa('ZFILES-R2-03C3A real Object Read permission QA', () => {
       // Only fixed stage/status categories are safe to show. Never print
       // raw SDK errors, URLs, object keys, account IDs or credentials.
       if (error instanceof ZfilesR2QaSafeDiagnosticError) {
-        throw new Error(
-          `ZFILES-R2-03C3A real QA NOT VERIFIED [${error.code}]`,
-        );
+        throw new Error(`ZFILES-R2-03C3A real QA NOT VERIFIED [${error.code}]`);
       }
-      throw new Error('ZFILES-R2-03C3A real QA NOT VERIFIED [SETUP_OR_UNKNOWN]');
+      throw new Error(
+        'ZFILES-R2-03C3A real QA NOT VERIFIED [SETUP_OR_UNKNOWN]',
+      );
     } finally {
       client.destroy();
     }
