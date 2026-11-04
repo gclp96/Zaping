@@ -63,6 +63,28 @@ try {
 
 La prueba sólo llama `HeadObject` y `GetObject` sobre cuarentena, luego `HeadObject` sobre private QA, y jamás escribe. Los errores SDK y datos identificables no se imprimen desde el test. Si falla, revisar configuración local y la política del token, **sin publicar diagnósticos que contengan credenciales, URLs firmadas, claves de objetos o account IDs**.
 
+## Diagnóstico seguro tras el primer FAIL real (04/11/2026)
+
+La primera ejecución local con el token nuevo y los dos objetos ya localizados devolvió `ZFILES-R2-03C3A real QA NOT VERIFIED`, sin detallar etapa. **No acredita fallo del token ni éxito de ningún subcontrol**; el test ocultaba intencionadamente el error original. No hay que ampliar permisos ni recrear credenciales sin diagnosticar.
+
+Se añadió clasificación de **solo etapa y código HTTP seguro** al test local:
+
+- `Q_HEAD_HTTP_401/403/404/412/429` o `Q_HEAD_OTHER`: error de petición HEAD en cuarentena.
+- `Q_HEAD_METADATA`: tamaño o ETag inesperado tras HEAD válido.
+- `Q_GET_HTTP_*`, `Q_GET_METADATA`: error GET condicionado, tipo de cuerpo o longitud.
+- `Q_BODY_VERIFICATION`: el cuerpo recibido no verifica SHA-256, tamaño o estructura de stream.
+- `P_HEAD_HTTP_404` / `P_HEAD_OTHER`: denegación del bucket privado NO demostrada; una lectura permitida produce `P_HEAD_ALLOWED`. Sólo `P_HEAD` con 403 AccessDenied/Forbidden equivale a éxito de la etapa negativa.
+- `SCOPE_INVALID`: manifest/rutas sintéticas no corresponden al contrato. `SETUP_OR_UNKNOWN`: error antes del comprobador de R2.
+
+No se imprime el SDK Error crudo, HTTP response body, account ID, token, URL, key, SHA-256, ETag ni contenido del PDF. La clasificación no se confunde con PASS. En la segunda ejecución local, compartir sólo el texto `QA NOT VERIFIED [CODIGO]` o el PASS de Jest y **no** los prompts o variables.
+
+Para actualizar el worktree detached en Windows sin modificar el repositorio base:
+```powershell
+git -C C:\dev\zaping-r2-03c3a fetch origin feat/zfiles-r2-03c3a-object-read-qa-20261104
+git -C C:\dev\zaping-r2-03c3a switch --detach FETCH_HEAD
+```
+No usar `reset --hard` ni modificar tokens; después ejecutar de nuevo el bloque local de prueba, que solicitará credenciales ocultas y limpiará variables al terminar.
+
 ## Criterios de aceptación
 
 | Gate | Evidencia | Estado |
