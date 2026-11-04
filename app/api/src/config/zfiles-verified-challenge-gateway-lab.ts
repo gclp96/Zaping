@@ -78,10 +78,10 @@ function trustedChallenge(
     value.status === 'ISSUED' &&
     Number.isSafeInteger(issuedAt) &&
     Number.isSafeInteger(expiresAt) &&
-    (issuedAt as number) <= nowMs &&
-    (expiresAt as number) > nowMs &&
-    (expiresAt as number) - (issuedAt as number) >= 60_000 &&
-    (expiresAt as number) - (issuedAt as number) <= 300_000 &&
+    issuedAt <= nowMs &&
+    expiresAt > nowMs &&
+    expiresAt - issuedAt >= 60_000 &&
+    expiresAt - issuedAt <= 300_000 &&
     Number.isSafeInteger(value.contentSizeBytes) &&
     value.contentSizeBytes >= 1 &&
     value.contentSizeBytes <= 10 * 1024 * 1024 &&
