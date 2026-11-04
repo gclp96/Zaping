@@ -222,22 +222,17 @@ describePg('ZFILES-R2-03C2A PostgreSQL issued-only challenge', () => {
       const [grants] = await db.$queryRawUnsafe<
         { canIssue: boolean; canInsert: boolean; canUpdate: boolean }[]
       >(
-        'SELECT ' +
-          "has_function_privilege($1, " +
-          "'public.issue_zfiles_scan_challenge(text,text,integer)'," +
-          "'EXECUTE') AS " +
-          '"canIssue", '" +
-          "has_table_privilege($1, '\"SupplierAttachmentScanJob\"'," +
-          "'INSERT') AS " +
-          '"canInsert", '" +
-          "has_table_privilege($1, '\"SupplierDocumentAttachment\"'," +
-          "'UPDATE') AS " +
-          '"canUpdate"',
+        `SELECT
+          has_function_privilege($1, 'public.issue_zfiles_scan_challenge(text,text,integer)', 'EXECUTE') AS "canIssue",
+          has_table_privilege($1, '"SupplierAttachmentScanJob"', 'INSERT') AS "canInsert",
+          has_table_privilege($1, '"SupplierDocumentAttachment"', 'UPDATE') AS "canUpdate"`,
         name,
       );
-      expect(grants).toEqual([
-        { canIssue: false, canInsert: false, canUpdate: false },
-      ]);
+      expect(grants).toEqual({
+        canIssue: false,
+        canInsert: false,
+        canUpdate: false,
+      });
       await expect(
         outsider.$executeRawUnsafe(
           'INSERT INTO "SupplierAttachmentScanJob" DEFAULT VALUES',
