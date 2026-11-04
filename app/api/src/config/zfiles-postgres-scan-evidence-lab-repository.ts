@@ -15,9 +15,7 @@ import {
  * PostgreSQL DOES NOT validate Ed25519. The caller MUST verify the full
  * signed envelope with ZfilesVerifiedChallengeGateway first.
  */
-export class ZfilesPostgresChallengeEvidenceLabRepository
-  implements ZfilesChallengeEvidenceRepository
-{
+export class ZfilesPostgresChallengeEvidenceLabRepository implements ZfilesChallengeEvidenceRepository {
   constructor(private readonly db: PrismaClient) {}
 
   async loadChallengeById(
