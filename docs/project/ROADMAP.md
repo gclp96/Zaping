@@ -4,6 +4,8 @@ Estado: Activo
 Última actualización: 2026-10-09
 Responsable: Zaping Team
 
+Nota de evolución propuesta (2026-11-03): Smart Station, piloto candidato INSAP Hermosillo. Consultar [ruta de discovery y entregas](SMART_STATION_ROADMAP.md), [arquitectura objetivo](../architecture/SMART_STATION_ARCHITECTURE.md) y [ADR propuesto](../architecture/adr/ADR-SMART-STATION-001.md). Orden sugerido: evaluar etiquetas y flujos reales → POC 2D individual y multilectura sin mutaciones → integración controlada Purchase Receipts → preparación/dispatch → devolución/reconciliación → remisión asistida → eventual industrialización/multisucursal. La línea Smart Station no desplaza los cierres de M-HC1 ni constituye un compromiso de disponibilidad en diciembre 2026.
+
 1. Propósito
 Este documento define la dirección futura de Zaping.
 
