@@ -1,6 +1,7 @@
 import {
   createScannerObjectReadQaClient,
   verifyScannerObjectReadQaScope,
+  ZfilesR2QaSafeDiagnosticError,
 } from '../src/config/zfiles-r2-scanner-object-read-qa';
 
 const describeQa =
@@ -18,9 +19,15 @@ describeQa('ZFILES-R2-03C3A real Object Read permission QA', () => {
     const { client, scope } = createScannerObjectReadQaClient(process.env);
     try {
       await verifyScannerObjectReadQaScope(client, scope);
-    } catch {
-      // No SDK errors, credentials, account IDs, object keys or signatures.
-      throw new Error('ZFILES-R2-03C3A real QA NOT VERIFIED');
+    } catch (error) {
+      // Only fixed stage/status categories are safe to show. Never print
+      // raw SDK errors, URLs, object keys, account IDs or credentials.
+      if (error instanceof ZfilesR2QaSafeDiagnosticError) {
+        throw new Error(
+          `ZFILES-R2-03C3A real QA NOT VERIFIED [${error.code}]`,
+        );
+      }
+      throw new Error('ZFILES-R2-03C3A real QA NOT VERIFIED [SETUP_OR_UNKNOWN]');
     } finally {
       client.destroy();
     }
