@@ -169,7 +169,7 @@ describe('ZFILES-R2-03C2B1 signed evidence and issued challenge gateway lab', ()
     {
       label: 'incorrect quarantine key',
       patch: { quarantineKey: 'private/unsafe' },
-    }
+    },
     { label: 'invalid job TTL', patch: { issuedAt: new Date(now - 500_000) } },
     { label: 'different id', patch: { jobId: randomUUID() } },
   ])('denies $label before signature acceptance', async ({ patch }) => {
