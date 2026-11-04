@@ -25,12 +25,7 @@ const challenge: TrustedIssuedScanChallenge = {
   documentId,
   attachmentId,
   requestNonce,
-  quarantineKey: [
-    'quarantine',
-    companyId,
-    documentId,
-    attachmentId,
-  ].join('/'),
+  quarantineKey: ['quarantine', companyId, documentId, attachmentId].join('/'),
   contentSizeBytes: 42,
   contentSha256: 'a'.repeat(64),
   status: 'ISSUED',
@@ -84,39 +79,45 @@ const cleanClaims: ScanEvidenceClaims = {
 function setup(override: Partial<TrustedIssuedScanChallenge> = {}) {
   const job = { ...challenge, ...override };
   const committed = new Set<string>();
-  const repository: ZfilesChallengeEvidenceRepository = {
-    loadChallengeById: jest.fn(() => Promise.resolve(job)),
-    commitVerifiedAndConsumeOnce: jest.fn((request) => {
+  const load = jest.fn(() => Promise.resolve(job));
+  const commit = jest.fn((request: { jobId: string; requestNonce: string }) => {
       const id = request.jobId + '/' + request.requestNonce;
       if (committed.has(id)) return Promise.resolve(false);
       committed.add(id);
       return Promise.resolve(true);
-    }),
+    });
+  const repository: ZfilesChallengeEvidenceRepository = {
+    loadChallengeById: load,
+    commitVerifiedAndConsumeOnce: commit,
   };
   const gateway = new ZfilesVerifiedChallengeGateway(
     repository,
     policy,
     () => now,
   );
-  return { repository, gateway };
+  return { repository, gateway, load, commit };
 }
 
 describe('ZFILES-R2-03C2B1 signed evidence and issued challenge gateway lab', () => {
   it('verifies Ed25519 before requesting a single atomic commit', async () => {
     const f = setup();
-    const evidence = signScanEvidence(cleanClaims, 'qa-signer', keys.privateKey);
+    const evidence = signScanEvidence(
+      cleanClaims,
+      'qa-signer',
+      keys.privateKey,
+    );
     await expect(f.gateway.verifyAndCommit(jobId, evidence)).resolves.toEqual({
       status: 'VERIFIED_UNRELEASED',
       verdict: 'CLEAN_CANDIDATE',
     });
-    expect(f.repository.loadChallengeById).toHaveBeenCalledWith(jobId);
-    expect(f.repository.commitVerifiedAndConsumeOnce).toHaveBeenCalledWith({
+    expect(f.load).toHaveBeenCalledWith(jobId);
+    expect(f.commit).toHaveBeenCalledWith({
       jobId,
       companyId,
       requestNonce,
       evidence,
     });
-    expect(f.repository.commitVerifiedAndConsumeOnce).toHaveBeenCalledTimes(1);
+    expect(f.commit).toHaveBeenCalledTimes(1);
   });
 
   it('preserves detected malware without converting it into AVAILABLE', async () => {
@@ -159,27 +160,38 @@ describe('ZFILES-R2-03C2B1 signed evidence and issued challenge gateway lab', ()
     await expect(f.gateway.verifyAndCommit(jobId, forged)).rejects.toThrow(
       ServiceUnavailableException,
     );
-    expect(f.repository.commitVerifiedAndConsumeOnce).not.toHaveBeenCalled();
+    expect(f.commit).not.toHaveBeenCalled();
   });
 
   it.each([
     { label: 'already consumed', patch: { status: 'CONSUMED' as const } },
     { label: 'expired job', patch: { expiresAt: new Date(now - 1) } },
-    { label: 'incorrect quarantine key', patch: { quarantineKey: 'private/unsafe' } },
+    {
+      label: 'incorrect quarantine key',
+      patch: { quarantineKey: 'private/unsafe' },
+    }
     { label: 'invalid job TTL', patch: { issuedAt: new Date(now - 500_000) } },
     { label: 'different id', patch: { jobId: randomUUID() } },
   ])('denies $label before signature acceptance', async ({ patch }) => {
     const f = setup(patch);
-    const evidence = signScanEvidence(cleanClaims, 'qa-signer', keys.privateKey);
+    const evidence = signScanEvidence(
+      cleanClaims,
+      'qa-signer',
+      keys.privateKey,
+    );
     await expect(f.gateway.verifyAndCommit(jobId, evidence)).rejects.toThrow(
       ServiceUnavailableException,
     );
-    expect(f.repository.commitVerifiedAndConsumeOnce).not.toHaveBeenCalled();
+    expect(f.commit).not.toHaveBeenCalled();
   });
 
   it('rejects modified signature and untrusted key id', async () => {
     const f = setup();
-    const evidence = signScanEvidence(cleanClaims, 'qa-signer', keys.privateKey);
+    const evidence = signScanEvidence(
+      cleanClaims,
+      'qa-signer',
+      keys.privateKey,
+    );
     for (const modified of [
       { ...evidence, signature: 'A'.repeat(86) },
       { ...evidence, keyId: 'revoked-key' },
@@ -188,7 +200,7 @@ describe('ZFILES-R2-03C2B1 signed evidence and issued challenge gateway lab', ()
         ServiceUnavailableException,
       );
     }
-    expect(f.repository.commitVerifiedAndConsumeOnce).not.toHaveBeenCalled();
+    expect(f.commit).not.toHaveBeenCalled();
   });
 
   it('rejects signed SCAN_FAILED as an accepted scan', async () => {
@@ -201,37 +213,49 @@ describe('ZFILES-R2-03C2B1 signed evidence and issued challenge gateway lab', ()
     await expect(f.gateway.verifyAndCommit(jobId, evidence)).rejects.toThrow(
       ServiceUnavailableException,
     );
-    expect(f.repository.commitVerifiedAndConsumeOnce).not.toHaveBeenCalled();
+    expect(f.commit).not.toHaveBeenCalled();
   });
 
   it('fails closed on a second commit attempt (fake atomic repository)', async () => {
     const f = setup();
-    const evidence = signScanEvidence(cleanClaims, 'qa-signer', keys.privateKey);
+    const evidence = signScanEvidence(
+      cleanClaims,
+      'qa-signer',
+      keys.privateKey,
+    );
     await f.gateway.verifyAndCommit(jobId, evidence);
     await expect(f.gateway.verifyAndCommit(jobId, evidence)).rejects.toThrow(
       ServiceUnavailableException,
     );
-    expect(f.repository.commitVerifiedAndConsumeOnce).toHaveBeenCalledTimes(2);
+    expect(f.commit).toHaveBeenCalledTimes(2);
   });
 
   it('fails closed when the trusted job lookup is unavailable', async () => {
     const f = setup();
-    (f.repository.loadChallengeById as jest.Mock).mockRejectedValue(
+    (f.load as jest.Mock).mockRejectedValue(
       new Error('db credentials would be secret'),
     );
-    const evidence = signScanEvidence(cleanClaims, 'qa-signer', keys.privateKey);
+    const evidence = signScanEvidence(
+      cleanClaims,
+      'qa-signer',
+      keys.privateKey,
+    );
     await expect(f.gateway.verifyAndCommit(jobId, evidence)).rejects.toThrow(
       'Evidencia de escaneo no autorizada',
     );
-    expect(f.repository.commitVerifiedAndConsumeOnce).not.toHaveBeenCalled();
+    expect(f.commit).not.toHaveBeenCalled();
   });
 
   it('fails closed on an ambiguous or rejected transaction', async () => {
     const f = setup();
-    (f.repository.commitVerifiedAndConsumeOnce as jest.Mock).mockResolvedValue(
+    (f.commit as jest.Mock).mockResolvedValue(
       false,
     );
-    const evidence = signScanEvidence(cleanClaims, 'qa-signer', keys.privateKey);
+    const evidence = signScanEvidence(
+      cleanClaims,
+      'qa-signer',
+      keys.privateKey,
+    );
     await expect(f.gateway.verifyAndCommit(jobId, evidence)).rejects.toThrow(
       ServiceUnavailableException,
     );
@@ -239,10 +263,14 @@ describe('ZFILES-R2-03C2B1 signed evidence and issued challenge gateway lab', ()
 
   it('rejects a noncanonical job identifier without reading the database', async () => {
     const f = setup();
-    const evidence = signScanEvidence(cleanClaims, 'qa-signer', keys.privateKey);
+    const evidence = signScanEvidence(
+      cleanClaims,
+      'qa-signer',
+      keys.privateKey,
+    );
     await expect(
       f.gateway.verifyAndCommit('../other-tenant', evidence),
     ).rejects.toThrow(ServiceUnavailableException);
-    expect(f.repository.loadChallengeById).not.toHaveBeenCalled();
+    expect(f.load).not.toHaveBeenCalled();
   });
 });
