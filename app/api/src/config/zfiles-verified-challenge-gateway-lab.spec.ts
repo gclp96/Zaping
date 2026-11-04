@@ -232,9 +232,7 @@ describe('ZFILES-R2-03C2B1 signed evidence and issued challenge gateway lab', ()
 
   it('fails closed when the trusted job lookup is unavailable', async () => {
     const f = setup();
-    f.load.mockRejectedValue(
-      new Error('db credentials would be secret'),
-    );
+    f.load.mockRejectedValue(new Error('db credentials would be secret'));
     const evidence = signScanEvidence(
       cleanClaims,
       'qa-signer',
@@ -248,9 +246,7 @@ describe('ZFILES-R2-03C2B1 signed evidence and issued challenge gateway lab', ()
 
   it('fails closed on an ambiguous or rejected transaction', async () => {
     const f = setup();
-    f.commit.mockResolvedValue(
-      false,
-    );
+    f.commit.mockResolvedValue(false);
     const evidence = signScanEvidence(
       cleanClaims,
       'qa-signer',
