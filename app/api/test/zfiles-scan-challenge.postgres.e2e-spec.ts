@@ -1,7 +1,8 @@
 import { PrismaClient, SupplierDocumentAttachmentStatus } from '@prisma/client';
 import { randomBytes, randomUUID } from 'node:crypto';
 
-const describePg = process.env.RUN_ZFILES_SCAN_CHALLENGE_PG === '1' ? describe : describe.skip;
+const describePg =
+  process.env.RUN_ZFILES_SCAN_CHALLENGE_PG === '1' ? describe : describe.skip;
 
 type Issued = {
   jobId: string;
