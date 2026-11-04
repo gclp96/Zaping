@@ -46,12 +46,12 @@ function fixtureClient(options?: {
   headLength?: number;
 }) {
   const commands: string[] = [];
-  const send = jest.fn(async (command: unknown) => {
+  const send = jest.fn((command: unknown) => {
     if (command instanceof HeadObjectCommand) {
       if (command.input.Bucket === 'zaping-private-qa') {
         commands.push('HEAD_PRIVATE');
         if (options?.privateResponse === 'allowed') {
-          return { ETag: '"private"' };
+          return Promise.resolve({ ETag: '"private"' });
         }
         if (options?.privateResponse === 'missing') {
           throw Object.assign(new Error('fixture not found'), {
@@ -66,10 +66,10 @@ function fixtureClient(options?: {
         Bucket: 'zaping-quarantine-qa',
         Key: scope.fixture.key,
       });
-      return {
+      return Promise.resolve({
         ContentLength: options?.headLength ?? bytes.length,
         ETag: '"known-qa-etag"',
-      };
+      });
     }
     if (command instanceof GetObjectCommand) {
       commands.push('GET_QUARANTINE');
@@ -78,12 +78,12 @@ function fixtureClient(options?: {
         Key: scope.fixture.key,
         IfMatch: '"known-qa-etag"',
       });
-      return {
+      return Promise.resolve({
         ContentLength: bytes.length,
         Body: Readable.from([
           options?.badBytes ? Buffer.from('TAMPERED') : bytes,
         ]),
-      };
+      });
     }
     throw new Error('Unexpected S3 operation was attempted');
   });
@@ -145,10 +145,10 @@ describe('ZFILES-R2-03C3A scanner Object Read QA (offline)', () => {
     ]) {
       const x = fixtureClient();
       await expect(
-        verifyScannerObjectReadQaScope(
-          x.client,
-          { ...scope, ...altered } as ScannerObjectReadQaScope,
-        ),
+        verifyScannerObjectReadQaScope(x.client, {
+          ...scope,
+          ...altered,
+        } as ScannerObjectReadQaScope),
       ).rejects.toThrow();
       expect(x.send).not.toHaveBeenCalled();
     }
@@ -180,7 +180,9 @@ describe('ZFILES-R2-03C3A scanner Object Read QA (offline)', () => {
       { R2_QUARANTINE_WRITE_ACCESS_KEY_ID: 'synthetic-read-id' },
       { R2_READ_ACCESS_KEY_ID: 'synthetic-read-id' },
     ]) {
-      expect(() => createScannerObjectReadQaClient({ ...env, ...altered })).toThrow();
+      expect(() =>
+        createScannerObjectReadQaClient({ ...env, ...altered }),
+      ).toThrow();
     }
     const { client, scope: parsed } = createScannerObjectReadQaClient(env);
     expect(parsed.fixture.key).toBe(scope.fixture.key);
