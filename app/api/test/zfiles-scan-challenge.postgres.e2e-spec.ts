@@ -1,10 +1,7 @@
 import { PrismaClient, SupplierDocumentAttachmentStatus } from '@prisma/client';
 import { randomBytes, randomUUID } from 'node:crypto';
 
-const describePg =
-  process.env.RUN_ZFILES_SCAN_CHALLENGE_PG === '1'
-    ? describe
-    : describe.skip;
+const describePg = process.env.RUN_ZFILES_SCAN_CHALLENGE_PG === '1' ? describe : describe.skip;
 
 type Issued = {
   jobId: string;
@@ -85,12 +82,7 @@ describePg('ZFILES-R2-03C2A PostgreSQL issued-only challenge', () => {
         companyId,
         documentId,
         uploadedById: actorId,
-        storageKey: [
-          'private',
-          companyId,
-          documentId,
-          attachmentId,
-        ].join('/'),
+        storageKey: ['private', companyId, documentId, attachmentId].join('/'),
         originalName: 'synthetic.pdf',
         contentType: 'application/pdf',
         sizeBytes: 64,
@@ -202,8 +194,12 @@ describePg('ZFILES-R2-03C2A PostgreSQL issued-only challenge', () => {
     const name = 'zscan_lab_' + randomBytes(5).toString('hex');
     const secret = randomBytes(24).toString('hex');
     await db.$executeRawUnsafe(
-      'CREATE ROLE "' + name + '" LOGIN NOINHERIT PASSWORD ' +
-        "'" + secret + "'",
+      'CREATE ROLE "' +
+        name +
+        '" LOGIN NOINHERIT PASSWORD ' +
+        "'" +
+        secret +
+        "'",
     );
     const target = new URL(raw);
     target.username = name;
