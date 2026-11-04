@@ -2174,7 +2174,7 @@ model SupplierAttachmentScanJob {
 /// No release authority. SQL SECURITY DEFINER commits only after an external
 /// isolated verifier has validated the Ed25519 signature.
 model SupplierAttachmentScanReceipt {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id String @id(map: "ZSASR_pkey") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   jobId String @unique(map: "ZSASR_job_unique") @db.Uuid
   companyId String
   documentId String
