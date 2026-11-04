@@ -21,6 +21,32 @@ const unavailable = () =>
   new Error('ZFILES-R2-03C3A QA permissions could not be verified');
 
 /**
+ * Only fixed stage/status codes are safe to print in local QA.
+ * No SDK message, URL, object key, account ID, request ID, or secret is used.
+ */
+export class ZfilesR2QaSafeDiagnosticError extends Error {
+  constructor(readonly code: string) {
+    super(`ZFILES-R2-03C3A QA permissions could not be verified [${code}]`);
+  }
+}
+
+type QaStage = 'Q_HEAD' | 'Q_GET' | 'P_HEAD';
+
+function safeRequestFailure(stage: QaStage, error: unknown) {
+  const metadata =
+    error && typeof error === 'object' && '$metadata' in error
+      ? (error as { $metadata?: { httpStatusCode?: unknown } }).$metadata
+      : undefined;
+  const status = metadata?.httpStatusCode;
+  const category =
+    status === 401 || status === 403 || status === 404 ||
+    status === 412 || status === 429
+      ? `HTTP_${status}`
+      : 'OTHER';
+  return new ZfilesR2QaSafeDiagnosticError(`${stage}_${category}`);
+}
+
+/**
  * Explicit opt-in, local only. Existing 03B3 parser performs strict fixture,
  * bucket, endpoint and credential checks. 03C3A additionally REQUIRES a
  * confirmed Cloudflare token scope and an existing private QA fixture.
@@ -100,49 +126,62 @@ export async function verifyScannerObjectReadQaScope(
     !UUID.test(fixture.companyId) ||
     !UUID.test(fixture.documentId) ||
     !UUID.test(fixture.attachmentId) ||
-    !/^private\/(?:[0-9a-f-]+\/){2}[0-9a-f-]+$/u.test(privateFixtureKey) ||
+    !/^private\\/(?:[0-9a-f-]+\\/){2}[0-9a-f-]+$/u.test(privateFixtureKey) ||
     !privateFixtureKey
       .split('/')
       .slice(1)
       .every((x) => UUID.test(x))
   ) {
-    throw unavailable();
+    throw new ZfilesR2QaSafeDiagnosticError('SCOPE_INVALID');
+  }
+
+  let head: { ContentLength?: number; ETag?: string };
+  try {
+    head = await client.send(
+      new HeadObjectCommand({ Bucket: fixture.bucket, Key: fixture.key }),
+      { abortSignal: AbortSignal.timeout(10_000) },
+    );
+  } catch (error) {
+    throw safeRequestFailure('Q_HEAD', error);
+  }
+  if (
+    head.ContentLength !== fixture.sizeBytes ||
+    typeof head.ETag !== 'string' ||
+    !/^"[^"\\r\\n]{1,128}"$/u.test(head.ETag)
+  ) {
+    throw new ZfilesR2QaSafeDiagnosticError('Q_HEAD_METADATA');
   }
 
   let stream: Readable | undefined;
   try {
-    const head = await client.send(
-      new HeadObjectCommand({ Bucket: fixture.bucket, Key: fixture.key }),
-      { abortSignal: AbortSignal.timeout(10_000) },
-    );
-    if (
-      head.ContentLength !== fixture.sizeBytes ||
-      typeof head.ETag !== 'string' ||
-      !/^"[^"\r\n]{1,128}"$/u.test(head.ETag)
-    ) {
-      throw unavailable();
+    let response: { Body?: unknown; ContentLength?: number };
+    try {
+      response = await client.send(
+        new GetObjectCommand({
+          Bucket: fixture.bucket,
+          Key: fixture.key,
+          IfMatch: head.ETag,
+        }),
+        { abortSignal: AbortSignal.timeout(15_000) },
+      );
+    } catch (error) {
+      throw safeRequestFailure('Q_GET', error);
     }
-    const response = await client.send(
-      new GetObjectCommand({
-        Bucket: fixture.bucket,
-        Key: fixture.key,
-        IfMatch: head.ETag,
-      }),
-      { abortSignal: AbortSignal.timeout(15_000) },
-    );
     stream = response.Body instanceof Readable ? response.Body : undefined;
     if (!stream || response.ContentLength !== fixture.sizeBytes) {
-      throw unavailable();
+      throw new ZfilesR2QaSafeDiagnosticError('Q_GET_METADATA');
     }
-    await verifyZfilesR2QaBody(stream, fixture);
-  } catch {
-    throw unavailable();
+    try {
+      await verifyZfilesR2QaBody(stream, fixture);
+    } catch {
+      throw new ZfilesR2QaSafeDiagnosticError('Q_BODY_VERIFICATION');
+    }
   } finally {
     stream?.destroy();
   }
 
-  // This test cannot modify private QA. It must use a known-existing fixture
-  // whose presence was independently confirmed by its owner beforehand.
+  // Negative permission probe ONLY after a fully verified quarantine read.
+  // 404 or network errors are inconclusive, not permission proof.
   try {
     await client.send(
       new HeadObjectCommand({
@@ -151,9 +190,9 @@ export async function verifyScannerObjectReadQaScope(
       }),
       { abortSignal: AbortSignal.timeout(10_000) },
     );
-  } catch (err) {
-    if (deniedPrivateRead(err)) return;
-    throw unavailable();
+  } catch (error) {
+    if (deniedPrivateRead(error)) return;
+    throw safeRequestFailure('P_HEAD', error);
   }
-  throw unavailable();
+  throw new ZfilesR2QaSafeDiagnosticError('P_HEAD_ALLOWED');
 }
