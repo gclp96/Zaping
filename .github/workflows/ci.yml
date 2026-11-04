@@ -113,6 +113,11 @@ jobs:
       - name: Run PostgreSQL concurrency E2E
         run: npm run test:concurrency
 
+      - name: Verify atomic ZFILES-R2-03C2B2 signed receipt and nonce in disposable PostgreSQL
+        env:
+          RUN_ZFILES_SCAN_RECEIPT_PG: "1"
+        run: npm run test:e2e -- --runInBand test/zfiles-scan-receipt-atomic.postgres.e2e-spec.ts
+
       - name: Verify issued-only ZFILES-R2-03C2A challenges in disposable PostgreSQL
         env:
           RUN_ZFILES_SCAN_CHALLENGE_PG: "1"
