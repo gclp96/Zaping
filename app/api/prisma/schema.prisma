@@ -1977,6 +1977,7 @@ model SupplierDocument {
   allocations PurchaseReceiptDocument[]
   receiptLinks PurchaseReceiptSupplierDocumentLink[]
   attachments SupplierDocumentAttachment[]
+  scanJobs SupplierAttachmentScanJob[]
   cancelledBy User? @relation("SupplierDocumentCancelledBy", fields: [cancelledById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
   replacedBy SupplierDocument? @relation("SupplierDocumentReplacement", fields: [replacedByDocumentId, companyId, supplierId], references: [id, companyId, supplierId], onDelete: Restrict, onUpdate: Restrict)
   replaces SupplierDocument[] @relation("SupplierDocumentReplacement")
@@ -2162,6 +2163,7 @@ model SupplierAttachmentScanJob {
   consumedAt DateTime? @db.Timestamp(3)
 
   attachment SupplierDocumentAttachment @relation(fields: [attachmentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict, map: "ZSASJ_attachment_company_fkey")
+  document SupplierDocument @relation(fields: [documentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict, map: "ZSASJ_document_company_fkey")
 
   // SQL partial unique index: at most one ISSUED job per Company/attachment.
   @@index([companyId, attachmentId, status, expiresAt], map: "ZSASJ_company_attachment_status_expires_idx")
