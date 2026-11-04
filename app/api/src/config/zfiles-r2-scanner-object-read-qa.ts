@@ -65,7 +65,10 @@ export function createScannerObjectReadQaClient(env: NodeJS.ProcessEnv): {
 
 function deniedPrivateRead(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
-  const data = error as { name?: unknown; $metadata?: { httpStatusCode?: unknown } };
+  const data = error as {
+    name?: unknown;
+    $metadata?: { httpStatusCode?: unknown };
+  };
   return (
     (data.name === 'AccessDenied' || data.name === 'Forbidden') &&
     data.$metadata?.httpStatusCode === 403
@@ -88,12 +91,20 @@ export async function verifyScannerObjectReadQaScope(
   if (
     fixture.bucket !== 'zaping-quarantine-qa' ||
     fixture.key !==
-      ['quarantine', fixture.companyId, fixture.documentId, fixture.attachmentId].join('/') ||
+      [
+        'quarantine',
+        fixture.companyId,
+        fixture.documentId,
+        fixture.attachmentId,
+      ].join('/') ||
     !UUID.test(fixture.companyId) ||
     !UUID.test(fixture.documentId) ||
     !UUID.test(fixture.attachmentId) ||
     !/^private\/(?:[0-9a-f-]+\/){2}[0-9a-f-]+$/u.test(privateFixtureKey) ||
-    !privateFixtureKey.split('/').slice(1).every((x) => UUID.test(x))
+    !privateFixtureKey
+      .split('/')
+      .slice(1)
+      .every((x) => UUID.test(x))
   ) {
     throw unavailable();
   }
