@@ -294,6 +294,23 @@ export async function runZfilesR2PrivateRealQa(
       config.attachmentId,
     ].join('/');
 
+    // Private QA token must NOT be allowed to inspect the known-existing
+    // quarantine source. This is only a HEAD with a scoped identity.
+    stage = 'PRIVATE_TOKEN_SCOPE';
+    try {
+      await privateStore.send(
+        new HeadObjectCommand({
+          Bucket: 'zaping-quarantine-qa',
+          Key: candidate.quarantineKey,
+        }),
+        { abortSignal: AbortSignal.timeout(10_000) },
+      );
+      throw fail('PRIVATE_TOKEN_CROSS_BUCKET_ALLOWED');
+    } catch (err) {
+      if (err instanceof ZfilesR2PrivateQaSafeError) throw err;
+      if (httpCode(err) !== 403) throw fail('PRIVATE_TOKEN_SCOPE');
+    }
+
     if (config.mode === 'CREATE_ONCE') {
       stage = 'PRECHECK';
       try {
@@ -353,6 +370,23 @@ export async function runZfilesR2PrivateRealQa(
       recovered.sizeBytes !== config.sizeBytes
     ) {
       throw fail('RECOVERY');
+    }
+
+    // The quarantine Object Read token must never read the private object
+    // just verified as existing. HTTP 404 or timeout is inconclusive.
+    stage = 'QUARANTINE_TOKEN_SCOPE';
+    try {
+      await quarantine.send(
+        new HeadObjectCommand({
+          Bucket: 'zaping-private-qa',
+          Key: privateKey,
+        }),
+        { abortSignal: AbortSignal.timeout(10_000) },
+      );
+      throw fail('QUARANTINE_TOKEN_CROSS_BUCKET_ALLOWED');
+    } catch (err) {
+      if (err instanceof ZfilesR2PrivateQaSafeError) throw err;
+      if (httpCode(err) !== 403) throw fail('QUARANTINE_TOKEN_SCOPE');
     }
     // This is only storage QA. Never persist AVAILABLE or sign real evidence.
   } catch (err) {
