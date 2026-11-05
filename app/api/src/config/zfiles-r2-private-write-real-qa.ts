@@ -1,7 +1,11 @@
 import { createHash, generateKeyPairSync, randomUUID } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import { win32 } from 'node:path';
-import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import {
   inspectSupplierAttachment,
   SUPPLIER_ATTACHMENT_MAX_BYTES,
@@ -62,10 +66,8 @@ export function requireZfilesR2PrivateQaConfig(
   const accountId = env.R2_ACCOUNT_ID ?? '';
   const jurisdiction = env.R2_JURISDICTION ?? 'default';
   const originalFile = env.R2_PROMOTER_QA_LOCAL_ORIGINAL_PDF ?? '';
-  const quarantineAccessKeyId =
-    env.R2_QUARANTINE_SCAN_READ_ACCESS_KEY_ID ?? '';
-  const quarantineSecret =
-    env.R2_QUARANTINE_SCAN_READ_SECRET_ACCESS_KEY ?? '';
+  const quarantineAccessKeyId = env.R2_QUARANTINE_SCAN_READ_ACCESS_KEY_ID ?? '';
+  const quarantineSecret = env.R2_QUARANTINE_SCAN_READ_SECRET_ACCESS_KEY ?? '';
   const privateAccessKeyId = env.R2_PROMOTER_QA_PRIVATE_ACCESS_KEY_ID ?? '';
   const privateSecret = env.R2_PROMOTER_QA_PRIVATE_SECRET_ACCESS_KEY ?? '';
 
@@ -128,9 +130,10 @@ export function requireZfilesR2PrivateQaConfig(
  * NO ClamAV took place here; signature key is ephemeral and cannot authorize
  * a PostgreSQL release. This result must never enter any persistent ledger.
  */
-function syntheticCandidate(
-  config: ZfilesR2PrivateQaConfig,
-): { candidate: TrustedPromotionCandidate; policy: EvidenceVerificationPolicy } {
+function syntheticCandidate(config: ZfilesR2PrivateQaConfig): {
+  candidate: TrustedPromotionCandidate;
+  policy: EvidenceVerificationPolicy;
+} {
   const now = Date.now();
   const pair = generateKeyPairSync('ed25519');
   const jobId = randomUUID();
