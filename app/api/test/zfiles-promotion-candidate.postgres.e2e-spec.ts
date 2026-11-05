@@ -75,7 +75,9 @@ describePg(
       const promoterPwd = randomBytes(24).toString('hex');
       const unrelatedPwd = randomBytes(24).toString('hex');
 
-      await db.$executeRawUnsafe(`CREATE ROLE "${ownerRole}" NOLOGIN NOINHERIT`);
+      await db.$executeRawUnsafe(
+        `CREATE ROLE "${ownerRole}" NOLOGIN NOINHERIT`,
+      );
       await db.$executeRawUnsafe(
         `CREATE ROLE "${promoterRole}" LOGIN NOINHERIT PASSWORD '${promoterPwd}'`,
       );
@@ -175,7 +177,9 @@ describePg(
           companyId,
           documentId,
           uploadedById: userId,
-          storageKey: ['private', companyId, documentId, attachmentId].join('/'),
+          storageKey: ['private', companyId, documentId, attachmentId].join(
+            '/',
+          ),
           originalName: 'synthetic.pdf',
           contentType: 'application/pdf',
           sizeBytes: 64,
@@ -237,8 +241,13 @@ describePg(
 
     it('grants dedicated promoter only scoped EXECUTE, not table reads or DML', async () => {
       const [grants] = await db.$queryRaw<
-        { canExecute: boolean; canReadJobs: boolean; canReadReceipts: boolean;
-          canUpdateAttachment: boolean; otherExec: boolean }[]
+        {
+          canExecute: boolean;
+          canReadJobs: boolean;
+          canReadReceipts: boolean;
+          canUpdateAttachment: boolean;
+          otherExec: boolean;
+        }[]
       >`SELECT
         has_function_privilege(${promoterRole},
           'public.read_zfiles_promotion_candidate(uuid,text)', 'EXECUTE')
@@ -276,7 +285,9 @@ describePg(
     it('returns only a scoped consumed CLEAN candidate and the intact signed envelope', async () => {
       const f = await fixture();
       const signed = evidence(f);
-      await expect(gateway().verifyAndCommit(f.jobId, signed)).resolves.toEqual({
+      await expect(
+        gateway().verifyAndCommit(f.jobId, signed),
+      ).resolves.toEqual({
         status: 'VERIFIED_UNRELEASED',
         verdict: 'CLEAN_CANDIDATE',
       });
@@ -330,9 +341,11 @@ describePg(
       await reader.load(f.jobId, f.companyId);
       await reader.load(f.jobId, f.companyId);
       expect(
-        (await db.supplierDocumentAttachment.findUniqueOrThrow({
-          where: { id: f.attachmentId },
-        })).status,
+        (
+          await db.supplierDocumentAttachment.findUniqueOrThrow({
+            where: { id: f.attachmentId },
+          })
+        ).status,
       ).toBe('PENDING_SCAN');
       await expect(
         db.supplierDocumentAttachment.update({
