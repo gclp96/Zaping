@@ -27,8 +27,7 @@ function qaEnv(): NodeJS.ProcessEnv {
     R2_QUARANTINE_SCAN_ATTACHMENT_ID: attachment,
     R2_QUARANTINE_SCAN_SHA256: 'b'.repeat(64),
     R2_QUARANTINE_SCAN_SIZE_BYTES: '110',
-    R2_PROMOTER_QA_LOCAL_ORIGINAL_PDF:
-      `C:\\QA\\quarantine_${company}_${document}_${attachment}.pdf`,
+    R2_PROMOTER_QA_LOCAL_ORIGINAL_PDF: `C:\\QA\\quarantine_${company}_${document}_${attachment}.pdf`,
     R2_QUARANTINE_SCAN_READ_ACCESS_KEY_ID: 'synthetic-quarantine-id',
     R2_QUARANTINE_SCAN_READ_SECRET_ACCESS_KEY: 'synthetic-q-secret',
     R2_PROMOTER_QA_PRIVATE_ACCESS_KEY_ID: 'synthetic-private-id',
