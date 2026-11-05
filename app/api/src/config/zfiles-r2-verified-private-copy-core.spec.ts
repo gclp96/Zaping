@@ -44,7 +44,9 @@ const policy: EvidenceVerificationPolicy = {
   maxFutureClockSkewMs: 5_000,
 };
 
-function candidate(verdict: 'CLEAN_CANDIDATE' | 'MALWARE_DETECTED' = 'CLEAN_CANDIDATE') {
+function candidate(
+  verdict: 'CLEAN_CANDIDATE' | 'MALWARE_DETECTED' = 'CLEAN_CANDIDATE',
+) {
   const claims: ScanEvidenceClaims = {
     protocol: 'zaping-scan-evidence-v1',
     companyId,
@@ -52,7 +54,9 @@ function candidate(verdict: 'CLEAN_CANDIDATE' | 'MALWARE_DETECTED' = 'CLEAN_CAND
     attachmentId,
     reservationId: attachmentId,
     requestNonce,
-    quarantineKey: ['quarantine', companyId, documentId, attachmentId].join('/'),
+    quarantineKey: ['quarantine', companyId, documentId, attachmentId].join(
+      '/',
+    ),
     contentSizeBytes: pdf.length,
     contentSha256: hash,
     bytesVerified: true,
@@ -123,7 +127,9 @@ function storage(options: QaOptions = {}) {
       return Promise.resolve({
         ContentLength: pdf.length,
         Body: Readable.from([
-          options.corruptedSource ? Buffer.alloc(pdf.length, 9) : Buffer.from(pdf),
+          options.corruptedSource
+              ? Buffer.alloc(pdf.length, 9)
+              : Buffer.from(pdf),
         ]),
       });
     }
