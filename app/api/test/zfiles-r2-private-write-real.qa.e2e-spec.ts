@@ -12,8 +12,11 @@ const describeLocal =
  * signature is not a real ClamAV scan or authorization to change PostgreSQL.
  * Never passes credentials, object keys or SDK errors into the Jest output.
  */
-describeLocal('ZFILES-R2-03D3B physical storage create-once / recovery QA', () => {
-  it('verifies synthetic private bytes without releasing an attachment', async () => {
-    await runZfilesR2PrivateRealQa(process.env);
-  }, 90_000);
-});
+describeLocal(
+  'ZFILES-R2-03D3B physical storage create-once / recovery QA',
+  () => {
+    it('verifies synthetic private bytes without releasing an attachment', async () => {
+      await runZfilesR2PrivateRealQa(process.env);
+    }, 90_000);
+  },
+);
