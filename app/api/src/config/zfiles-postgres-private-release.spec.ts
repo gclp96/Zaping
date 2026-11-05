@@ -1,6 +1,4 @@
-import {
-  ZfilesPrivateReleaseCoordinator,
-} from './zfiles-postgres-private-release';
+import { ZfilesPrivateReleaseCoordinator } from './zfiles-postgres-private-release';
 import type {
   TrustedPromotionCandidate,
   PrivateBytesVerifiedUnreleased,
