@@ -77,6 +77,24 @@ export class ZfilesVerifiedPrivateCopyCore {
   async stageVerifiedBytes(
     candidate: TrustedPromotionCandidate,
   ): Promise<PrivateBytesVerifiedUnreleased> {
+    return this.verifyPrivateBytes(candidate, 'create');
+  }
+
+  /**
+   * 03D3A: explicit recovery of an already-existing private object after an
+   * ambiguous PUT or a failed DB transaction. NEVER writes or deletes R2.
+   * Caller must be an isolated promoter with fresh DB candidate authority.
+   */
+  async reconcileExistingVerifiedBytes(
+    candidate: TrustedPromotionCandidate,
+  ): Promise<PrivateBytesVerifiedUnreleased> {
+    return this.verifyPrivateBytes(candidate, 'existing');
+  }
+
+  private async verifyPrivateBytes(
+    candidate: TrustedPromotionCandidate,
+    mode: 'create' | 'existing',
+  ): Promise<PrivateBytesVerifiedUnreleased> {
     let origin: Buffer | undefined;
     let destination: Buffer | undefined;
     try {
@@ -152,27 +170,49 @@ export class ZfilesVerifiedPrivateCopyCore {
         candidate.attachmentId,
       ].join('/');
 
-      // Conditional create must fail on a pre-existing destination.
-      // 03D1 deliberately does not overwrite, delete or auto-reconcile.
-      await this.privateClient.send(
-        new PutObjectCommand({
-          Bucket: 'zaping-private-qa',
-          Key: privateKey,
-          Body: origin,
-          ContentLength: candidate.contentSizeBytes,
-          ContentType: inspection.contentType,
-          IfNoneMatch: '*',
-        }),
-        { abortSignal: AbortSignal.timeout(15_000) },
-      );
+      // Create-only mode retains 03D1 semantics. An ambiguous PUT failure
+      // MUST NOT be treated as success; the isolated caller can explicitly
+      // invoke recovery later after obtaining a fresh candidate from SQL.
+      // Recovery mode performs NO PUT, COPY, DELETE, LIST or overwrite.
+      if (mode === 'create') {
+        await this.privateClient.send(
+          new PutObjectCommand({
+            Bucket: 'zaping-private-qa',
+            Key: privateKey,
+            Body: origin,
+            ContentLength: candidate.contentSizeBytes,
+            ContentType: inspection.contentType,
+            IfNoneMatch: '*',
+          }),
+          { abortSignal: AbortSignal.timeout(15_000) },
+        );
+      }
 
-      // Never trust a PUT response alone. Read destination independently.
+      // Never trust a PUT response, 412, timeout or HEAD metadata as proof
+      // of the destination. Read the COMPLETE private bytes independently.
       destination = await readExactBytes(
         this.privateClient,
         'zaping-private-qa',
         privateKey,
         candidate.contentSizeBytes,
         candidate.contentSha256,
+      );
+
+      // A long R2 operation must not turn an expired/revoked scan policy
+      // into a release. Re-evaluate signature, key and freshness after GET.
+      verifyScanEvidence(
+        candidate.receipt.signedEnvelope,
+        {
+          companyId: candidate.companyId,
+          documentId: candidate.documentId,
+          attachmentId: candidate.attachmentId,
+          reservationId: candidate.attachmentId,
+          requestNonce: candidate.requestNonce,
+          contentSizeBytes: candidate.contentSizeBytes,
+          contentSha256: candidate.contentSha256,
+        },
+        this.policy,
+        this.clock(),
       );
 
       return {
