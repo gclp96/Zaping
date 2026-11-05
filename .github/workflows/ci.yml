@@ -113,6 +113,11 @@ jobs:
       - name: Run PostgreSQL concurrency E2E
         run: npm run test:concurrency
 
+      - name: Verify auditable ZFILES-R2-03D2B private release in disposable PostgreSQL
+        env:
+          RUN_ZFILES_PRIVATE_RELEASE_PG: "1"
+        run: npm run test:e2e -- --runInBand test/zfiles-private-release.postgres.e2e-spec.ts
+
       - name: Verify read-only ZFILES-R2-03D2A promotion candidate in disposable PostgreSQL
         env:
           RUN_ZFILES_PROMOTION_CANDIDATE_PG: "1"
