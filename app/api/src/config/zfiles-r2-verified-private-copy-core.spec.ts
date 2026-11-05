@@ -128,8 +128,8 @@ function storage(options: QaOptions = {}) {
         ContentLength: pdf.length,
         Body: Readable.from([
           options.corruptedSource
-              ? Buffer.alloc(pdf.length, 9)
-              : Buffer.from(pdf),
+            ? Buffer.alloc(pdf.length, 9)
+            : Buffer.from(pdf),
         ]),
       });
     }
