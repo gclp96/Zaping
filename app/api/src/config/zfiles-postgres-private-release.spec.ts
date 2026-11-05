@@ -1,6 +1,5 @@
 import {
   ZfilesPrivateReleaseCoordinator,
-  type ZfilesPrivateReleaseLedger,
 } from './zfiles-postgres-private-release';
 import type {
   TrustedPromotionCandidate,
@@ -37,14 +36,10 @@ function harness(
 ) {
   const reader = { load: jest.fn().mockResolvedValue(candidateResult) };
   const copy = { stageVerifiedBytes: jest.fn().mockResolvedValue(copied) };
-  const ledger: jest.Mocked<ZfilesPrivateReleaseLedger> = {
+  const ledger = {
     commitVerifiedPrivateRelease: jest.fn().mockResolvedValue(released),
   };
-  const coordinator = new ZfilesPrivateReleaseCoordinator(
-    reader,
-    copy,
-    ledger,
-  );
+  const coordinator = new ZfilesPrivateReleaseCoordinator(reader, copy, ledger);
   return { reader, copy, ledger, coordinator };
 }
 
@@ -89,7 +84,7 @@ describe('ZFILES-R2-03D2B unregistered coordinator', () => {
       { ...verified, sizeBytes: 201 },
       { ...verified, attachmentId: 'different' },
     ]) {
-      const h = harness(candidate, bad as PrivateBytesVerifiedUnreleased);
+      const h = harness(candidate, bad);
       await expect(h.coordinator.promote(jobId, companyId)).rejects.toThrow(
         'ZFILES-R2-03D2B release failed',
       );
