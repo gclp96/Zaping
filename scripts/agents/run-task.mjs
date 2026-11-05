@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Human-gated local dispatcher for one GitHub issue to one Codex worktree. */
-import { spawnSync } from 'node:child_process';
-import { createHash, randomUUID } from 'node:crypto';
+import { spawnSync as systemSpawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
@@ -10,18 +10,22 @@ import { createCodexPrompt, validateIssue } from './issue-contract.mjs';
 import { codexExecArgs } from './codex-command.mjs';
 import { evaluateCodexExecution } from './codex-outcome.mjs';
 
-const REPO = 'gclp96/zaping';
+import { loadIssueContext, contextMaterial } from './issue-context.mjs';
 const repoDir = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 
-function fail(message) { process.stderr.write(`ERROR: ${message}\n`); process.exit(1); }
-function call(binary, args, opts = {}) {
+function fail(message) { throw new Error(message); }
+function callProcess(binary, args, opts = {}, spawnSync = systemSpawnSync) {
   const result = spawnSync(binary, args, { cwd: repoDir, encoding: 'utf8', ...opts });
   if (result.error) fail(`${binary}: ${result.error.message}`);
   if (result.status !== 0) fail(`${binary} ${args.join(' ')}: ${(result.stderr ?? '').trim() || `exit ${result.status}`}`);
   return (result.stdout ?? '').trim();
 }
-function main() {
-  const args = process.argv.slice(2);
+// Prompts may include approved context. Never expose their content to other local users.
+export function writePrivatePrompt(path, prompt) {
+  writeFileSync(path, prompt, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+}
+export function main(args = process.argv.slice(2), spawnSync = systemSpawnSync) {
+  const call = (binary, argv, opts) => callProcess(binary, argv, opts, spawnSync);
   const preview = args.length === 2 && args[0] === '--issue' && /^\d+$/.test(args[1]);
   const execute = args.length === 5 && args[0] === '--issue' && /^\d+$/.test(args[1])
     && args[2] === '--execute' && args[3] === '--approval-sha' && /^[a-f0-9]{64}$/.test(args[4]);
@@ -30,25 +34,17 @@ function main() {
   }
   const number = Number(args[1]);
   if (!Number.isSafeInteger(number) || number <= 0) fail('Número de issue inválido');
-  const gh = process.platform === 'win32' ? 'gh.exe' : 'gh';
-  const raw = call(gh, ['issue', 'view', String(number), '--repo', REPO, '--json', 'number,title,body,labels,state,url']);
-  let issue;
-  try { issue = JSON.parse(raw); } catch { fail('GitHub CLI devolvió JSON inválido'); }
-  if (issue.number !== number || !issue.url?.startsWith(`https://github.com/${REPO}/issues/${number}`)) {
-    fail('Identidad del issue no coincide con el repositorio esperado');
-  }
+  const { issue, references, approvalSha } = loadIssueContext(number, spawnSync, repoDir);
   const validated = validateIssue(issue);
   if (!validated.ok) fail(validated.errors.join('; '));
-  const prompt = createCodexPrompt(issue, validated.sections);
-  // Approval fingerprint binds the operator's reviewed title/body to this exact issue.
-  const approvalSha = createHash('sha256').update(JSON.stringify([issue.number, issue.title, issue.body])).digest('hex');
+  const prompt = createCodexPrompt(issue, validated.sections) + contextMaterial(references);
   if (!execute) {
-    process.stdout.write(`Issue #${number} con etiqueta agent:ready. Vista previa: NO se ha ejecutado Codex.\n\n${prompt}`);
+    process.stdout.write(`Issue #${number} con etiqueta agent:ready. Vista previa: NO se ha ejecutado Codex.\n\n${prompt}\nTicket original (JSON literal):\n${JSON.stringify(issue)}\n`);
     process.stdout.write(`\nHuella SHA-256 del ticket revisado: ${approvalSha}\n`);
     process.stdout.write(`Si estás de acuerdo con el contenido, ejecuta:\nnode scripts/agents/run-task.mjs --issue ${number} --execute --approval-sha ${approvalSha}\n`);
     return;
   }
-  if (args[4] !== approvalSha) fail('El issue fue editado o la huella no corresponde; revisar y aprobar nuevamente');
+  if (args[4] !== approvalSha) fail('El issue o sus referencias cambiaron o la huella no corresponde; revisar y aprobar nuevamente');
 
   const remote = call('git', ['remote', 'get-url', 'origin']);
   if (!/^(https:\/\/github\.com\/gclp96\/zaping(?:\.git)?|git@github\.com:gclp96\/zaping(?:\.git)?)$/.test(remote)) {
@@ -80,7 +76,7 @@ function main() {
   call('git', ['worktree', 'add', '-b', branch, runDir, 'refs/remotes/origin/main']);
   const promptPath = join(resolve(runDir, '..'), `issue-${number}-${randomUUID()}-prompt.txt`);
   // Write outside the Git worktree to avoid accidental inclusion in a commit.
-  writeFileSync(promptPath, prompt, { encoding: 'utf8', flag: 'wx' });
+  writePrivatePrompt(promptPath, prompt);
   process.stdout.write(`Issue #${number} | base ${base} | branch ${branch}\nWorktree: ${runDir}\nPrompt: ${promptPath}\n`);
   const expectedHead = call('git', ['rev-parse', 'HEAD'], { cwd: runDir });
   const start = Date.now();
@@ -109,4 +105,9 @@ function main() {
   }
   process.stdout.write('Codex terminó con cambios locales. Estado: LOCAL_REVIEW. Revisar diff y ejecutar validaciones antes de PR/merge.\n');
 }
-main();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try { main(); } catch (error) {
+    process.stderr.write(`BLOCKED: ${error.message}\n`);
+    process.exitCode = 1;
+  }
+}
