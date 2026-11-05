@@ -152,8 +152,7 @@ BEGIN
   SELECT j.* INTO v_job
   FROM public."SupplierAttachmentScanJob" j
   WHERE j."id" = p_job_id AND j."companyId" = p_company_id
-    AND j."attachmentId" = v_attachment."id"
-  FOR UPDATE;
+    AND j."attachmentId" = v_attachment."id";
   IF NOT FOUND THEN RETURN FALSE; END IF;
 
   SELECT d."status"::text INTO v_document_status
