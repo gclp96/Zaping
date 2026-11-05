@@ -106,6 +106,8 @@ type QaOptions = {
   corruptedDestination?: boolean;
   conflict?: boolean;
   corruptHeader?: boolean;
+  missingDestination?: boolean;
+  expireDuringRead?: boolean;
 };
 
 function storage(options: QaOptions = {}) {
@@ -155,6 +157,9 @@ function storage(options: QaOptions = {}) {
       calls.push('P_GET');
       expect(command.input.Bucket).toBe('zaping-private-qa');
       expect(command.input.Key).toBe(privateKey);
+      if (options.missingDestination) {
+        return Promise.reject(new Error('NoSuchKey'));
+      }
       return Promise.resolve({
         ContentLength: pdf.length,
         Body: Readable.from([
@@ -168,11 +173,15 @@ function storage(options: QaOptions = {}) {
   });
   const quarantine = { send: qSend } as unknown as Pick<S3Client, 'send'>;
   const privateBucket = { send: pSend } as unknown as Pick<S3Client, 'send'>;
+  let clockReads = 0;
   const core = new ZfilesVerifiedPrivateCopyCore(
     quarantine,
     privateBucket,
     policy,
-    () => now,
+    () =>
+      options.expireDuringRead && clockReads++ > 0
+        ? now + policy.maxEvidenceAgeMs + 2_000
+        : now,
   );
   return { core, calls, qSend, pSend, privateKey };
 }
@@ -258,6 +267,65 @@ describe('ZFILES-R2-03D1 verified private-byte staging core (offline only)', () 
     const x = storage({ corruptedDestination: true });
     await expect(x.core.stageVerifiedBytes(candidate())).rejects.toThrow();
     expect(x.calls).toEqual(['Q_HEAD', 'Q_GET', 'P_PUT', 'P_GET']);
+  });
+
+  it('03D3A recovers only by re-verifying existing private bytes with NO new PUT', async () => {
+    const x = storage();
+    await expect(x.core.reconcileExistingVerifiedBytes(candidate())).resolves.toEqual({
+      status: 'PRIVATE_BYTES_VERIFIED_UNRELEASED',
+      companyId,
+      attachmentId,
+      privateKey: x.privateKey,
+      sha256: hash,
+      sizeBytes: pdf.length,
+    });
+    expect(x.calls).toEqual(['Q_HEAD', 'Q_GET', 'P_GET']);
+  });
+
+  it('03D3A never re-stages if existing destination is missing or tampered', async () => {
+    for (const opts of [
+      { missingDestination: true },
+      { corruptedDestination: true },
+      { corruptedSource: true },
+    ]) {
+      const x = storage(opts);
+      await expect(
+        x.core.reconcileExistingVerifiedBytes(candidate()),
+      ).rejects.toThrow('ZFILES-R2-03D1 private-byte verification failed');
+      expect(x.calls).not.toContain('P_PUT');
+    }
+  });
+
+  it('03D3A rejects malware or forged signed receipts before any R2 request', async () => {
+    const malware = storage();
+    await expect(
+      malware.core.reconcileExistingVerifiedBytes(candidate('MALWARE_DETECTED')),
+    ).rejects.toThrow();
+    expect(malware.calls).toEqual([]);
+
+    const x = storage();
+    const trusted = candidate();
+    await expect(
+      x.core.reconcileExistingVerifiedBytes({
+        ...trusted,
+        receipt: {
+          ...trusted.receipt,
+          signedEnvelope: {
+            ...trusted.receipt.signedEnvelope,
+            signature: 'invalid',
+          },
+        },
+      }),
+    ).rejects.toThrow();
+    expect(x.calls).toEqual([]);
+  });
+
+  it('03D3A rejects evidence that expires during read-back without any write', async () => {
+    const x = storage({ expireDuringRead: true });
+    await expect(
+      x.core.reconcileExistingVerifiedBytes(candidate()),
+    ).rejects.toThrow('ZFILES-R2-03D1 private-byte verification failed');
+    expect(x.calls).toEqual(['Q_HEAD', 'Q_GET', 'P_GET']);
   });
 
   it('rejects misrepresented file MIME or extension before private PUT', async () => {
