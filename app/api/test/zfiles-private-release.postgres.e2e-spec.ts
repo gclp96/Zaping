@@ -401,6 +401,49 @@ describePg(
       ).rejects.toThrow();
     });
 
+    it('does not accept a forged transaction GUC without a promotion audit', async () => {
+      const f = await fixture();
+      await consume(f);
+
+      await expect(
+        db.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT set_config(
+            'zfiles.release_job_id', ${f.jobId}::text, true
+          ) AS configured`;
+          await tx.supplierDocumentAttachment.update({
+            where: { id: f.attachmentId },
+            data: {
+              status: 'AVAILABLE',
+              scanEngine: 'ZAPING_R2_CLAMAV_VERIFIED_V1',
+              scannedAt: new Date(),
+            },
+          });
+        }),
+      ).rejects.toThrow();
+
+      expect(await countAudit(f.attachmentId)).toBe(0);
+      const attachment = await db.supplierDocumentAttachment.findUniqueOrThrow({
+        where: { id: f.attachmentId },
+      });
+      expect(attachment.status).toBe('PENDING_SCAN');
+    });
+
+    it('keeps a completed promotion audit immutable against direct UPDATE', async () => {
+      const f = await fixture();
+      await consume(f);
+      const ledger = new ZfilesPostgresPrivateReleaseLedger(promoter);
+      await expect(
+        ledger.commitVerifiedPrivateRelease(releaseArgs(f)),
+      ).resolves.toBe(true);
+
+      await expect(
+        db.$executeRaw`UPDATE "SupplierAttachmentPromotionAudit"
+          SET "scanKeyId" = 'tampered'
+          WHERE "attachmentId" = ${f.attachmentId}::text`,
+      ).rejects.toThrow();
+      expect(await countAudit(f.attachmentId)).toBe(1);
+    });
+
     it('never releases signed MALWARE_DETECTED receipts', async () => {
       const f = await fixture();
       await consume(f, 'MALWARE_DETECTED');
