@@ -56,7 +56,7 @@ export class ZfilesPrivateReleaseCoordinator {
     >,
     private readonly copy: Pick<
       ZfilesVerifiedPrivateCopyCore,
-      'stageVerifiedBytes'
+      'stageVerifiedBytes' | 'reconcileExistingVerifiedBytes'
     >,
     private readonly ledger: ZfilesPrivateReleaseLedger,
   ) {}
@@ -64,6 +64,26 @@ export class ZfilesPrivateReleaseCoordinator {
   async promote(
     jobId: string,
     companyId: string,
+  ): Promise<Readonly<{ status: 'AVAILABLE' | 'UNRELEASED' }>> {
+    return this.commitAfterPhysicalProof(jobId, companyId, 'create');
+  }
+
+  /**
+   * 03D3A manual/isolated recovery after 412, ambiguous PUT or DB rollback.
+   * Does not issue a new private PUT; only full source + destination read-back
+   * may justify attempting the existing SQL release. Not an HTTP provider.
+   */
+  async recoverExisting(
+    jobId: string,
+    companyId: string,
+  ): Promise<Readonly<{ status: 'AVAILABLE' | 'UNRELEASED' }>> {
+    return this.commitAfterPhysicalProof(jobId, companyId, 'existing');
+  }
+
+  private async commitAfterPhysicalProof(
+    jobId: string,
+    companyId: string,
+    mode: 'create' | 'existing',
   ): Promise<Readonly<{ status: 'AVAILABLE' | 'UNRELEASED' }>> {
     try {
       const candidate: TrustedPromotionCandidate | null =
@@ -74,7 +94,9 @@ export class ZfilesPrivateReleaseCoordinator {
       }
 
       const verified: PrivateBytesVerifiedUnreleased =
-        await this.copy.stageVerifiedBytes(candidate);
+        mode === 'existing'
+          ? await this.copy.reconcileExistingVerifiedBytes(candidate)
+          : await this.copy.stageVerifiedBytes(candidate);
       // Copy core has already re-verified Ed25519 + source and private R2
       // bytes. Recheck it did not return a different job's private object.
       const expectedKey = [
