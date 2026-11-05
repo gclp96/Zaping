@@ -194,27 +194,81 @@ BEGIN
      OR p_verified_size <> v_attachment."sizeBytes"
      OR p_verified_size NOT BETWEEN 1 AND 10485760
      OR v_attachment."contentType" NOT IN ('application/pdf','image/jpeg')
-     OR v_receipt."signedEnvelope"->'claims'->>'protocol' <>
+     OR v_receipt."signedEnvelope"->'claims'->>'protocol' IS DISTINCT FROM
           'zaping-scan-evidence-v1'
-     OR v_receipt."signedEnvelope"->'claims'->>'verdict' <>
+     OR v_receipt."signedEnvelope"->'claims'->>'verdict' IS DISTINCT FROM
           'CLEAN_CANDIDATE'
-     OR v_receipt."signedEnvelope"->'claims'->>'companyId' <>
+     OR v_receipt."signedEnvelope"->'claims'->>'companyId' IS DISTINCT FROM
           v_job."companyId"
-     OR v_receipt."signedEnvelope"->'claims'->>'documentId' <>
+     OR v_receipt."signedEnvelope"->'claims'->>'documentId' IS DISTINCT FROM
           v_job."documentId"
-     OR v_receipt."signedEnvelope"->'claims'->>'attachmentId' <>
+     OR v_receipt."signedEnvelope"->'claims'->>'attachmentId' IS DISTINCT FROM
           v_job."attachmentId"
-     OR v_receipt."signedEnvelope"->'claims'->>'requestNonce' <>
+     OR v_receipt."signedEnvelope"->'claims'->>'requestNonce' IS DISTINCT FROM
           v_job."requestNonce"::text
-     OR v_receipt."signedEnvelope"->'claims'->>'quarantineKey' <>
+     OR v_receipt."signedEnvelope"->'claims'->>'quarantineKey' IS DISTINCT FROM
           v_job."quarantineKey"
      OR v_receipt."signedEnvelope"->'claims'->'contentSizeBytes'
           IS DISTINCT FROM to_jsonb(v_job."contentSizeBytes")
-     OR v_receipt."signedEnvelope"->'claims'->>'contentSha256' <>
+     OR v_receipt."signedEnvelope"->'claims'->>'contentSha256' IS DISTINCT FROM
           v_job."contentSha256"
      OR v_receipt."signedEnvelope"->'claims'->'bytesVerified'
           IS DISTINCT FROM 'true'::jsonb
-     OR v_receipt."signedEnvelope"->>'keyId' IS NULL
+     OR (v_receipt."signedEnvelope"->>'keyId' ~ '^[a-z0-9][a-z0-9._-]{0,63}
+  THEN
+    RETURN FALSE;
+  END IF;
+
+  -- A repeat is idempotent only for EXACTLY the same committed job and
+  -- measured bytes. This does not replace future R2 reconciliation.
+  IF v_attachment."status" = 'AVAILABLE' THEN
+    RETURN EXISTS (
+      SELECT 1 FROM public."SupplierAttachmentPromotionAudit" a
+      WHERE a."jobId" = v_job."id"
+        AND a."scanReceiptId" = v_receipt."id"
+        AND a."companyId" = v_job."companyId"
+        AND a."attachmentId" = v_job."attachmentId"
+        AND a."privateKey" = p_private_key
+        AND a."bytesSha256" = p_verified_sha256
+        AND a."sizeBytes" = p_verified_size
+    );
+  END IF;
+  IF v_attachment."status" <> 'PENDING_SCAN' THEN RETURN FALSE; END IF;
+
+  v_now := clock_timestamp() AT TIME ZONE 'UTC';
+  INSERT INTO public."SupplierAttachmentPromotionAudit" (
+    "jobId", "scanReceiptId", "companyId", "documentId",
+    "attachmentId", "privateKey", "bytesSha256", "sizeBytes",
+    "scanKeyId", "recordedAt"
+  ) VALUES (
+    v_job."id", v_receipt."id", v_job."companyId", v_job."documentId",
+    v_job."attachmentId", p_private_key, p_verified_sha256,
+    p_verified_size, v_receipt."signedEnvelope"->>'keyId', v_now
+  );
+
+  -- Transaction-local and bound to the audit row. Reset at transaction end.
+  PERFORM pg_catalog.set_config('zfiles.release_job_id', v_job."id"::text, true);
+  UPDATE public."SupplierDocumentAttachment" a
+  SET "status" = 'AVAILABLE',
+      "scannedAt" = v_now,
+      "scanEngine" = 'ZAPING_R2_CLAMAV_VERIFIED_V1'
+  WHERE a."id" = v_attachment."id"
+    AND a."companyId" = p_company_id
+    AND a."status" = 'PENDING_SCAN';
+  GET DIAGNOSTICS v_updated = ROW_COUNT;
+  IF v_updated <> 1 THEN
+    RAISE EXCEPTION 'ZFILES release transaction rolled back';
+  END IF;
+  RETURN TRUE;
+END;
+$$;
+
+REVOKE ALL ON TABLE public."SupplierAttachmentPromotionAudit" FROM PUBLIC;
+REVOKE ALL ON FUNCTION public."commit_zfiles_verified_private_release"(
+  UUID, TEXT, TEXT, TEXT, INTEGER
+) FROM PUBLIC;
+COMMIT;
+) IS DISTINCT FROM TRUE
   THEN
     RETURN FALSE;
   END IF;
