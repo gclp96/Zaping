@@ -285,12 +285,12 @@ describePg(
     it('returns only a scoped consumed CLEAN candidate and the intact signed envelope', async () => {
       const f = await fixture();
       const signed = evidence(f);
-      await expect(
-        gateway().verifyAndCommit(f.jobId, signed),
-      ).resolves.toEqual({
-        status: 'VERIFIED_UNRELEASED',
-        verdict: 'CLEAN_CANDIDATE',
-      });
+      await expect(gateway().verifyAndCommit(f.jobId, signed)).resolves.toEqual(
+        {
+          status: 'VERIFIED_UNRELEASED',
+          verdict: 'CLEAN_CANDIDATE',
+        },
+      );
       const reader = new ZfilesPostgresPromotionCandidateReader(promoter);
       const result = await reader.load(f.jobId, f.companyId);
       expect(result).toMatchObject({
