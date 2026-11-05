@@ -44,6 +44,7 @@ Desde worktree aislado de la rama de PR 03D3B, `app/api`, ejecutar `npm ci`. No 
 
 ```powershell
 $ErrorActionPreference = 'Stop'
+try {
 $env:RUN_ZFILES_R2_03D3B_REAL_QA = '1'
 $env:R2_PROMOTER_QA_SYNTHETIC_ONLY_CONFIRMED = '1'
 $env:R2_SCANNER_QA_READ_ONLY_CONFIRMED = '1'
@@ -83,7 +84,6 @@ $env:R2_QUARANTINE_SCAN_READ_SECRET_ACCESS_KEY = Get-HiddenR2Credential 'Quarant
 $env:R2_PROMOTER_QA_PRIVATE_ACCESS_KEY_ID = Get-HiddenR2Credential 'Private QA READ WRITE Access Key ID'
 $env:R2_PROMOTER_QA_PRIVATE_SECRET_ACCESS_KEY = Get-HiddenR2Credential 'Private QA READ WRITE Secret Access Key'
 
-try {
     npm run test:e2e -- --runInBand test/zfiles-r2-private-write-real.qa.e2e-spec.ts
 } finally {
     @(
