@@ -271,7 +271,9 @@ describe('ZFILES-R2-03D1 verified private-byte staging core (offline only)', () 
 
   it('03D3A recovers only by re-verifying existing private bytes with NO new PUT', async () => {
     const x = storage();
-    await expect(x.core.reconcileExistingVerifiedBytes(candidate())).resolves.toEqual({
+    await expect(
+      x.core.reconcileExistingVerifiedBytes(candidate()),
+    ).resolves.toEqual({
       status: 'PRIVATE_BYTES_VERIFIED_UNRELEASED',
       companyId,
       attachmentId,
@@ -299,7 +301,9 @@ describe('ZFILES-R2-03D1 verified private-byte staging core (offline only)', () 
   it('03D3A rejects malware or forged signed receipts before any R2 request', async () => {
     const malware = storage();
     await expect(
-      malware.core.reconcileExistingVerifiedBytes(candidate('MALWARE_DETECTED')),
+      malware.core.reconcileExistingVerifiedBytes(
+        candidate('MALWARE_DETECTED'),
+      ),
     ).rejects.toThrow();
     expect(malware.calls).toEqual([]);
 
