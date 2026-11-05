@@ -214,7 +214,10 @@ BEGIN
           v_job."contentSha256"
      OR v_receipt."signedEnvelope"->'claims'->'bytesVerified'
           IS DISTINCT FROM 'true'::jsonb
-     OR (v_receipt."signedEnvelope"->>'keyId' ~ '^[a-z0-9][a-z0-9._-]{0,63}
+     OR (v_receipt."signedEnvelope"->>'keyId' ~
+          '^[a-z0-9][a-z0-9._-]{0,63}$') IS DISTINCT FROM TRUE
+     OR v_receipt."signedEnvelope"->'claims'->>'reservationId'
+          IS DISTINCT FROM v_job."attachmentId"
   THEN
     RETURN FALSE;
   END IF;
