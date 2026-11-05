@@ -18,7 +18,8 @@ import {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 const SHA256 = /^[0-9a-f]{64}$/u;
-const failure = () => new Error('ZFILES-R2-03D1 private-byte verification failed');
+const failure = () =>
+  new Error('ZFILES-R2-03D1 private-byte verification failed');
 
 /**
  * MUST come from one tenant-scoped, trusted PostgreSQL query in a future
