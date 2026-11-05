@@ -97,6 +97,9 @@ describePg('ZFILES-R2-03D2B transactional release on disposable PostgreSQL 16', 
         ON "SupplierDocumentAttachment" TO "${ownerRole}"`,
     );
     await db.$executeRawUnsafe(
+      `GRANT UPDATE ("status") ON "SupplierDocument" TO "${ownerRole}"`,
+    );
+    await db.$executeRawUnsafe(
       `ALTER FUNCTION public."commit_zfiles_verified_private_release"(uuid,text,text,text,integer)
         OWNER TO "${ownerRole}"`,
     );
@@ -142,6 +145,11 @@ describePg('ZFILES-R2-03D2B transactional release on disposable PostgreSQL 16', 
       );
       await db.$executeRawUnsafe(
         `REVOKE UPDATE ("status", "scanEngine", "scannedAt") ON "SupplierDocumentAttachment" FROM "${ownerRole}"`,
+      );
+    }
+    if (ownerRole) {
+      await db.$executeRawUnsafe(
+        `REVOKE UPDATE ("status") ON "SupplierDocument" FROM "${ownerRole}"`,
       );
     }
     for (const role of [promoterRole, unrelatedRole, ownerRole]) {
