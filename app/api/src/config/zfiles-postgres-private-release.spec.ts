@@ -47,11 +47,15 @@ function harness(
 describe('ZFILES-R2-03D2B unregistered coordinator', () => {
   it('03D3A uses explicit no-write recovery and the same SQL release gate', async () => {
     const h = harness();
-    await expect(h.coordinator.recoverExisting(jobId, companyId)).resolves.toEqual({
+    await expect(
+      h.coordinator.recoverExisting(jobId, companyId),
+    ).resolves.toEqual({
       status: 'AVAILABLE',
     });
     expect(h.copy.stageVerifiedBytes).not.toHaveBeenCalled();
-    expect(h.copy.reconcileExistingVerifiedBytes).toHaveBeenCalledWith(candidate);
+    expect(h.copy.reconcileExistingVerifiedBytes).toHaveBeenCalledWith(
+      candidate,
+    );
     expect(h.ledger.commitVerifiedPrivateRelease).toHaveBeenCalledWith({
       jobId,
       companyId,
@@ -85,7 +89,9 @@ describe('ZFILES-R2-03D2B unregistered coordinator', () => {
 
   it('03D3A does not touch R2 or SQL if the isolated reader denies recovery', async () => {
     const h = harness(null);
-    await expect(h.coordinator.recoverExisting(jobId, companyId)).resolves.toEqual({
+    await expect(
+      h.coordinator.recoverExisting(jobId, companyId),
+    ).resolves.toEqual({
       status: 'UNRELEASED',
     });
     expect(h.copy.reconcileExistingVerifiedBytes).not.toHaveBeenCalled();
