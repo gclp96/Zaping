@@ -2213,6 +2213,6 @@ model SupplierAttachmentPromotionAudit {
   receipt SupplierAttachmentScanReceipt @relation(fields: [scanReceiptId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "ZSAPA_receipt_fk")
   attachment SupplierDocumentAttachment @relation(fields: [attachmentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict, map: "ZSAPA_attachment_company_fk")
 
-  @@unique([companyId, attachmentId], map: "ZSAPA_attachment_unique")
+  @@unique([attachmentId, companyId], map: "ZSAPA_attachment_unique")
   @@index([companyId, documentId, recordedAt], map: "ZSAPA_company_document_recorded_idx")
 }
