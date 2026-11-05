@@ -17,7 +17,7 @@ Precondiciones:
 
 `commit_zfiles_verified_private_release(jobId, companyId, privateKey, verifiedSha256, verifiedSize)` — `SECURITY DEFINER`, `search_path` restringido, sin EXECUTE público.
 
-1. Resuelve el attachment desde el job (no desde el caller), bloquea attachment y job, mantiene el documento bloqueado para revalidar su estado y selecciona el receipt inmutable.
+1. Resuelve el attachment desde el job (no desde el caller), bloquea el adjunto y mantiene un bloqueo de lectura del documento para revalidar su estado; el job CONSUMED ya es inmutable por trigger y se reconsulta sin UPDATE y selecciona el receipt inmutable.
 2. Exige **CONSUMED**, nonce usado antes de la expiración, documento `ACTIVE`, adjunto no eliminado, receipt `CLEAN_CANDIDATE`, igualdad exacta de empresa, documento, attachment, claves derivadas, hash y tamaño.
 3. Revalida la estructura del signed envelope persistido. **PostgreSQL no puede verificar Ed25519 ni leer R2**; la autorización criptográfica reside exclusivamente en el proceso promotor aislado, que entrega mediciones posteriores al read-back.
 4. Inserta `SupplierAttachmentPromotionAudit` (identidad job/receipt, Company, objeto privado, SHA/bytes, keyId y fecha) y ejecuta `PENDING_SCAN → AVAILABLE` bajo el trigger de protección en **una transacción**. Un rollback revierte ambos.
