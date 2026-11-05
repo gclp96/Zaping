@@ -56,7 +56,7 @@ for (const [name, mutate, reason] of [
   ['index missing', e => { e.inventory[0].index = null; }, 'INDEX_CONTENT_UNAVAILABLE'],
   ['base missing', e => { e.inventory[1].base = null; }, 'BASE_CONTENT_UNAVAILABLE'],
   ['deleted', e => { Object.assign(e.inventory[1], { status: ' D', size: null, sha256: null, base: null }); }, 'DELETED_CONTENT'],
-  ['large', e => { e.inventory[0].size = LIMITS.reviewBytes + 1; }, 'TOO_LARGE'],
+  ['large', e => { e.inventory[0].status = 'MM'; e.inventory[0].size = LIMITS.reviewBytes + 1; }, 'TOO_LARGE'],
   ['ci missing commit', e => { e.checks[0].source.kind = 'GITHUB_CI'; }, 'CHECK_UNVERIFIED'],
   ['ci old commit', e => { e.checks[0].source.kind = 'GITHUB_CI'; e.checks[0].binding.publishedCommitSha = 'c'.repeat(40); }, 'CHECK_UNVERIFIED'],
   ...['BINARY', 'TOO_LARGE', 'POSSIBLE_SECRET'].map(code => [code, e => { e.inventory[0].excluded = code; }, code]),
@@ -145,4 +145,26 @@ test('empty inventory cannot yield QA_REVIEW even with a bound PASS check', () =
   assert.deepEqual(r.reasons, ['INVENTORY_EMPTY']);
   assert.equal(r.envelope.checks[0].status, 'PASS');
   assert.deepEqual(r.exportablePaths, []);
+});
+
+// Independent review follow-up: index/base metadata must agree with staged-only Git XY.
+test('staged addition with base content is invalid Git metadata', () => {
+  const e = fixture();
+  Object.assign(e.inventory[0], { status: 'A ', base: content(), index: content() });
+  assert.deepEqual(validate(e).reasons, ['INVALID_GIT_METADATA']);
+  assert.equal(validate(e).status, 'BLOCKED');
+});
+test('staged-only modification with index different from working content blocks', () => {
+  const e = fixture(); e.inventory[0].index.sha256 = 'c'.repeat(64);
+  assert.equal(validate(e).status, 'BLOCKED');
+  assert.deepEqual(validate(e).reasons, ['INVALID_GIT_METADATA']);
+});
+test('staged-only rename with index size different from working content blocks', () => {
+  const e = fixture(); e.inventory[3].index.size++;
+  assert.equal(validate(e).status, 'BLOCKED');
+  assert.deepEqual(validate(e).reasons, ['INVALID_GIT_METADATA']);
+});
+test('staged and unstaged modification may legitimately have distinct index and working content', () => {
+  const e = fixture(); e.inventory[0].status = 'MM'; e.inventory[0].index.sha256 = 'c'.repeat(64);
+  assert.equal(validate(e).status, 'QA_REVIEW');
 });

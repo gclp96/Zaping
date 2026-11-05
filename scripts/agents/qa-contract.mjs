@@ -77,6 +77,13 @@ export function validateQaEnvelope(input) {
         const v = e[layer];
         if (v !== null) { object(v, ['size', 'sha256']); require(Number.isSafeInteger(v.size) && v.size >= 0 && v.size <= LIMITS.reviewBytes, 'INVALID_SIZE'); digest(v.sha256); }
       }
+      // A staged addition has no content in HEAD at its current path.
+      require(e.status[0] !== 'A' || e.base === null, 'INVALID_GIT_METADATA');
+      // With no unstaged change, the working copy and staged index are identical.
+      if (['A', 'M', 'R'].includes(e.status[0]) && e.status[1] === ' '
+        && e.index !== null && e.size !== null) {
+        require(e.index.size === e.size && e.index.sha256 === e.sha256, 'INVALID_GIT_METADATA');
+      }
       // Scope violations block the whole envelope; no partial content eligibility.
       require(allowed(e.path) && (!rename || allowed(e.originalPath)), 'OUT_OF_SCOPE');
       require(e.excluded !== 'OUT_OF_SCOPE' && !e.evidenceGaps.includes('OUT_OF_SCOPE'), 'OUT_OF_SCOPE');

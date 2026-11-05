@@ -86,8 +86,15 @@ Symlinks/junctions/archivos especiales representados en `kind` bloquean. La
 función no puede detectar enlaces omitidos o falsamente declarados REGULAR.
 Un registro `??` es incompatible con `base` o `index` distintos de null:
 se devuelve `BLOCKED` (`INVALID_GIT_METADATA`) incluso si otros metadatos
-parecen completos. Los `originalPath` duplicados entre renombres se rechazan
-con `DUPLICATE_RENAME_SOURCE`.
+parecen completos. Una incorporación staged (`A` en X) tampoco puede tener
+contenido `base`: el archivo no existía en HEAD en su ruta actual. Si el índice
+está disponible y no hay cambios unstaged (Y es espacio), el contenido actual
+`tamaño + SHA-256` debe coincidir con el índice en cambios staged `A`, `M` o
+`R`; divergencias declaradas producen `INVALID_GIT_METADATA`. Si falta una
+capa, V1 mantiene su razón de insuficiencia; no inventa bytes. Cuando hay
+cambios staged y unstaged (`MM`, `AM`, `RM`), sus contenidos pueden diferir.
+Los `originalPath` duplicados entre renombres se rechazan con
+`DUPLICATE_RENAME_SOURCE`.
 
 Un inventario vacío se considera `INSUFFICIENT_EVIDENCE` con
 `INVENTORY_EMPTY`, incluso si el llamador declara checks vinculados PASS; un
