@@ -30,8 +30,7 @@ export class ZfilesPostgresPrivateReleaseLedger implements ZfilesPrivateReleaseL
   constructor(private readonly db: PrismaClient) {}
 
   async commitVerifiedPrivateRelease(request: ReleaseRequest): Promise<boolean> {
-    const rows = await this.db.$queryRaw<{ released: boolean }[]>
-      `SELECT public."commit_zfiles_verified_private_release"(
+    const rows = await this.db.$queryRaw<{ released: boolean }[]>`SELECT public."commit_zfiles_verified_private_release"(
         ${request.jobId}::uuid, ${request.companyId}::text,
         ${request.privateKey}::text, ${request.sha256}::text,
         ${request.sizeBytes}::integer
@@ -60,6 +59,9 @@ export class ZfilesPrivateReleaseCoordinator {
       const candidate: TrustedPromotionCandidate | null =
         await this.reader.load(jobId, companyId);
       if (!candidate) return { status: 'UNRELEASED' };
+      if (candidate.jobId !== jobId || candidate.companyId !== companyId) {
+        throw new Error('candidate scope mismatch');
+      }
 
       const verified: PrivateBytesVerifiedUnreleased =
         await this.copy.stageVerifiedBytes(candidate);
