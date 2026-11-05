@@ -43,11 +43,7 @@ const blocked = () =>
 function fixtureClient(options?: {
   badBytes?: boolean;
   privateResponse?:
-    | 'denied'
-    | 'generic403'
-    | 'missing'
-    | 'allowed'
-    | 'unauthorized';
+    'denied' | 'generic403' | 'missing' | 'allowed' | 'unauthorized';
   headLength?: number;
 }) {
   const commands: string[] = [];
