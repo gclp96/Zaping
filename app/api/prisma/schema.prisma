@@ -2134,6 +2134,7 @@ model SupplierDocumentAttachment {
   removedBy User? @relation("SupplierAttachmentRemovedBy", fields: [removedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
 
   scanJobs SupplierAttachmentScanJob[]
+  promotionAudit SupplierAttachmentPromotionAudit?
 
   @@unique([id, companyId], map: "ZSATT_id_company_key")
   @@unique([companyId, storageKey])
@@ -2165,6 +2166,7 @@ model SupplierAttachmentScanJob {
   attachment SupplierDocumentAttachment @relation(fields: [attachmentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict, map: "ZSASJ_attachment_company_fkey")
   document SupplierDocument @relation(fields: [documentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict, map: "ZSASJ_document_company_fkey")
   receipt SupplierAttachmentScanReceipt?
+  promotionAudit SupplierAttachmentPromotionAudit?
 
   // SQL partial unique index: at most one ISSUED job per Company/attachment.
   @@index([companyId, attachmentId, status, expiresAt], map: "ZSASJ_company_attachment_status_expires_idx")
@@ -2184,8 +2186,33 @@ model SupplierAttachmentScanReceipt {
   signedEnvelope Json @db.JsonB
   createdAt DateTime @default(now()) @db.Timestamp(3)
 
+  promotionAudit SupplierAttachmentPromotionAudit?
   job SupplierAttachmentScanJob @relation(fields: [jobId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "ZSASR_job_fk")
 
   @@unique([companyId, attachmentId], map: "ZSASR_attachment_unique")
   @@index([companyId, documentId, createdAt], map: "ZSASR_company_document_idx")
+}
+
+
+/// 03D2B: one immutable, DB-atomic promotion record per scanned attachment.
+/// This is the trusted worker's attestation, not independent proof of R2 bytes.
+model SupplierAttachmentPromotionAudit {
+  id String @id(map: "ZSAPA_pkey") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  jobId String @unique(map: "ZSAPA_job_unique") @db.Uuid
+  scanReceiptId String @unique(map: "ZSAPA_receipt_unique") @db.Uuid
+  companyId String
+  documentId String
+  attachmentId String
+  privateKey String @db.VarChar(300)
+  bytesSha256 String @db.VarChar(64)
+  sizeBytes Int
+  scanKeyId String @db.VarChar(64)
+  recordedAt DateTime @default(now()) @db.Timestamp(3)
+
+  job SupplierAttachmentScanJob @relation(fields: [jobId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "ZSAPA_job_fk")
+  receipt SupplierAttachmentScanReceipt @relation(fields: [scanReceiptId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "ZSAPA_receipt_fk")
+  attachment SupplierDocumentAttachment @relation(fields: [attachmentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict, map: "ZSAPA_attachment_company_fk")
+
+  @@unique([companyId, attachmentId], map: "ZSAPA_attachment_unique")
+  @@index([companyId, documentId, recordedAt], map: "ZSAPA_company_document_recorded_idx")
 }
