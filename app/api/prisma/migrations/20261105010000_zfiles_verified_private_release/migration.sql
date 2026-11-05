@@ -18,7 +18,7 @@ CREATE TABLE public."SupplierAttachmentPromotionAudit" (
   CONSTRAINT "ZSAPA_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "ZSAPA_job_unique" UNIQUE ("jobId"),
   CONSTRAINT "ZSAPA_receipt_unique" UNIQUE ("scanReceiptId"),
-  CONSTRAINT "ZSAPA_attachment_unique" UNIQUE ("companyId", "attachmentId"),
+  CONSTRAINT "ZSAPA_attachment_unique" UNIQUE ("attachmentId", "companyId"),
   CONSTRAINT "ZSAPA_size_check" CHECK ("sizeBytes" BETWEEN 1 AND 10485760),
   CONSTRAINT "ZSAPA_sha_check" CHECK ("bytesSha256" ~ '^[0-9a-f]{64}$'),
   CONSTRAINT "ZSAPA_key_check" CHECK (
