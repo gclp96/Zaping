@@ -29,8 +29,12 @@ export interface ZfilesPrivateReleaseLedger {
 export class ZfilesPostgresPrivateReleaseLedger implements ZfilesPrivateReleaseLedger {
   constructor(private readonly db: PrismaClient) {}
 
-  async commitVerifiedPrivateRelease(request: ReleaseRequest): Promise<boolean> {
-    const rows = await this.db.$queryRaw<{ released: boolean }[]>`SELECT public."commit_zfiles_verified_private_release"(
+  async commitVerifiedPrivateRelease(
+    request: ReleaseRequest,
+  ): Promise<boolean> {
+    const rows = await this.db.$queryRaw<
+      { released: boolean }[]
+    >`SELECT public."commit_zfiles_verified_private_release"(
         ${request.jobId}::uuid, ${request.companyId}::text,
         ${request.privateKey}::text, ${request.sha256}::text,
         ${request.sizeBytes}::integer
@@ -46,8 +50,14 @@ export class ZfilesPostgresPrivateReleaseLedger implements ZfilesPrivateReleaseL
  */
 export class ZfilesPrivateReleaseCoordinator {
   constructor(
-    private readonly reader: Pick<ZfilesPostgresPromotionCandidateReader, 'load'>,
-    private readonly copy: Pick<ZfilesVerifiedPrivateCopyCore, 'stageVerifiedBytes'>,
+    private readonly reader: Pick<
+      ZfilesPostgresPromotionCandidateReader,
+      'load'
+    >,
+    private readonly copy: Pick<
+      ZfilesVerifiedPrivateCopyCore,
+      'stageVerifiedBytes'
+    >,
     private readonly ledger: ZfilesPrivateReleaseLedger,
   ) {}
 
