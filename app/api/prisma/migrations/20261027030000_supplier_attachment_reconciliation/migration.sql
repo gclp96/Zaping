@@ -18,6 +18,11 @@ CREATE TABLE "SupplierAttachmentReconcileEvent" (
 CREATE INDEX "SARE_company_reservation_created_idx"
   ON "SupplierAttachmentReconcileEvent" ("companyId", "reservationId", "createdAt");
 
+-- Exactly one audit record may authorize each never-started cancellation.
+CREATE UNIQUE INDEX "SARE_cancelled_before_write_once"
+  ON "SupplierAttachmentReconcileEvent" ("companyId", "reservationId")
+  WHERE "action" = 'CANCELLED_BEFORE_WRITE';
+
 ALTER TABLE "SupplierAttachmentReconcileEvent" ADD CONSTRAINT "SARE_company_fkey"
   FOREIGN KEY ("companyId") REFERENCES "Company"("id")
   ON DELETE RESTRICT ON UPDATE RESTRICT;
@@ -88,6 +93,12 @@ BEGIN
   IF OLD."status" = 'RESERVED'
     AND NEW."status" = 'RELEASED_VERIFIED_EMPTY'
     AND OLD."writeAttemptedAt" IS NULL
+    AND EXISTS (
+      SELECT 1 FROM "SupplierAttachmentReconcileEvent" audit
+      WHERE audit."companyId" = OLD."companyId"
+        AND audit."reservationId" = OLD."id"
+        AND audit."action" = 'CANCELLED_BEFORE_WRITE'
+    )
   THEN
     RETURN NEW;
   END IF;
