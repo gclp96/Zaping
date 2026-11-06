@@ -4,7 +4,7 @@ import { UserRole } from '@prisma/client';
 import { SupplierAttachmentUploadReservationsController } from './supplier-attachment-upload-reservations.controller';
 
 describe('ZFILES first-stage reservation endpoint', () => {
-  const reservations = { reserve: jest.fn() };
+  const reservations = { reserve: jest.fn(), status: jest.fn() };
   const uploads = { receive: jest.fn() };
   const controller = new SupplierAttachmentUploadReservationsController(
     reservations as never,
@@ -80,6 +80,33 @@ describe('ZFILES first-stage reservation endpoint', () => {
       requestKey: 'request-12345678',
       metadata: dto,
     });
+  });
+
+  it('does not expose recovery status outside QA', () => {
+    expect(() =>
+      controller.status(req, 'document-a', 'reservation-a'),
+    ).toThrow(ServiceUnavailableException);
+    expect(reservations.status).not.toHaveBeenCalled();
+  });
+
+  it('queries only the authenticated actor reservation status', async () => {
+    process.env.ZFILES_QA_RESERVATIONS_ENABLED = '1';
+    process.env.ZFILES_DEPLOYMENT_SCOPE = 'qa';
+    reservations.status.mockResolvedValue({
+      id: 'reservation-a',
+      status: 'RESERVED',
+      sizeBytes: 512,
+      createdAt: new Date('2026-11-05T00:00:00.000Z'),
+    });
+    await expect(
+      controller.status(req, 'document-a', 'reservation-a'),
+    ).resolves.toMatchObject({ status: 'RESERVED' });
+    expect(reservations.status).toHaveBeenCalledWith(
+      'company-a',
+      'document-a',
+      'actor-a',
+      'reservation-a',
+    );
   });
 
   it('blocks binary PUT until both QA switches are enabled', () => {
