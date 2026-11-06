@@ -1,4 +1,6 @@
-import { NotFoundException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
+import { Readable } from 'node:stream';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import {
   SupplierDocumentAttachmentStatus,
   SupplierDocumentStatus,
@@ -63,6 +65,55 @@ describe('SupplierDocumentAttachmentsService', () => {
       }),
     );
     expect(storage.openReadOnly).not.toHaveBeenCalled();
+  });
+
+  it('rejects AVAILABLE metadata with a quarantine or cross-tenant object key', async () => {
+    prisma.supplierDocumentAttachment.findFirst.mockResolvedValue({
+      storageKey: 'quarantine/company-a/document-a/file-a',
+      originalName: 'documento.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: 18,
+      sha256: 'a'.repeat(64),
+    });
+    await expect(
+      service.verifiedDownload('company-a', 'document-a', 'file-a'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(storage.openReadOnly).not.toHaveBeenCalled();
+
+    prisma.supplierDocumentAttachment.findFirst.mockResolvedValue({
+      storageKey: 'private/company-b/document-a/file-a',
+      originalName: 'documento.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: 18,
+      sha256: 'a'.repeat(64),
+    });
+    await expect(
+      service.verifiedDownload('company-a', 'document-a', 'file-a'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(storage.openReadOnly).not.toHaveBeenCalled();
+  });
+
+  it('reads only the exact canonical private key after an authorized lookup', async () => {
+    const bytes = Buffer.from('%PDF-1.7\\nverified\\n%%EOF\\n');
+    prisma.supplierDocumentAttachment.findFirst.mockResolvedValue({
+      storageKey: 'private/company-a/document-a/file-a',
+      originalName: 'documento.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: bytes.length,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    });
+    storage.openReadOnly.mockResolvedValue(Readable.from([bytes]));
+
+    await expect(
+      service.verifiedDownload('company-a', 'document-a', 'file-a'),
+    ).resolves.toEqual({
+      bytes,
+      contentType: 'application/pdf',
+      originalName: 'documento.pdf',
+    });
+    expect(storage.openReadOnly).toHaveBeenCalledWith(
+      'private/company-a/document-a/file-a',
+    );
   });
 
   it('returns only available metadata and never the private object key', async () => {
