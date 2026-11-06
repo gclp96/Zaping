@@ -87,8 +87,13 @@ describe('ZFILES first-stage reservation endpoint', () => {
     process.env.ZFILES_DEPLOYMENT_SCOPE = 'qa';
     expect(() =>
       controller.receiveBytes(
-        req, 'document-a', 'reservation-a', '24',
-        'application/pdf', undefined, undefined,
+        req,
+        'document-a',
+        'reservation-a',
+        '24',
+        'application/pdf',
+        undefined,
+        undefined,
       ),
     ).toThrow(ServiceUnavailableException);
     expect(uploads.receive).not.toHaveBeenCalled();
@@ -103,8 +108,13 @@ describe('ZFILES first-stage reservation endpoint', () => {
       status: 'QUARANTINE_WRITE_ACKNOWLEDGED_UNVERIFIED',
     });
     await controller.receiveBytes(
-      req, 'document-a', 'reservation-a', '24',
-      'application/pdf', undefined, undefined,
+      req,
+      'document-a',
+      'reservation-a',
+      '24',
+      'application/pdf',
+      undefined,
+      undefined,
     );
     expect(uploads.receive).toHaveBeenCalledWith({
       companyId: 'company-a',

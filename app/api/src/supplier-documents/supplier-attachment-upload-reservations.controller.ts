@@ -91,6 +91,4 @@ export class SupplierAttachmentUploadReservationsController {
       source: req as unknown as Readable,
     });
   }
-
-
 }

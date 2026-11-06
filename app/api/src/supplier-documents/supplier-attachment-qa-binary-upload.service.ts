@@ -12,7 +12,10 @@ import {
   UserRole,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { inspectSupplierAttachment, SUPPLIER_ATTACHMENT_MAX_BYTES } from './supplier-document-attachment-validation';
+import {
+  inspectSupplierAttachment,
+  SUPPLIER_ATTACHMENT_MAX_BYTES,
+} from './supplier-document-attachment-validation';
 import { QuarantineUploadWriterPort } from './zfiles-qa-quarantine-writer';
 import { requireTenantQuarantineR2Key } from './cloudflare-r2-object-keys';
 
@@ -44,8 +47,15 @@ export class SupplierAttachmentQaBinaryUploadService {
     status: 'QUARANTINE_WRITE_ACKNOWLEDGED_UNVERIFIED';
   }> {
     const {
-      companyId, documentId, actorId, reservationId, source,
-      declaredLength, contentType, contentEncoding, transferEncoding,
+      companyId,
+      documentId,
+      actorId,
+      reservationId,
+      source,
+      declaredLength,
+      contentType,
+      contentEncoding,
+      transferEncoding,
     } = input;
     if (
       !declaredLength ||
@@ -90,12 +100,17 @@ export class SupplierAttachmentQaBinaryUploadService {
     if (!reservation) {
       throw new NotFoundException('Reserva de adjunto no encontrada');
     }
-    if (size !== reservation.sizeBytes || contentType !== reservation.contentType) {
+    if (
+      size !== reservation.sizeBytes ||
+      contentType !== reservation.contentType
+    ) {
       throw new BadRequestException('La carga no coincide con la reserva');
     }
     const expectedKey = [
-      'quarantine', companyId.toLowerCase(),
-      documentId.toLowerCase(), reservationId.toLowerCase(),
+      'quarantine',
+      companyId.toLowerCase(),
+      documentId.toLowerCase(),
+      reservationId.toLowerCase(),
     ].join('/');
     requireTenantQuarantineR2Key(reservation.quarantineKey, companyId);
     if (reservation.quarantineKey !== expectedKey) {
@@ -132,12 +147,17 @@ export class SupplierAttachmentQaBinaryUploadService {
       claimedMime: contentType,
       originalName: reservation.originalName,
     });
-    if (createHash('sha256').update(bytes).digest('hex') !== reservation.sha256) {
+    if (
+      createHash('sha256').update(bytes).digest('hex') !== reservation.sha256
+    ) {
       throw new BadRequestException('El archivo no coincide con la reserva');
     }
     await this.writer.put(companyId, expectedKey, { metadata, bytes });
     // This is a PUT acknowledgement, NOT a scanner or database clearance.
     // The reconciliation worker must still verify exact bytes via R2 GET.
-    return { id: reservationId, status: 'QUARANTINE_WRITE_ACKNOWLEDGED_UNVERIFIED' };
+    return {
+      id: reservationId,
+      status: 'QUARANTINE_WRITE_ACKNOWLEDGED_UNVERIFIED',
+    };
   }
 }

@@ -26,7 +26,10 @@ import {
     ReceiptDocumentLinksService,
     SupplierAttachmentUploadReservationsService,
     SupplierAttachmentQaBinaryUploadService,
-    { provide: QuarantineUploadWriterPort, useFactory: createQaQuarantineWriter },
+    {
+      provide: QuarantineUploadWriterPort,
+      useFactory: createQaQuarantineWriter,
+    },
   ],
 })
 export class SupplierDocumentsModule {}

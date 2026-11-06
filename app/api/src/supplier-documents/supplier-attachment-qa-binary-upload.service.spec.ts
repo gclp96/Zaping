@@ -38,7 +38,7 @@ describe('ZFILES QA raw PDF/JPEG quarantine ingestion', () => {
   const writer = { put: jest.fn() };
   const service = new SupplierAttachmentQaBinaryUploadService(
     prisma as never,
-    writer as never,
+    writer,
   );
   const input = () => ({
     companyId,
@@ -67,17 +67,18 @@ describe('ZFILES QA raw PDF/JPEG quarantine ingestion', () => {
       id: reservationId,
       status: 'QUARANTINE_WRITE_ACKNOWLEDGED_UNVERIFIED',
     });
-    expect(prisma.supplierAttachmentUploadReservation.findFirst)
-      .toHaveBeenCalledWith({
-        where: {
-          id: reservationId,
-          companyId,
-          documentId,
-          createdById: actorId,
-          status: SupplierAttachmentUploadReservationStatus.RESERVED,
-          document: { is: { status: SupplierDocumentStatus.ACTIVE } },
-        },
-      });
+    expect(
+      prisma.supplierAttachmentUploadReservation.findFirst,
+    ).toHaveBeenCalledWith({
+      where: {
+        id: reservationId,
+        companyId,
+        documentId,
+        createdById: actorId,
+        status: SupplierAttachmentUploadReservationStatus.RESERVED,
+        document: { is: { status: SupplierDocumentStatus.ACTIVE } },
+      },
+    });
     expect(writer.put).toHaveBeenCalledWith(
       companyId,
       reservation.quarantineKey,
@@ -100,7 +101,9 @@ describe('ZFILES QA raw PDF/JPEG quarantine ingestion', () => {
   });
 
   it('denies missing or other-tenant reservations', async () => {
-    prisma.supplierAttachmentUploadReservation.findFirst.mockResolvedValue(null);
+    prisma.supplierAttachmentUploadReservation.findFirst.mockResolvedValue(
+      null,
+    );
     await expect(service.receive(input())).rejects.toBeInstanceOf(
       NotFoundException,
     );
