@@ -100,6 +100,7 @@ La decisión continúa registrada por razones históricas pero ya no debe utiliz
 | ADR-013 | Inventory Custody & Case Logistics | ACCEPTED | Arquitectura objetivo Healthcare |
 | ADR-014 | Inventory Locations and Internal Transfers | ACCEPTED | Arquitectura objetivo |
 | ADR-HC-LOCK-001 | Healthcare Company-Scoped Transaction Coordination | ACCEPTED | Implementación y producción pendientes |
+| ADR-016 | Cloudflare R2 Standard para adjuntos privados | ACCEPTED | QA parcial; producción pendiente |
 
 ---
 
