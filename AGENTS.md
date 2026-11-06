@@ -7,6 +7,19 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Zaping — instrucciones para agentes de programación
 
+## Vigencia especial: congelamiento de estabilización (desde 2026-11-06)
+
+**Prioridad sobre el flujo legado indicado más abajo.** Consultar `docs/engineering/BRANCH_AND_STABILIZATION_POLICY.md` antes de cualquier cambio.
+
+- Solo se autorizan las ramas remotas `main` y `qa/integration` al terminar la depuración histórica. Las ramas antiguas son legado de solo lectura.
+- **Prohibido crear nuevas ramas/PR por issue o agente.** La instrucción antigua de “trabajar en rama aislada y preparar un PR” queda suspendida. Para aislamiento, usar parches y worktrees locales detached HEAD sin publicar ramas.
+- No desarrollar ni integrar funcionalidades nuevas hasta completar el cierre de estabilización. Solo correcciones autorizadas, auditoría, QA, pruebas y gobernanza.
+- El dispatcher `scripts/agents/run-task.mjs --execute` y su verificador usan la convención `codex/agent-issue-N`: **no utilizarlos** hasta refactorización, pruebas y aprobación. Los prompts no sustituyen esta restricción del código.
+- Nunca hacer merges o escrituras directas a `main`, eliminar PR/ramas, alterar bases/volúmenes, crear migraciones ni activar flags sin autorización explícita para la operación concreta.
+- Cada PR heredado requiere clasificación y evidencia antes del cierre; no confundir “mergeable” o CI verde con aceptación de seguridad.
+
+
+
 ## Objetivo y fuentes de verdad
 - Zaping es un SaaS ERP multiempresa con vertical Healthcare. Backend: `app/api` (NestJS, Prisma, PostgreSQL); frontend: `web` (Next.js, React).
 - Antes de modificar, revisar el código afectado y las fuentes pertinentes: `docs/engineering/DEVELOPMENT_WORKFLOW.md`, `QUALITY_STANDARDS.md`, `SECURITY_PRINCIPLES.md`, `docs/project/PROJECT_BOARD.md` y la especificación del módulo.
