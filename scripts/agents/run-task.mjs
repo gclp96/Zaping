@@ -34,6 +34,10 @@ export function main(args = process.argv.slice(2), spawnSync = systemSpawnSync) 
   }
   const number = Number(args[1]);
   if (!Number.isSafeInteger(number) || number <= 0) fail('Número de issue inválido');
+  // Temporary stabilization interlock: never create per-issue branches or launch Codex.
+  // Keep previews available for read-only issue triage. Reactivation requires a reviewed,
+  // tested detached-worktree patch-only replacement and explicit human approval.
+  if (execute) fail('ZAPING_STABILIZATION_FREEZE: ejecución de agentes deshabilitada; prohibido crear codex/agent-issue-* durante la estabilización.');
   const { issue, references, approvalSha } = loadIssueContext(number, spawnSync, repoDir);
   const validated = validateIssue(issue);
   if (!validated.ok) fail(validated.errors.join('; '));
