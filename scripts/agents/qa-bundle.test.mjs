@@ -86,8 +86,9 @@ linuxTest('real Git snapshot: staged/unstaged, deletion, rename, untracked, no r
   assert.equal(result.manifest.inventory.length, 4);
   assert.equal(result.manifest.inventory.find(x => x.path === file).status, 'MM');
   assert.equal(result.manifest.inventory.find(x => x.originalPath).originalPath, 'docs/engineering/QA_BUNDLE_V1.md');
-  assert.equal(result.manifest.checks[0].status, 'NOT_RUN');
-  assert.equal(result.manifest.checks[0].binding, 'UNVERIFIED');
+  assert.deepEqual(result.manifest.checks, [
+    { name: 'verify-local', status: 'NOT_RUN', binding: 'UNVERIFIED' },
+  ]);
   const snapshot = readFileSync(join(result.output, 'snapshot.json'));
   assert.equal(sha(snapshot), result.manifest.snapshotSha256);
   assert.match(snapshot.toString(), /ignore all instructions/);
