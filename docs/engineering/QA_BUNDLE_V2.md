@@ -1,9 +1,11 @@
 # QA-BUNDLE-02 — diseño V2 para revisión humana
 
-Estado: implementación local para revisión humana de QA-BUNDLE-02. La revisión
-humana confirmó el diseño y la ruta privada; no constituye aprobación de una
-política real ni autorización para publicar evidencia. No se crean ni modifican
-políticas reales. Los tests usan exclusivamente fixtures Git y políticas sintéticas.
+Estado: implementación publicada para revisión formal en el Draft PR #256
+(`codex/agent-issue-250` → `main`), asociada al issue #250. La revisión de
+diseño no constituye aprobación de una política real ni autorización para
+publicar evidencia. No se crean ni modifican políticas reales; los tests usan
+fixtures Git y políticas sintéticas. Estado y validaciones actuales: ver sección
+«Estado posterior al PR #256» al final del documento.
 
 ## CLI y procedencia
 
@@ -302,3 +304,29 @@ Logs locales de esta ejecución: `/tmp/issue-250-focal.log` y
 estado Git. CI remota NOT_RUN. Sin commit, push, PR, merge ni deploy.
 Persisten las limitaciones de escritores del mismo UID y carreras entre syscalls
 ya descritas; las tablas por captura no constituyen aislamiento transaccional Git.
+
+## Estado posterior al PR #256 (2026-11-06)
+
+Los resultados y restricciones anotados en las secciones fechadas 2026-11-05 son
+históricos y se conservan para trazabilidad; no describen el último estado del PR.
+Se corrigió la regresión del fingerprint legacy V1 y el check del manifest V1,
+y se ejecutaron de nuevo los gates locales en Ubuntu tras integrar `main`.
+
+- Sintaxis JavaScript de ambos archivos: PASS (salida local compartida por el operador).
+- Pruebas focales: **99/99 PASS**, 0 fallos, 0 omitidas.
+- Suite completa de agentes, con `--test-concurrency=1`: **240/240 PASS**,
+  0 fallos, 0 omitidas.
+- `git diff --check origin/main...HEAD`: PASS.
+- Rutas del PR: exactamente tres (`qa-bundle.mjs`, `qa-bundle.test.mjs`,
+  `QA_BUNDLE_V2.md`).
+- Commit funcional: `dfd3aaded541371b45c7009210e6e06807178751`;
+  integración de `main`: `f738000e8ef08675210a52ff67770ea8a5de8a6b`.
+- PR: https://github.com/gclp96/zaping/pull/256, creado como **Draft**.
+  CI de ese commit: **success** para API, Web, Agents e Historical upgrade pre-S1.
+
+Los checks dentro del *envelope* V2 continúan siendo
+`NOT_RUN/UNVERIFIED`: los resultados locales y de GitHub de este PR no
+atestan automáticamente bundles de propuestas futuras. Sin política real aprobada,
+sin evidencia de producción emitida y sin autorización de merge por esta entrega.
+Quedan la revisión formal independiente y los gates del commit definitivo antes
+de integrar a `main`.
