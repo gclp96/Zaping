@@ -2135,6 +2135,7 @@ model SupplierAttachmentUploadReservation {
   contentType   String @db.VarChar(32)
   sizeBytes     Int
   sha256        String @db.VarChar(64)
+  writeAttemptedAt DateTime?
   status        SupplierAttachmentUploadReservationStatus @default(RESERVED)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

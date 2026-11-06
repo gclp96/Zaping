@@ -4,7 +4,7 @@ ALTER TABLE "SupplierAttachmentUploadReservation"
   ADD CONSTRAINT "SAR_id_company_key" UNIQUE ("id", "companyId");
 
 CREATE TYPE "SupplierAttachmentReconcileAction" AS ENUM
-  ('NEEDS_REVIEW', 'QUARANTINE_VERIFIED');
+  ('NEEDS_REVIEW', 'QUARANTINE_VERIFIED', 'CANCELLED_BEFORE_WRITE');
 
 CREATE TABLE "SupplierAttachmentReconcileEvent" (
   "id" TEXT NOT NULL,
@@ -67,6 +67,29 @@ BEGIN
     OR OLD."createdAt" IS DISTINCT FROM NEW."createdAt"
   THEN
     RAISE EXCEPTION 'Immutable upload reservation metadata';
+  END IF;
+
+  -- The R2 writer must persist a durable attempt marker BEFORE starting any
+  -- PUT. This one-way fence is serialized by the parent SupplierDocument lock.
+  -- It cannot be unset or changed after the first attempt.
+  IF OLD."writeAttemptedAt" IS DISTINCT FROM NEW."writeAttemptedAt" THEN
+    IF OLD."status" = 'RESERVED'
+      AND NEW."status" = 'RESERVED'
+      AND OLD."writeAttemptedAt" IS NULL
+      AND NEW."writeAttemptedAt" IS NOT NULL
+    THEN
+      RETURN NEW;
+    END IF;
+    RAISE EXCEPTION 'Upload write intent is immutable';
+  END IF;
+
+  -- Cancellation is permitted ONLY before any PUT intent was recorded.
+  -- Even an ambiguous/failed PUT permanently excludes this safe path.
+  IF OLD."status" = 'RESERVED'
+    AND NEW."status" = 'RELEASED_VERIFIED_EMPTY'
+    AND OLD."writeAttemptedAt" IS NULL
+  THEN
+    RETURN NEW;
   END IF;
 
   IF OLD."status" = 'RESERVED'

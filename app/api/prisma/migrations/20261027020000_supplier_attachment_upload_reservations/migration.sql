@@ -15,6 +15,7 @@ CREATE TABLE "SupplierAttachmentUploadReservation" (
   "contentType" VARCHAR(32) NOT NULL,
   "sizeBytes" INTEGER NOT NULL,
   "sha256" VARCHAR(64) NOT NULL,
+  "writeAttemptedAt" TIMESTAMP(3),
   "status" "SupplierAttachmentUploadReservationStatus" NOT NULL DEFAULT 'RESERVED',
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
