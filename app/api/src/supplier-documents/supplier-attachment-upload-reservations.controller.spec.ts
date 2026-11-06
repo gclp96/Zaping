@@ -5,8 +5,10 @@ import { SupplierAttachmentUploadReservationsController } from './supplier-attac
 
 describe('ZFILES first-stage reservation endpoint', () => {
   const reservations = { reserve: jest.fn() };
+  const uploads = { receive: jest.fn() };
   const controller = new SupplierAttachmentUploadReservationsController(
     reservations as never,
+    uploads as never,
   );
   const req = { user: { companyId: 'company-a', id: 'actor-a' } } as never;
   const dto = {
@@ -17,14 +19,21 @@ describe('ZFILES first-stage reservation endpoint', () => {
   };
   const originalFlag = process.env.ZFILES_QA_RESERVATIONS_ENABLED;
   const originalScope = process.env.ZFILES_DEPLOYMENT_SCOPE;
+  const originalBinary = process.env.ZFILES_QA_BINARY_UPLOAD_ENABLED;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    delete process.env.ZFILES_QA_BINARY_UPLOAD_ENABLED;
     delete process.env.ZFILES_QA_RESERVATIONS_ENABLED;
     delete process.env.ZFILES_DEPLOYMENT_SCOPE;
   });
 
   afterAll(() => {
+    if (originalBinary === undefined) {
+      delete process.env.ZFILES_QA_BINARY_UPLOAD_ENABLED;
+    } else {
+      process.env.ZFILES_QA_BINARY_UPLOAD_ENABLED = originalBinary;
+    }
     if (originalFlag === undefined) {
       delete process.env.ZFILES_QA_RESERVATIONS_ENABLED;
     } else {
@@ -70,6 +79,43 @@ describe('ZFILES first-stage reservation endpoint', () => {
       documentId: 'document-a',
       requestKey: 'request-12345678',
       metadata: dto,
+    });
+  });
+
+  it('blocks binary PUT until both QA switches are enabled', () => {
+    process.env.ZFILES_QA_RESERVATIONS_ENABLED = '1';
+    process.env.ZFILES_DEPLOYMENT_SCOPE = 'qa';
+    expect(() =>
+      controller.receiveBytes(
+        req, 'document-a', 'reservation-a', '24',
+        'application/pdf', undefined, undefined,
+      ),
+    ).toThrow(ServiceUnavailableException);
+    expect(uploads.receive).not.toHaveBeenCalled();
+  });
+
+  it('passes actor and source to the bounded upload service only in QA', async () => {
+    process.env.ZFILES_QA_RESERVATIONS_ENABLED = '1';
+    process.env.ZFILES_QA_BINARY_UPLOAD_ENABLED = '1';
+    process.env.ZFILES_DEPLOYMENT_SCOPE = 'qa';
+    uploads.receive.mockResolvedValue({
+      id: 'reservation-a',
+      status: 'QUARANTINE_WRITE_ACKNOWLEDGED_UNVERIFIED',
+    });
+    await controller.receiveBytes(
+      req, 'document-a', 'reservation-a', '24',
+      'application/pdf', undefined, undefined,
+    );
+    expect(uploads.receive).toHaveBeenCalledWith({
+      companyId: 'company-a',
+      actorId: 'actor-a',
+      documentId: 'document-a',
+      reservationId: 'reservation-a',
+      declaredLength: '24',
+      contentType: 'application/pdf',
+      contentEncoding: undefined,
+      transferEncoding: undefined,
+      source: req,
     });
   });
 

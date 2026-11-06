@@ -7,6 +7,11 @@ import { SupplierReceiptVarianceService } from './supplier-receipt-variance.serv
 import { ReceiptDocumentLinksService } from './receipt-document-links.service';
 import { SupplierAttachmentUploadReservationsController } from './supplier-attachment-upload-reservations.controller';
 import { SupplierAttachmentUploadReservationsService } from './supplier-attachment-upload-reservations.service';
+import { SupplierAttachmentQaBinaryUploadService } from './supplier-attachment-qa-binary-upload.service';
+import {
+  QuarantineUploadWriterPort,
+  createQaQuarantineWriter,
+} from './zfiles-qa-quarantine-writer';
 
 @Module({
   imports: [PrismaModule],
@@ -20,6 +25,8 @@ import { SupplierAttachmentUploadReservationsService } from './supplier-attachme
     SupplierReceiptVarianceService,
     ReceiptDocumentLinksService,
     SupplierAttachmentUploadReservationsService,
+    SupplierAttachmentQaBinaryUploadService,
+    { provide: QuarantineUploadWriterPort, useFactory: createQaQuarantineWriter },
   ],
 })
 export class SupplierDocumentsModule {}
