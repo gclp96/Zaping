@@ -1,7 +1,7 @@
 # ADR-016 — Cloudflare R2 como almacenamiento privado de adjuntos de Zaping
 
 **Estado de decisión:** ACCEPTED
-**Estado de implementación:** PENDIENTE (sin bucket, credenciales ni escáner operativo configurados)
+**Estado de implementación:** PARTIAL — componentes y buckets QA; sin worker integrado ni descarga habilitada
 **Fecha:** 2026-10-26
 **Responsable:** Zaping Team
 **Área:** ERP / Documentos / Archivos de proveedores y futuros adjuntos de otros módulos
@@ -20,7 +20,7 @@ Adoptar **Cloudflare R2, clase de almacenamiento Standard**, como proveedor obje
 - Backend NestJS accede a R2 por la API **S3-compatible**, mediante SDK oficial AWS para JavaScript `@aws-sdk/client-s3` con `region: "auto"` y endpoint `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` (o endpoint específico si se elige una jurisdicción compatible).
 - PostgreSQL/Prisma conserva exclusivamente metadatos, referencias de Company/Document/User, estado, checksum y auditoría; R2 conserva los bytes.
 - Buckets **sin acceso público**: no activar `r2.dev` ni un dominio público y no utilizar una URL pública permanente.
-- Separación de **cuarentena** y **objetos liberados**, preferentemente con buckets distintos por ambiente y permisos acotados a cada flujo. Los nombres finales se definirán durante provisioning; nombres propuestos: `zaping-attachments-quarantine-{env}` y `zaping-attachments-private-{env}`, con `env` = `dev`/`qa`/`prod`.
+- Separación de **cuarentena** y **objetos liberados**, preferentemente con buckets distintos por ambiente y permisos acotados a cada flujo. En QA se utilizan `zaping-quarantine-qa` y `zaping-private-qa`; producción y demás ambientes conservan una decisión de provisioning pendiente.
 - Backend de aplicación recibe subida autenticada, valida límites y documento/tenant, crea la clave aleatoria y deposita el objeto en cuarentena. La verificación completa del contenido y malware ocurre **antes** de marcar `AVAILABLE` y antes de que pueda leerse desde la ruta de descarga.
 - Motor de escaneo segregado y con privilegios mínimos lee cuarentena y publica bytes validados en almacenamiento privado, tras verificar checksum/contenido, y transiciona metadata con auditoría. Un error, timeout o falta de escáner deja el objeto en cuarentena o `REJECTED`; nunca autoaprueba.
 - Descargas de archivos privados **vía backend NestJS autenticado** en esta etapa: RBAC, scope de Company, vínculo a documento, estado `AVAILABLE`, verificación de tamaño/checksum, auditoría y encabezados seguros. No usar presigned GET desde navegador inicialmente por facilidad de revocación y auditoría.
@@ -73,11 +73,11 @@ Fuente oficial de precios: https://developers.cloudflare.com/r2/pricing/
 - **Backend:** adaptador R2 S3-compatible, proceso de cuarentena/escáner, descarga autenticada y eventos de auditoría.
 - **Frontend:** carga y descarga mediante API autenticada sin credenciales ni presigned GET; estados visibles `PENDING_SCAN`, `AVAILABLE`, `REJECTED`.
 - **Seguridad:** separación de permisos/tokens/buckets y bloqueo público; contratos multiempresa existentes permanecen obligatorios.
-- **Migración:** no migrar archivos previos ni ejecutar migraciones nuevas hasta QA y revisión. PR #145 y #146 continúan en borrador.
+- **Migración:** no migrar archivos previos ni ejecutar migraciones nuevas hasta QA y revisión. Los contratos históricos de PR #145 y #146 deben reconciliarse con `main` antes de su integración.
 
 ## 8. Estado y gates
 
-**CURRENT:** Metadata/cuarentena y contrato de lectura en PR #145/#146. El adaptador de descarga registrado falla explícitamente (503); no existe almacenamiento R2 ni escáner operativo dentro del backend desplegado.
+**CURRENT (05/11/2026):** la fundación de metadatos está integrada en `main`, existen buckets R2 QA con pruebas de lectura, y los prototipos de escáner, firma y promoción permanecen en PR apilados. No existe flujo operativo de escaneo y promoción integrado en el backend, no hay descarga habilitada. QA de recuperación privada 03D3B todavía no está aprobado; el objeto privado esperado devolvió 404. No trasladar resultados de laboratorio a autorización de producción.
 
 **TARGET:** Subida autenticada a cuarentena R2 → validación/escáner obligatorio → objeto privado liberado → marca `AVAILABLE` → descarga autorizada desde NestJS.
 
