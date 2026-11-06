@@ -1,6 +1,6 @@
 # Registro de depuración de PR — 2026-11-06
 
-**Repositorio:** gclp96/zaping. **Estado:** auditoría preliminar / solo lectura. **Fuente:** PR abiertos en GitHub consultados el 2026-11-06. **Total inicial:** 47. **Cerrados en esta limpieza:** 1 (#223). **Abiertos restantes a este corte:** 46.
+**Repositorio:** gclp96/zaping. **Estado:** auditoría preliminar / solo lectura. **Fuente:** PR abiertos en GitHub consultados el 2026-11-06. **Total inicial:** 47. **Cerrados en esta limpieza:** 4 (#223, #253, #255, #257). **Abiertos restantes a este corte:** 43.
 
 No se ha autorizado ninguna fusión, cierre ni borrado por el hecho de figurar en esta lista. El objetivo es resolver cada registro con trazabilidad y sin perder trabajo; los números son identificadores históricos que deben conservarse.
 
@@ -61,9 +61,9 @@ No se ha autorizado ninguna fusión, cierre ni borrado por el hecho de figurar e
 
 | PR | Nombre | Estado de triage | Decisión final |
 |---|---|---|---|
-| [#253](https://github.com/gclp96/zaping/pull/253) | feat(zfiles): integrate fail-closed attachment read gate for receipts on modern main | NEEDS_REVIEW | Pendiente |
-| [#255](https://github.com/gclp96/zaping/pull/255) | feat(zfiles): consolidate QA upload reservations and quarantine reconciliation | NEEDS_REVIEW | Pendiente |
-| [#257](https://github.com/gclp96/zaping/pull/257) | feat(zfiles): receipt-native attachment metadata and QA-only read boundary | NEEDS_REVIEW | Pendiente |
+| [#253](https://github.com/gclp96/zaping/pull/253) | feat(zfiles): integrate fail-closed attachment read gate for receipts on modern main | DEFERRED | Cerrado sin merge 2026-11-06; reabrir solo después de estabilización y revisión |
+| [#255](https://github.com/gclp96/zaping/pull/255) | feat(zfiles): consolidate QA upload reservations and quarantine reconciliation | DEFERRED | Cerrado sin merge 2026-11-06; reabrir solo después de estabilización y revisión |
+| [#257](https://github.com/gclp96/zaping/pull/257) | feat(zfiles): receipt-native attachment metadata and QA-only read boundary | DEFERRED | Cerrado sin merge 2026-11-06; reabrir solo después de estabilización y revisión |
 
 ## Documentos y Recepciones (7)
 
