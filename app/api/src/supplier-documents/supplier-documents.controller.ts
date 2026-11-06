@@ -9,9 +9,13 @@ import {
   Post,
   Query,
   Req,
+  Res,
+  StreamableFile,
+  ServiceUnavailableException,
   UseGuards,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import type { Response } from 'express';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -25,6 +29,8 @@ import { SupplierDocumentsService } from './supplier-documents.service';
 import { SupplierDocumentReconciliationService } from './supplier-document-reconciliation.service';
 import { SupplierReceiptVarianceService } from './supplier-receipt-variance.service';
 import { ReceiptDocumentLinksService } from './receipt-document-links.service';
+import { SupplierDocumentAttachmentsService } from './supplier-document-attachments.service';
+import { safeAttachmentDisposition } from './supplier-document-attachment-download';
 import {
   CreateReceiptDocumentLinkDto,
   RemoveReceiptDocumentLinkDto,
@@ -47,6 +53,7 @@ export class SupplierDocumentsController {
     private readonly reconciliation: SupplierDocumentReconciliationService,
     private readonly variance: SupplierReceiptVarianceService,
     private readonly receiptLinks: ReceiptDocumentLinksService,
+    private readonly attachments: SupplierDocumentAttachmentsService,
   ) {}
 
   @Get()
@@ -93,6 +100,42 @@ export class SupplierDocumentsController {
       documentId,
       dto.reason,
     );
+  }
+
+  @Get(':id/attachments')
+  listAvailableAttachments(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
+    this.requireAttachmentsReadEnabled();
+    return this.attachments.listAvailable(req.user.companyId, id);
+  }
+
+  @Get(':id/attachments/:attachmentId/download')
+  async downloadAttachment(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Param('attachmentId') attachmentId: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    this.requireAttachmentsReadEnabled();
+    const file = await this.attachments.verifiedDownload(
+      req.user.companyId,
+      id,
+      attachmentId,
+    );
+    response.setHeader('Cache-Control', 'private, no-store');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Content-Security-Policy', 'sandbox');
+    response.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    return new StreamableFile(file.bytes, {
+      type: file.contentType,
+      disposition: safeAttachmentDisposition(
+        file.originalName,
+        file.contentType,
+      ),
+      length: file.bytes.length,
+    });
   }
 
   @Get(':id')
@@ -235,6 +278,12 @@ export class SupplierDocumentsController {
       this.requireKey(key),
       dto,
     );
+  }
+
+  private requireAttachmentsReadEnabled(): void {
+    if (process.env.ZFILES_ATTACHMENTS_READ_QA_ENABLED !== '1') {
+      throw new ServiceUnavailableException('Adjuntos no habilitados');
+    }
   }
 
   private requireKey(value: string | undefined): string {
