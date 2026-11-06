@@ -6,11 +6,17 @@ import { EquipmentModule } from '../equipment/equipment.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PurchaseReceiptsController } from './purchases-receipts.controller';
 import { PurchaseReceiptsService } from './purchases-receipts.service';
+import { PurchaseReceiptAttachmentsController } from './purchase-receipt-attachments.controller';
+import { PurchaseReceiptAttachmentsService } from './purchase-receipt-attachments.service';
 
 @Module({
   imports: [InventoryPhysicalAuthorityModule, PrismaModule, EquipmentModule],
-  controllers: [PurchaseReceiptsController],
-  providers: [ReceiptPhysicalIntegrationService, PurchaseReceiptsService],
+  controllers: [PurchaseReceiptsController, PurchaseReceiptAttachmentsController],
+  providers: [
+    ReceiptPhysicalIntegrationService,
+    PurchaseReceiptsService,
+    PurchaseReceiptAttachmentsService,
+  ],
   exports: [PurchaseReceiptsService],
 })
 export class PurchaseReceiptsModule {}

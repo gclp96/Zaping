@@ -419,6 +419,7 @@ model Purchase {
   supplierDocumentAllocations PurchaseReceiptDocument[]
   supplierDocumentApprovals PurchaseReceiptReconciliationApproval[]
   documentLinks PurchaseReceiptSupplierDocumentLink[]
+  attachments PurchaseReceiptAttachment[]
 
   @@unique([id, companyId, supplierId])
   @@unique([companyId, folio])
@@ -549,6 +550,7 @@ model Company {
   idempotencyRecords                    IdempotencyRecord[]
   supplierDocuments                     SupplierDocument[]
   supplierDocumentAttachments           SupplierDocumentAttachment[]
+  purchaseReceiptAttachments            PurchaseReceiptAttachment[]
   supplierDocumentAllocations           PurchaseReceiptDocument[]
   supplierDocumentApprovals             PurchaseReceiptReconciliationApproval[]
   receiptDocumentLinks                  PurchaseReceiptSupplierDocumentLink[]
@@ -689,7 +691,9 @@ model User {
 
   receivedPurchaseReceipts PurchaseReceipt[] @relation("PurchaseReceiptReceivedBy")
   supplierAttachmentUploaders SupplierDocumentAttachment[] @relation("SupplierAttachmentUploadedBy")
+  receiptAttachmentUploaders PurchaseReceiptAttachment[] @relation("ReceiptAttachmentUploadedBy")
   supplierAttachmentRemovers SupplierDocumentAttachment[] @relation("SupplierAttachmentRemovedBy")
+  receiptAttachmentRemovers PurchaseReceiptAttachment[] @relation("ReceiptAttachmentRemovedBy")
   supplierDocumentsCreated SupplierDocument[] @relation("SupplierDocumentCreatedBy")
   supplierDocumentExceptionsReviewed SupplierDocument[] @relation("SupplierDocumentExceptionReviewer")
   supplierDocumentAuditActions SupplierDocumentAudit[] @relation("SupplierDocumentAuditActor")
@@ -2134,4 +2138,40 @@ model SupplierDocumentAttachment {
 
   @@unique([companyId, storageKey])
   @@index([companyId, documentId, status, createdAt])
+}
+
+/// ZFILES-03E2: receipts may own files independently of supplier invoices.
+/// Metadata only; no scanner clearance or object access is enabled here.
+enum PurchaseReceiptAttachmentStatus {
+  PENDING_SCAN
+  AVAILABLE
+  REJECTED
+  REMOVED
+}
+
+model PurchaseReceiptAttachment {
+  id              String @id @default(uuid())
+  companyId       String
+  receiptId       String
+  storageKey      String @db.VarChar(300)
+  originalName    String @db.VarChar(255)
+  contentType     String @db.VarChar(32)
+  sizeBytes       Int
+  sha256          String @db.VarChar(64)
+  status          PurchaseReceiptAttachmentStatus @default(PENDING_SCAN)
+  scanEngine      String? @db.VarChar(80)
+  scannedAt       DateTime?
+  rejectionReason String? @db.VarChar(1000)
+  uploadedById    String
+  createdAt       DateTime @default(now())
+  removedById     String?
+  removedAt       DateTime?
+
+  company    Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "PRATT_company_fkey")
+  receipt    PurchaseReceipt @relation(fields: [receiptId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict, map: "PRATT_receipt_fkey")
+  uploadedBy User @relation("ReceiptAttachmentUploadedBy", fields: [uploadedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict, map: "PRATT_uploaded_by_fkey")
+  removedBy  User? @relation("ReceiptAttachmentRemovedBy", fields: [removedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict, map: "PRATT_removed_by_fkey")
+
+  @@unique([companyId, storageKey], map: "PRATT_company_storage_key")
+  @@index([companyId, receiptId, status, createdAt], map: "PRATT_company_receipt_status_created_idx")
 }
