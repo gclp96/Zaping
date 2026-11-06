@@ -157,8 +157,8 @@ export class SupplierAttachmentUploadReservationsService {
             action: SupplierAttachmentReconcileAction.CANCELLED_BEFORE_WRITE,
           },
         });
-        const updated =
-          await tx.supplierAttachmentUploadReservation.updateMany({
+        const updated = await tx.supplierAttachmentUploadReservation.updateMany(
+          {
             where: {
               id: reservationId,
               companyId,
@@ -171,7 +171,8 @@ export class SupplierAttachmentUploadReservationsService {
               status:
                 SupplierAttachmentUploadReservationStatus.RELEASED_VERIFIED_EMPTY,
             },
-          });
+          },
+        );
         if (updated.count !== 1) {
           throw new ConflictException('Reserva ya no cancelable');
         }

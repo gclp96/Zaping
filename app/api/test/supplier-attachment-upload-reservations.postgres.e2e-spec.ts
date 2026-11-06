@@ -197,9 +197,10 @@ describePg('B3d2 real PostgreSQL quota and concurrency', () => {
         },
       }),
     ).toBe(1);
-    const previous = await db.supplierAttachmentUploadReservation.findUniqueOrThrow({
-      where: { id: first.id },
-    });
+    const previous =
+      await db.supplierAttachmentUploadReservation.findUniqueOrThrow({
+        where: { id: first.id },
+      });
     await expect(
       service.reserve({ ...input(f), requestKey: previous.requestKey }),
     ).rejects.toBeInstanceOf(ConflictException);

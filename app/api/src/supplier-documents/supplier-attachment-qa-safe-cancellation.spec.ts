@@ -56,15 +56,15 @@ describe('ZFILES QA pre-PUT cancellation fence', () => {
       id: scope.reservationId,
       status: SupplierAttachmentUploadReservationStatus.RELEASED_VERIFIED_EMPTY,
     });
-    expect(
-      prisma.supplierAttachmentReconcileEvent.create,
-    ).toHaveBeenCalledWith({
-      data: {
-        companyId: 'company-a',
-        reservationId: 'reservation-a',
-        action: SupplierAttachmentReconcileAction.CANCELLED_BEFORE_WRITE,
+    expect(prisma.supplierAttachmentReconcileEvent.create).toHaveBeenCalledWith(
+      {
+        data: {
+          companyId: 'company-a',
+          reservationId: 'reservation-a',
+          action: SupplierAttachmentReconcileAction.CANCELLED_BEFORE_WRITE,
+        },
       },
-    });
+    );
     expect(
       prisma.supplierAttachmentUploadReservation.updateMany,
     ).toHaveBeenCalledWith({
@@ -77,7 +77,8 @@ describe('ZFILES QA pre-PUT cancellation fence', () => {
         writeAttemptedAt: null,
       },
       data: {
-        status: SupplierAttachmentUploadReservationStatus.RELEASED_VERIFIED_EMPTY,
+        status:
+          SupplierAttachmentUploadReservationStatus.RELEASED_VERIFIED_EMPTY,
       },
     });
     expect(
@@ -154,6 +155,8 @@ describe('ZFILES QA pre-PUT cancellation fence', () => {
     await expect(service.cancelBeforeWrite(scope)).rejects.toBeInstanceOf(
       ConflictException,
     );
-    expect(prisma.supplierAttachmentReconcileEvent.create).toHaveBeenCalledTimes(1);
+    expect(
+      prisma.supplierAttachmentReconcileEvent.create,
+    ).toHaveBeenCalledTimes(1);
   });
 });
