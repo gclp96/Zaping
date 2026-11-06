@@ -62,19 +62,17 @@ describe('ZFILES QA raw HTTP boundary (no DB or network)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    uploaded.receive.mockImplementation(
-      async (input: { source: Readable }) => {
-        const chunks: Buffer[] = [];
-        for await (const chunk of input.source) {
-          chunks.push(Buffer.from(chunk as Uint8Array));
-        }
-        observedBytes = Buffer.concat(chunks);
-        return {
-          id: 'qa-reservation',
-          status: 'QUARANTINE_WRITE_ACKNOWLEDGED_UNVERIFIED',
-        };
-      },
-    );
+    uploaded.receive.mockImplementation(async (input: { source: Readable }) => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of input.source) {
+        chunks.push(Buffer.from(chunk as Uint8Array));
+      }
+      observedBytes = Buffer.concat(chunks);
+      return {
+        id: 'qa-reservation',
+        status: 'QUARANTINE_WRITE_ACKNOWLEDGED_UNVERIFIED',
+      };
+    });
   });
 
   afterAll(async () => {
