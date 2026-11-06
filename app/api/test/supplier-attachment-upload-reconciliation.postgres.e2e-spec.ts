@@ -133,8 +133,7 @@ describePg('B3d3 isolated PostgreSQL quarantine reconciliation', () => {
     ).toBe(0);
   });
 
-
-  it('database rejects REGISTERED with forged pending metadata but missing intent or verification', async () => {
+  it('rejects forged REGISTERED without intent or verification', async () => {
     async function seedPending(f: Awaited<ReturnType<typeof fixture>>) {
       const reservation =
         await db.supplierAttachmentUploadReservation.findUniqueOrThrow({
