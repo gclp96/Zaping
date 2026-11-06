@@ -104,7 +104,14 @@ export class SupplierDocumentAttachmentsService {
     if (contentType !== 'application/pdf' && contentType !== 'image/jpeg') {
       throw new ConflictException('Tipo de archivo almacenado inválido');
     }
-    const source = await this.storage.openReadOnly(item.storageKey);
+    // A DB row marked AVAILABLE is not sufficient to select an object.
+    // Require the exact tenant/document/attachment destination authorized by
+    // the transactional private release boundary; never read quarantine paths.
+    const privateKey = ['private', companyId, documentId, attachmentId].join('/');
+    if (item.storageKey !== privateKey) {
+      throw new ConflictException('Ubicación privada del adjunto inválida');
+    }
+    const source = await this.storage.openReadOnly(privateKey);
     const bytes = await consumeAndVerifyPrivateAttachment(
       source,
       item.sizeBytes,
