@@ -1,4 +1,4 @@
-import { Readable } from 'node:stream';
+import type { Readable } from 'node:stream';
 import { ExecutionContext, INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -19,7 +19,9 @@ describe('ZFILES QA raw HTTP boundary (no DB or network)', () => {
     scope: process.env.ZFILES_DEPLOYMENT_SCOPE,
   };
   const bytes = Buffer.from('%PDF-1.7\nraw request\n%%EOF\n');
-  let observedBytes: Buffer;
+  let observedBytes = Buffer.alloc(0);
+  const route =
+    '/supplier-documents/qa-document/attachments/reservations/qa-reservation/content';
 
   beforeAll(async () => {
     process.env.ZFILES_QA_RESERVATIONS_ENABLED = '1';
@@ -42,7 +44,7 @@ describe('ZFILES QA raw HTTP boundary (no DB or network)', () => {
       .overrideGuard(JwtAuthGuard)
       .useValue({
         canActivate: (context: ExecutionContext) => {
-          context.switchToHttp().getRequest<{user?: unknown}>().user = {
+          context.switchToHttp().getRequest<{ user?: unknown }>().user = {
             id: 'qa-actor',
             companyId: 'qa-company',
             role: 'ADMIN',
@@ -60,17 +62,19 @@ describe('ZFILES QA raw HTTP boundary (no DB or network)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    uploaded.receive.mockImplementation(async (input: { source: Readable }) => {
-      const chunks: Buffer[] = [];
-      for await (const chunk of input.source) {
-        chunks.push(Buffer.from(chunk as Uint8Array));
-      }
-      observedBytes = Buffer.concat(chunks);
-      return {
-        id: 'qa-reservation',
-        status: 'QUARANTINE_WRITE_ACKNOWLEDGED_UNVERIFIED',
-      };
-    });
+    uploaded.receive.mockImplementation(
+      async (input: { source: Readable }) => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of input.source) {
+          chunks.push(Buffer.from(chunk as Uint8Array));
+        }
+        observedBytes = Buffer.concat(chunks);
+        return {
+          id: 'qa-reservation',
+          status: 'QUARANTINE_WRITE_ACKNOWLEDGED_UNVERIFIED',
+        };
+      },
+    );
   });
 
   afterAll(async () => {
@@ -80,14 +84,17 @@ describe('ZFILES QA raw HTTP boundary (no DB or network)', () => {
       ['ZFILES_QA_BINARY_UPLOAD_ENABLED', qaEnv.binary],
       ['ZFILES_DEPLOYMENT_SCOPE', qaEnv.scope],
     ] as const) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
     }
   });
 
-  it('streams exact PDF bytes without interpreting them as JSON or uploading to R2', async () => {
+  it('streams exact PDF bytes without parsing them as JSON', async () => {
     const response = await request(app.getHttpServer())
-      .put('/supplier-documents/qa-document/attachments/reservations/qa-reservation/content')
+      .put(route)
       .set('Content-Type', 'application/pdf')
       .send(bytes)
       .expect(202);
@@ -109,10 +116,10 @@ describe('ZFILES QA raw HTTP boundary (no DB or network)', () => {
     );
   });
 
-  it('blocks raw HTTP before accessing the service when QA upload is disabled', async () => {
+  it('blocks raw HTTP before accessing the service when disabled', async () => {
     delete process.env.ZFILES_QA_BINARY_UPLOAD_ENABLED;
     await request(app.getHttpServer())
-      .put('/supplier-documents/qa-document/attachments/reservations/qa-reservation/content')
+      .put(route)
       .set('Content-Type', 'application/pdf')
       .send(bytes)
       .expect(503);
