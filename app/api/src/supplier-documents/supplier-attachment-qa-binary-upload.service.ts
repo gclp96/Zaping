@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -10,6 +11,7 @@ import {
   SupplierAttachmentUploadReservationStatus,
   SupplierDocumentStatus,
   UserRole,
+  Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -152,6 +154,16 @@ export class SupplierAttachmentQaBinaryUploadService {
     ) {
       throw new BadRequestException('El archivo no coincide con la reserva');
     }
+    // The durable write-intent fence wins a race against cancellation under
+    // the SAME SupplierDocument lock as quota reservations. No R2 operation
+    // may start before it commits. Any failure after this remains ambiguous:
+    // the quota stays reserved until explicit R2 reconciliation.
+    await this.claimWriteIntent({
+      companyId,
+      documentId,
+      actorId,
+      reservationId,
+    });
     await this.writer.put(companyId, expectedKey, { metadata, bytes });
     // This is a PUT acknowledgement, NOT a scanner or database clearance.
     // The reconciliation worker must still verify exact bytes via R2 GET.
@@ -159,5 +171,56 @@ export class SupplierAttachmentQaBinaryUploadService {
       id: reservationId,
       status: 'QUARANTINE_WRITE_ACKNOWLEDGED_UNVERIFIED',
     };
+  }
+
+  private async claimWriteIntent(scope: {
+    companyId: string;
+    documentId: string;
+    actorId: string;
+    reservationId: string;
+  }): Promise<void> {
+    const { companyId, documentId, actorId, reservationId } = scope;
+    await this.prisma.$transaction(
+      async (tx) => {
+        const locked = await tx.$queryRaw<Array<{ id: string }>>(
+          Prisma.sql`SELECT "id" FROM "SupplierDocument"
+            WHERE "id" = ${documentId} AND "companyId" = ${companyId}
+              AND "status" = 'ACTIVE'
+            FOR UPDATE`,
+        );
+        if (locked.length !== 1) {
+          throw new NotFoundException('Documento activo no encontrado');
+        }
+        const actor = await tx.user.findFirst({
+          where: { id: actorId, companyId, isActive: true },
+          select: { role: true },
+        });
+        if (
+          !actor ||
+          (actor.role !== UserRole.ADMIN && actor.role !== UserRole.MANAGER)
+        ) {
+          throw new ForbiddenException('Sin permiso para cargar adjuntos');
+        }
+        const changed = await tx.supplierAttachmentUploadReservation.updateMany({
+          where: {
+            id: reservationId,
+            companyId,
+            documentId,
+            createdById: actorId,
+            status: SupplierAttachmentUploadReservationStatus.RESERVED,
+            writeAttemptedAt: null,
+          },
+          data: { writeAttemptedAt: new Date() },
+        });
+        if (changed.count !== 1) {
+          throw new ConflictException('Reserva cancelada o escritura ya iniciada');
+        }
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+        maxWait: 5000,
+        timeout: 15000,
+      },
+    );
   }
 }
