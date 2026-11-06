@@ -13,13 +13,32 @@ describe('supplier document download headers', () => {
   const req = { user: { id: 'actor-a', companyId: 'company-a' } } as never;
   const response = { setHeader: jest.fn() } as never;
 
+  const initialFlag = process.env.ZFILES_ATTACHMENTS_READ_QA_ENABLED;
+
   beforeEach(() => {
+    process.env.ZFILES_ATTACHMENTS_READ_QA_ENABLED = '1';
     jest.clearAllMocks();
     attachments.verifiedDownload.mockResolvedValue({
       bytes: Buffer.from('%PDF-1.7%%EOF'),
       contentType: 'application/pdf',
       originalName: 'factura proveedor.pdf',
     });
+  });
+
+  afterAll(() => {
+    if (initialFlag === undefined) {
+      delete process.env.ZFILES_ATTACHMENTS_READ_QA_ENABLED;
+    } else {
+      process.env.ZFILES_ATTACHMENTS_READ_QA_ENABLED = initialFlag;
+    }
+  });
+
+  it('denies downloads while feature flag is OFF without calling storage', async () => {
+    delete process.env.ZFILES_ATTACHMENTS_READ_QA_ENABLED;
+    await expect(
+      controller.downloadAttachment(req, 'document-a', 'file-a', response),
+    ).rejects.toThrow('Adjuntos no habilitados');
+    expect(attachments.verifiedDownload).not.toHaveBeenCalled();
   });
 
   it('uses authenticated tenant and attachment ID, never user-supplied storage keys', async () => {
