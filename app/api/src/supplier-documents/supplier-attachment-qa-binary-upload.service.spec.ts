@@ -32,8 +32,13 @@ describe('ZFILES QA raw PDF/JPEG quarantine ingestion', () => {
     quarantineKey: `quarantine/${companyId}/${documentId}/${reservationId}`,
   };
   const prisma = {
+    $transaction: jest.fn(),
+    $queryRaw: jest.fn(),
     user: { findFirst: jest.fn() },
-    supplierAttachmentUploadReservation: { findFirst: jest.fn() },
+    supplierAttachmentUploadReservation: {
+      findFirst: jest.fn(),
+      updateMany: jest.fn(),
+    },
   };
   const writer = { put: jest.fn() };
   const service = new SupplierAttachmentQaBinaryUploadService(
@@ -59,6 +64,14 @@ describe('ZFILES QA raw PDF/JPEG quarantine ingestion', () => {
       reservation,
     );
     writer.put.mockResolvedValue(undefined);
+    prisma.$queryRaw.mockResolvedValue([{ id: documentId }]);
+    prisma.supplierAttachmentUploadReservation.updateMany.mockResolvedValue({
+      count: 1,
+    });
+    prisma.$transaction.mockImplementation(
+      (callback: (tx: typeof prisma) => Promise<unknown>) =>
+        callback(prisma),
+    );
   });
 
   it('verifies metadata and bytes and writes only a canonical quarantine key', async () => {
@@ -79,6 +92,24 @@ describe('ZFILES QA raw PDF/JPEG quarantine ingestion', () => {
         document: { is: { status: SupplierDocumentStatus.ACTIVE } },
       },
     });
+    expect(
+      prisma.supplierAttachmentUploadReservation.updateMany,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: reservationId,
+          companyId,
+          documentId,
+          createdById: actorId,
+          writeAttemptedAt: null,
+        }) as unknown,
+        data: { writeAttemptedAt: expect.any(Date) as unknown },
+      }),
+    );
+    expect(
+      prisma.supplierAttachmentUploadReservation.updateMany.mock
+        .invocationCallOrder[0],
+    ).toBeLessThan(writer.put.mock.invocationCallOrder[0]);
     expect(writer.put).toHaveBeenCalledWith(
       companyId,
       reservation.quarantineKey,
@@ -140,6 +171,26 @@ describe('ZFILES QA raw PDF/JPEG quarantine ingestion', () => {
     await expect(
       service.receive({ ...input(), declaredLength: '5' }),
     ).rejects.toBeInstanceOf(BadRequestException);
+    expect(writer.put).not.toHaveBeenCalled();
+  });
+
+  it('cannot call R2 when the attempt was already cancelled or claimed', async () => {
+    prisma.supplierAttachmentUploadReservation.updateMany.mockResolvedValue({
+      count: 0,
+    });
+    await expect(service.receive(input())).rejects.toThrow(
+      'Reserva cancelada o escritura ya iniciada',
+    );
+    expect(writer.put).not.toHaveBeenCalled();
+  });
+
+  it('rechecks active management role under the same lock before R2', async () => {
+    prisma.user.findFirst
+      .mockResolvedValueOnce({ role: UserRole.ADMIN })
+      .mockResolvedValueOnce({ role: UserRole.SALES });
+    await expect(service.receive(input())).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
     expect(writer.put).not.toHaveBeenCalled();
   });
 
