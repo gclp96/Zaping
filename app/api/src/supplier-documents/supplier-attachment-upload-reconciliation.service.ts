@@ -61,6 +61,11 @@ export class SupplierAttachmentUploadReconciliationService {
     ) {
       throw new ConflictException('Reserva no conciliable');
     }
+    // Never register quarantine bytes without a durable pre-PUT intent.
+    // It must predate any R2 write, and cancellation is forbidden afterward.
+    if (reservation.writeAttemptedAt === null) {
+      throw new ConflictException('No existe intención de carga registrada');
+    }
     const expectedKey = [
       'quarantine',
       companyId.toLowerCase(),
@@ -108,6 +113,9 @@ export class SupplierAttachmentUploadReconciliationService {
           SupplierAttachmentUploadReservationStatus.RECONCILE_REQUIRED
       ) {
         throw new ConflictException('Reserva no conciliable');
+      }
+      if (reservation.writeAttemptedAt === null) {
+        throw new ConflictException('No existe intención de carga registrada');
       }
       const expected = [
         'quarantine',
