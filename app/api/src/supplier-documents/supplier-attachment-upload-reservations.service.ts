@@ -94,7 +94,10 @@ export class SupplierAttachmentUploadReservationsService {
     documentId: string;
     actorId: string;
     reservationId: string;
-  }): Promise<{ id: string; status: SupplierAttachmentUploadReservationStatus }> {
+  }): Promise<{
+    id: string;
+    status: SupplierAttachmentUploadReservationStatus;
+  }> {
     const { companyId, documentId, actorId, reservationId } = input;
     return this.prisma.$transaction(
       async (tx) => {
@@ -118,7 +121,12 @@ export class SupplierAttachmentUploadReservationsService {
           throw new ForbiddenException('Sin permiso para cancelar adjuntos');
         }
         const current = await tx.supplierAttachmentUploadReservation.findFirst({
-          where: { id: reservationId, companyId, documentId, createdById: actorId },
+          where: {
+            id: reservationId,
+            companyId,
+            documentId,
+            createdById: actorId,
+          },
           select: { id: true, status: true, writeAttemptedAt: true },
         });
         if (!current) {
@@ -131,7 +139,8 @@ export class SupplierAttachmentUploadReservationsService {
           return { id: reservationId, status: current.status };
         }
         if (
-          current.status !== SupplierAttachmentUploadReservationStatus.RESERVED ||
+          current.status !==
+            SupplierAttachmentUploadReservationStatus.RESERVED ||
           current.writeAttemptedAt !== null
         ) {
           throw new ConflictException(
@@ -148,26 +157,28 @@ export class SupplierAttachmentUploadReservationsService {
             action: SupplierAttachmentReconcileAction.CANCELLED_BEFORE_WRITE,
           },
         });
-        const updated = await tx.supplierAttachmentUploadReservation.updateMany({
-          where: {
-            id: reservationId,
-            companyId,
-            documentId,
-            createdById: actorId,
-            status: SupplierAttachmentUploadReservationStatus.RESERVED,
-            writeAttemptedAt: null,
-          },
-          data: {
-            status:
-              SupplierAttachmentUploadReservationStatus.RELEASED_VERIFIED_EMPTY,
-          },
-        });
+        const updated =
+          await tx.supplierAttachmentUploadReservation.updateMany({
+            where: {
+              id: reservationId,
+              companyId,
+              documentId,
+              createdById: actorId,
+              status: SupplierAttachmentUploadReservationStatus.RESERVED,
+              writeAttemptedAt: null,
+            },
+            data: {
+              status:
+                SupplierAttachmentUploadReservationStatus.RELEASED_VERIFIED_EMPTY,
+            },
+          });
         if (updated.count !== 1) {
           throw new ConflictException('Reserva ya no cancelable');
         }
         return {
           id: reservationId,
-          status: SupplierAttachmentUploadReservationStatus.RELEASED_VERIFIED_EMPTY,
+          status:
+            SupplierAttachmentUploadReservationStatus.RELEASED_VERIFIED_EMPTY,
         };
       },
       {

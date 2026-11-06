@@ -69,8 +69,7 @@ describe('ZFILES QA raw PDF/JPEG quarantine ingestion', () => {
       count: 1,
     });
     prisma.$transaction.mockImplementation(
-      (callback: (tx: typeof prisma) => Promise<unknown>) =>
-        callback(prisma),
+      (callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma),
     );
   });
 

@@ -122,9 +122,9 @@ describePg('B3d3 isolated PostgreSQL quarantine reconciliation', () => {
 
   it('refuses a fabricated quarantine object with no recorded write attempt', async () => {
     const f = await fixture(false);
-    await expect(
-      reconciliation.reconcile(f),
-    ).rejects.toBeInstanceOf(ConflictException);
+    await expect(reconciliation.reconcile(f)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
     expect(verifier.verify).not.toHaveBeenCalled();
     expect(
       await db.supplierDocumentAttachment.count({

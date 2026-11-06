@@ -201,19 +201,22 @@ export class SupplierAttachmentQaBinaryUploadService {
         ) {
           throw new ForbiddenException('Sin permiso para cargar adjuntos');
         }
-        const changed = await tx.supplierAttachmentUploadReservation.updateMany({
-          where: {
-            id: reservationId,
-            companyId,
-            documentId,
-            createdById: actorId,
-            status: SupplierAttachmentUploadReservationStatus.RESERVED,
-            writeAttemptedAt: null,
-          },
-          data: { writeAttemptedAt: new Date() },
-        });
+        const changed =
+          await tx.supplierAttachmentUploadReservation.updateMany({
+            where: {
+              id: reservationId,
+              companyId,
+              documentId,
+              createdById: actorId,
+              status: SupplierAttachmentUploadReservationStatus.RESERVED,
+              writeAttemptedAt: null,
+            },
+            data: { writeAttemptedAt: new Date() },
+          });
         if (changed.count !== 1) {
-          throw new ConflictException('Reserva cancelada o escritura ya iniciada');
+          throw new ConflictException(
+            'Reserva cancelada o escritura ya iniciada',
+          );
         }
       },
       {

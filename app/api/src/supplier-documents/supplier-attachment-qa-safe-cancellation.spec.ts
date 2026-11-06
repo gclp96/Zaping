@@ -1,4 +1,8 @@
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   SupplierAttachmentReconcileAction,
   SupplierAttachmentUploadReservationStatus,
@@ -52,7 +56,9 @@ describe('ZFILES QA pre-PUT cancellation fence', () => {
       id: scope.reservationId,
       status: SupplierAttachmentUploadReservationStatus.RELEASED_VERIFIED_EMPTY,
     });
-    expect(prisma.supplierAttachmentReconcileEvent.create).toHaveBeenCalledWith({
+    expect(
+      prisma.supplierAttachmentReconcileEvent.create,
+    ).toHaveBeenCalledWith({
       data: {
         companyId: 'company-a',
         reservationId: 'reservation-a',
@@ -74,11 +80,13 @@ describe('ZFILES QA pre-PUT cancellation fence', () => {
         status: SupplierAttachmentUploadReservationStatus.RELEASED_VERIFIED_EMPTY,
       },
     });
-    expect(prisma.supplierAttachmentReconcileEvent.create.mock.invocationCallOrder[0])
-      .toBeLessThan(
-        prisma.supplierAttachmentUploadReservation.updateMany.mock
-          .invocationCallOrder[0],
-      );
+    expect(
+      prisma.supplierAttachmentReconcileEvent.create.mock
+        .invocationCallOrder[0],
+    ).toBeLessThan(
+      prisma.supplierAttachmentUploadReservation.updateMany.mock
+        .invocationCallOrder[0],
+    );
   });
 
   it('never releases a reservation after any write attempt, even if PUT failed', async () => {
@@ -90,8 +98,12 @@ describe('ZFILES QA pre-PUT cancellation fence', () => {
     await expect(service.cancelBeforeWrite(scope)).rejects.toBeInstanceOf(
       ConflictException,
     );
-    expect(prisma.supplierAttachmentReconcileEvent.create).not.toHaveBeenCalled();
-    expect(prisma.supplierAttachmentUploadReservation.updateMany).not.toHaveBeenCalled();
+    expect(
+      prisma.supplierAttachmentReconcileEvent.create,
+    ).not.toHaveBeenCalled();
+    expect(
+      prisma.supplierAttachmentUploadReservation.updateMany,
+    ).not.toHaveBeenCalled();
   });
 
   it('does not release a reconciliation-required reservation', async () => {
@@ -115,7 +127,9 @@ describe('ZFILES QA pre-PUT cancellation fence', () => {
       id: scope.reservationId,
       status: SupplierAttachmentUploadReservationStatus.RELEASED_VERIFIED_EMPTY,
     });
-    expect(prisma.supplierAttachmentReconcileEvent.create).not.toHaveBeenCalled();
+    expect(
+      prisma.supplierAttachmentReconcileEvent.create,
+    ).not.toHaveBeenCalled();
   });
 
   it('denies non-management actors and unknown documents before mutation', async () => {
@@ -123,7 +137,9 @@ describe('ZFILES QA pre-PUT cancellation fence', () => {
     await expect(service.cancelBeforeWrite(scope)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
-    expect(prisma.supplierAttachmentUploadReservation.updateMany).not.toHaveBeenCalled();
+    expect(
+      prisma.supplierAttachmentUploadReservation.updateMany,
+    ).not.toHaveBeenCalled();
 
     prisma.$queryRaw.mockResolvedValue([]);
     await expect(service.cancelBeforeWrite(scope)).rejects.toBeInstanceOf(
