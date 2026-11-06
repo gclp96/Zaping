@@ -2154,6 +2154,7 @@ model SupplierAttachmentUploadReservation {
 enum SupplierAttachmentReconcileAction {
   NEEDS_REVIEW
   QUARANTINE_VERIFIED
+  CANCELLED_BEFORE_WRITE
 }
 
 model SupplierAttachmentReconcileEvent {
