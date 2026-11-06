@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import { requireTenantQuarantineR2Key } from './cloudflare-r2-object-keys';
 
-
 /** Internal worker-only boundary. Never exposed to a controller or user. */
 export abstract class QuarantineObjectVerifier {
   abstract verify(

@@ -216,6 +216,7 @@ export class SupplierAttachmentUploadReconciliationService {
     const rows = await tx.$queryRaw<Array<{ id: string }>>(
       Prisma.sql`SELECT "id" FROM "SupplierDocument"
         WHERE "id" = ${documentId} AND "companyId" = ${companyId}
+          AND "status" = 'ACTIVE'
         FOR UPDATE`,
     );
     if (rows.length !== 1) {

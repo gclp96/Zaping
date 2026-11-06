@@ -37,7 +37,7 @@ describe('ZFILES first-stage reservation endpoint', () => {
     }
   });
 
-  it('is off by default and does not access PostgreSQL', async () => {
+  it('is off by default and does not access PostgreSQL', () => {
     expect(() =>
       controller.reserve(req, 'document-a', 'request-12345678', dto),
     ).toThrow(ServiceUnavailableException);
@@ -79,9 +79,11 @@ describe('ZFILES first-stage reservation endpoint', () => {
       SupplierAttachmentUploadReservationsController,
     ) as unknown[];
     expect(guards).toHaveLength(2);
-    expect(Reflect.getMetadata(
-      'roles',
-      SupplierAttachmentUploadReservationsController,
-    )).toEqual([UserRole.ADMIN, UserRole.MANAGER]);
+    expect(
+      Reflect.getMetadata(
+        'roles',
+        SupplierAttachmentUploadReservationsController,
+      ),
+    ).toEqual([UserRole.ADMIN, UserRole.MANAGER]);
   });
 });
