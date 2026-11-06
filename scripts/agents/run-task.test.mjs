@@ -60,3 +60,13 @@ test('approved prompt is private and cannot overwrite an existing file', (t) => 
   }
   assert.throws(() => writePrivatePrompt(path, 'overwritten'), { code: 'EEXIST' });
 });
+
+
+test('stabilization freeze prevents agent execution before any external process', () => {
+  let externalCalls = 0;
+  assert.throws(() => main(['--issue', '240', '--execute', '--approval-sha', 'a'.repeat(64)], () => {
+    externalCalls += 1;
+    throw new Error('no external process may run');
+  }), /ZAPING_STABILIZATION_FREEZE/);
+  assert.equal(externalCalls, 0);
+});
