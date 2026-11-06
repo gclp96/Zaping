@@ -1,6 +1,6 @@
 # Registro de depuración de PR — 2026-11-06
 
-**Repositorio:** gclp96/zaping. **Estado:** auditoría preliminar / solo lectura. **Fuente:** PR abiertos en GitHub consultados el 2026-11-06. **Total inicial:** 47. **Cerrados en esta limpieza:** 4 (#223, #253, #255, #257). **Abiertos restantes a este corte:** 43.
+**Repositorio:** gclp96/zaping. **Estado:** auditoría preliminar / solo lectura. **Fuente:** PR abiertos en GitHub consultados el 2026-11-06. **Total inicial:** 47. **Cerrados en esta limpieza:** 37 (#223, #253, #255, #257 y 33 laboratorios R2/ClamAV). **Abiertos restantes a este corte:** 10.
 
 No se ha autorizado ninguna fusión, cierre ni borrado por el hecho de figurar en esta lista. El objetivo es resolver cada registro con trazabilidad y sin perder trabajo; los números son identificadores históricos que deben conservarse.
 
@@ -14,25 +14,25 @@ No se ha autorizado ninguna fusión, cierre ni borrado por el hecho de figurar e
 
 | PR | Nombre | Estado de triage | Decisión final |
 |---|---|---|---|
-| [#148](https://github.com/gclp96/zaping/pull/148) | feat(r2): validate Cloudflare R2 config and tenant-scoped object read contract (B3a) | NEEDS_REVIEW | Pendiente |
-| [#149](https://github.com/gclp96/zaping/pull/149) | feat(r2): add locked AWS SDK v3 GetObject transport (UX-PDOC-01B3b) | NEEDS_REVIEW | Pendiente |
-| [#150](https://github.com/gclp96/zaping/pull/150) | test(r2): read-only Cloudflare R2 QA smoke with synthetic fixture (B3c) | NEEDS_REVIEW | Pendiente |
-| [#151](https://github.com/gclp96/zaping/pull/151) | feat(r2): bounded PDF/JPEG quarantine upload and create-once PutObject (B3d1) | NEEDS_REVIEW | Pendiente |
-| [#152](https://github.com/gclp96/zaping/pull/152) | feat(r2): atomic PostgreSQL upload reservations and quota ledger (B3d2) | NEEDS_REVIEW | Pendiente |
-| [#153](https://github.com/gclp96/zaping/pull/153) | feat(r2): verify quarantined bytes and reconcile upload ledger atomically (B3d3) | NEEDS_REVIEW | Pendiente |
-| [#154](https://github.com/gclp96/zaping/pull/154) | feat(r2): fail-closed ClamAV Unix INSTREAM quarantine scan boundary (B3d4a) | NEEDS_REVIEW | Pendiente |
-| [#155](https://github.com/gclp96/zaping/pull/155) | test(r2): isolated real ClamAV LTS scanner EICAR smoke (B3d4b) | NEEDS_REVIEW | Pendiente |
-| [#156](https://github.com/gclp96/zaping/pull/156) | test(r2): opt-in real ClamAV lab smoke gate (B3d4b) | NEEDS_REVIEW | Pendiente |
-| [#157](https://github.com/gclp96/zaping/pull/157) | feat(r2): ClamAV Unix VERSION freshness and pre/post scan readiness gates (B3d4c) | NEEDS_REVIEW | Pendiente |
-| [#158](https://github.com/gclp96/zaping/pull/158) | feat(r2): fail-closed ClamAV readiness policy prototype (B3d4c) | NEEDS_REVIEW | Pendiente |
-| [#159](https://github.com/gclp96/zaping/pull/159) | docs(r2): immutable scan attestation and private promotion design (B3d5) | NEEDS_REVIEW | Pendiente |
-| [#160](https://github.com/gclp96/zaping/pull/160) | feat(r2): untrusted scan attempt ledger and hard deny unsafe attachment approval (B3d5a) | NEEDS_REVIEW | Pendiente |
-| [#161](https://github.com/gclp96/zaping/pull/161) | feat(r2): isolated Ed25519 scan evidence envelope and verifier (B3d5b1) | NEEDS_REVIEW | Pendiente |
-| [#162](https://github.com/gclp96/zaping/pull/162) | feat(r2): isolated signed worker pre/post ClamAV readiness lab (B3d5b2) | NEEDS_REVIEW | Pendiente |
-| [#163](https://github.com/gclp96/zaping/pull/163) | feat(r2): immutable tenant and nonce-bound signed evidence receipts (B3d5b3a) | NEEDS_REVIEW | Pendiente |
-| [#164](https://github.com/gclp96/zaping/pull/164) | feat(r2): DB-issued single-use scanner job challenges (B3d5b3b) | NEEDS_REVIEW | Pendiente |
-| [#165](https://github.com/gclp96/zaping/pull/165) | feat(r2): isolated Ed25519 verified scan evidence gateway (B3d5b3c1) | NEEDS_REVIEW | Pendiente |
-| [#166](https://github.com/gclp96/zaping/pull/166) | test(r2): authenticated non-owner PostgreSQL role denial matrix (B3d5b3c2a) | NEEDS_REVIEW | Pendiente |
+| [#148](https://github.com/gclp96/zaping/pull/148) | feat(r2): validate Cloudflare R2 config and tenant-scoped object read contract (B3a) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#149](https://github.com/gclp96/zaping/pull/149) | feat(r2): add locked AWS SDK v3 GetObject transport (UX-PDOC-01B3b) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#150](https://github.com/gclp96/zaping/pull/150) | test(r2): read-only Cloudflare R2 QA smoke with synthetic fixture (B3c) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#151](https://github.com/gclp96/zaping/pull/151) | feat(r2): bounded PDF/JPEG quarantine upload and create-once PutObject (B3d1) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#152](https://github.com/gclp96/zaping/pull/152) | feat(r2): atomic PostgreSQL upload reservations and quota ledger (B3d2) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#153](https://github.com/gclp96/zaping/pull/153) | feat(r2): verify quarantined bytes and reconcile upload ledger atomically (B3d3) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#154](https://github.com/gclp96/zaping/pull/154) | feat(r2): fail-closed ClamAV Unix INSTREAM quarantine scan boundary (B3d4a) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#155](https://github.com/gclp96/zaping/pull/155) | test(r2): isolated real ClamAV LTS scanner EICAR smoke (B3d4b) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#156](https://github.com/gclp96/zaping/pull/156) | test(r2): opt-in real ClamAV lab smoke gate (B3d4b) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#157](https://github.com/gclp96/zaping/pull/157) | feat(r2): ClamAV Unix VERSION freshness and pre/post scan readiness gates (B3d4c) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#158](https://github.com/gclp96/zaping/pull/158) | feat(r2): fail-closed ClamAV readiness policy prototype (B3d4c) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#159](https://github.com/gclp96/zaping/pull/159) | docs(r2): immutable scan attestation and private promotion design (B3d5) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#160](https://github.com/gclp96/zaping/pull/160) | feat(r2): untrusted scan attempt ledger and hard deny unsafe attachment approval (B3d5a) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#161](https://github.com/gclp96/zaping/pull/161) | feat(r2): isolated Ed25519 scan evidence envelope and verifier (B3d5b1) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#162](https://github.com/gclp96/zaping/pull/162) | feat(r2): isolated signed worker pre/post ClamAV readiness lab (B3d5b2) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#163](https://github.com/gclp96/zaping/pull/163) | feat(r2): immutable tenant and nonce-bound signed evidence receipts (B3d5b3a) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#164](https://github.com/gclp96/zaping/pull/164) | feat(r2): DB-issued single-use scanner job challenges (B3d5b3b) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#165](https://github.com/gclp96/zaping/pull/165) | feat(r2): isolated Ed25519 verified scan evidence gateway (B3d5b3c1) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#166](https://github.com/gclp96/zaping/pull/166) | test(r2): authenticated non-owner PostgreSQL role denial matrix (B3d5b3c2a) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
 
 ## ZFiles laboratorios apilados (14)
 
@@ -40,20 +40,20 @@ No se ha autorizado ninguna fusión, cierre ni borrado por el hecho de figurar e
 
 | PR | Nombre | Estado de triage | Decisión final |
 |---|---|---|---|
-| [#212](https://github.com/gclp96/zaping/pull/212) | test(zfiles): real isolated ClamAV INSTREAM QA, synthetic EICAR (03B2) | NEEDS_REVIEW | Pendiente |
-| [#215](https://github.com/gclp96/zaping/pull/215) | feat(zfiles): quarantine read-only verified scan laboratory (03B3) | NEEDS_REVIEW | Pendiente |
-| [#218](https://github.com/gclp96/zaping/pull/218) | feat(zfiles): ClamAV Unix readiness with bounded signature age (03B4) | NEEDS_REVIEW | Pendiente |
-| [#220](https://github.com/gclp96/zaping/pull/220) | test(zfiles): one-shot real FreshClam + UTC clamd readiness QA (03B5) | NEEDS_REVIEW | Pendiente |
-| [#225](https://github.com/gclp96/zaping/pull/225) | feat(zfiles): isolated signed scan evidence worker lab (03C1) | NEEDS_REVIEW | Pendiente |
-| [#228](https://github.com/gclp96/zaping/pull/228) | feat(zfiles): PostgreSQL issued-only scan challenge and nonce ledger (03C2A) | NEEDS_REVIEW | Pendiente |
-| [#230](https://github.com/gclp96/zaping/pull/230) | feat(zfiles): DB-challenge-bound signed scan gateway lab (03C2B1) | NEEDS_REVIEW | Pendiente |
-| [#232](https://github.com/gclp96/zaping/pull/232) | feat(zfiles): atomic PostgreSQL signed scan receipt and nonce consumption lab (03C2B2) | NEEDS_REVIEW | Pendiente |
-| [#234](https://github.com/gclp96/zaping/pull/234) | test(zfiles): isolate R2 quarantine Object Read QA and cross-bucket denial (03C3A) | NEEDS_REVIEW | Pendiente |
-| [#239](https://github.com/gclp96/zaping/pull/239) | feat(zfiles): verified private-byte staging core without release authority (03D1) | NEEDS_REVIEW | Pendiente |
-| [#241](https://github.com/gclp96/zaping/pull/241) | feat(zfiles): least-privilege PostgreSQL promotion candidate reader (03D2A) | NEEDS_REVIEW | Pendiente |
-| [#243](https://github.com/gclp96/zaping/pull/243) | feat(zfiles): auditable PostgreSQL private release transaction (03D2B) | NEEDS_REVIEW | Pendiente |
-| [#247](https://github.com/gclp96/zaping/pull/247) | feat(zfiles): explicit read-only recovery of existing private objects (03D3A) | NEEDS_REVIEW | Pendiente |
-| [#248](https://github.com/gclp96/zaping/pull/248) | test(zfiles): opt-in Cloudflare R2 private create-once and recovery QA (03D3B) | NEEDS_REVIEW | Pendiente |
+| [#212](https://github.com/gclp96/zaping/pull/212) | test(zfiles): real isolated ClamAV INSTREAM QA, synthetic EICAR (03B2) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#215](https://github.com/gclp96/zaping/pull/215) | feat(zfiles): quarantine read-only verified scan laboratory (03B3) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#218](https://github.com/gclp96/zaping/pull/218) | feat(zfiles): ClamAV Unix readiness with bounded signature age (03B4) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#220](https://github.com/gclp96/zaping/pull/220) | test(zfiles): one-shot real FreshClam + UTC clamd readiness QA (03B5) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#225](https://github.com/gclp96/zaping/pull/225) | feat(zfiles): isolated signed scan evidence worker lab (03C1) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#228](https://github.com/gclp96/zaping/pull/228) | feat(zfiles): PostgreSQL issued-only scan challenge and nonce ledger (03C2A) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#230](https://github.com/gclp96/zaping/pull/230) | feat(zfiles): DB-challenge-bound signed scan gateway lab (03C2B1) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#232](https://github.com/gclp96/zaping/pull/232) | feat(zfiles): atomic PostgreSQL signed scan receipt and nonce consumption lab (03C2B2) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#234](https://github.com/gclp96/zaping/pull/234) | test(zfiles): isolate R2 quarantine Object Read QA and cross-bucket denial (03C3A) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#239](https://github.com/gclp96/zaping/pull/239) | feat(zfiles): verified private-byte staging core without release authority (03D1) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#241](https://github.com/gclp96/zaping/pull/241) | feat(zfiles): least-privilege PostgreSQL promotion candidate reader (03D2A) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#243](https://github.com/gclp96/zaping/pull/243) | feat(zfiles): auditable PostgreSQL private release transaction (03D2B) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#247](https://github.com/gclp96/zaping/pull/247) | feat(zfiles): explicit read-only recovery of existing private objects (03D3A) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
+| [#248](https://github.com/gclp96/zaping/pull/248) | test(zfiles): opt-in Cloudflare R2 private create-once and recovery QA (03D3B) | DEFERRED | Cerrado sin merge 2026-11-06; laboratorio archivado en PR |
 
 ## ZFiles consolidación (3)
 
