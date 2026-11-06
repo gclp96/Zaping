@@ -1,6 +1,6 @@
 # Registro de depuración de PR — 2026-11-06
 
-**Repositorio:** gclp96/zaping. **Estado:** auditoría preliminar / solo lectura. **Fuente:** PR abiertos en GitHub consultados el 2026-11-06. **Total inicial:** 47. **Cerrados en esta limpieza:** 37 (#223, #253, #255, #257 y 33 laboratorios R2/ClamAV). **Abiertos restantes a este corte:** 10.
+**Repositorio:** gclp96/zaping. **Estado:** auditoría preliminar / solo lectura. **Fuente:** PR abiertos en GitHub consultados el 2026-11-06. **Total inicial:** 47. **Cerrados en esta limpieza:** 47 de 47, sin merge. **PR heredados abiertos:** 0, sujeto a comprobación de GitHub. **Pendientes diferentes de PR:** limpiar refs remotos, ejecutar CI/regresión, aplicar reglas de protección a main y reconciliar posibles bugs/funciones necesarias.
 
 No se ha autorizado ninguna fusión, cierre ni borrado por el hecho de figurar en esta lista. El objetivo es resolver cada registro con trazabilidad y sin perder trabajo; los números son identificadores históricos que deben conservarse.
 
@@ -71,13 +71,13 @@ No se ha autorizado ninguna fusión, cierre ni borrado por el hecho de figurar e
 
 | PR | Nombre | Estado de triage | Decisión final |
 |---|---|---|---|
-| [#139](https://github.com/gclp96/zaping/pull/139) | docs(purchases): secure receipt-document links and attachments design (#132) | NEEDS_REVIEW | Pendiente |
-| [#140](https://github.com/gclp96/zaping/pull/140) | feat(documents): receipt to supplier document links by ID (UX-PDOC-01A #132) | NEEDS_REVIEW | Pendiente |
-| [#141](https://github.com/gclp96/zaping/pull/141) | feat(receipts): navigate to supplier documents by validated ID (#132) | NEEDS_REVIEW | Pendiente |
-| [#142](https://github.com/gclp96/zaping/pull/142) | feat(receipts): select existing supplier documents and link by ID (#132) | NEEDS_REVIEW | Pendiente |
-| [#144](https://github.com/gclp96/zaping/pull/144) | feat(receipts): unlink supplier document with reason (#132) | NEEDS_REVIEW | Pendiente |
-| [#145](https://github.com/gclp96/zaping/pull/145) | feat(documents): private attachment metadata and scan gate (UX-PDOC-01B #132) | NEEDS_REVIEW | Pendiente |
-| [#146](https://github.com/gclp96/zaping/pull/146) | feat(documents): authorize and integrity-check private attachment downloads (#132) | NEEDS_REVIEW | Pendiente |
+| [#139](https://github.com/gclp96/zaping/pull/139) | docs(purchases): secure receipt-document links and attachments design (#132) | DEFERRED | Cerrado sin merge 2026-11-06; contexto y SHA en comentario |
+| [#140](https://github.com/gclp96/zaping/pull/140) | feat(documents): receipt to supplier document links by ID (UX-PDOC-01A #132) | DEFERRED — divergencias vs main | Cerrado sin merge 2026-11-06; contexto y SHA en comentario |
+| [#141](https://github.com/gclp96/zaping/pull/141) | feat(receipts): navigate to supplier documents by validated ID (#132) | DEFERRED | Cerrado sin merge 2026-11-06; contexto y SHA en comentario |
+| [#142](https://github.com/gclp96/zaping/pull/142) | feat(receipts): select existing supplier documents and link by ID (#132) | DEFERRED | Cerrado sin merge 2026-11-06; contexto y SHA en comentario |
+| [#144](https://github.com/gclp96/zaping/pull/144) | feat(receipts): unlink supplier document with reason (#132) | DEFERRED | Cerrado sin merge 2026-11-06; contexto y SHA en comentario |
+| [#145](https://github.com/gclp96/zaping/pull/145) | feat(documents): private attachment metadata and scan gate (UX-PDOC-01B #132) | DEFERRED | Cerrado sin merge 2026-11-06; contexto y SHA en comentario |
+| [#146](https://github.com/gclp96/zaping/pull/146) | feat(documents): authorize and integrity-check private attachment downloads (#132) | DEFERRED | Cerrado sin merge 2026-11-06; contexto y SHA en comentario |
 
 ## Correcciones de UI (2)
 
@@ -85,8 +85,8 @@ No se ha autorizado ninguna fusión, cierre ni borrado por el hecho de figurar e
 
 | PR | Nombre | Estado de triage | Decisión final |
 |---|---|---|---|
-| [#137](https://github.com/gclp96/zaping/pull/137) | fix(ux): clarify supplier document net merchandise subtotal (#135) | NEEDS_REVIEW | Pendiente |
-| [#138](https://github.com/gclp96/zaping/pull/138) | fix(receipts): conditional equipment section (#133) | NEEDS_REVIEW | Pendiente |
+| [#137](https://github.com/gclp96/zaping/pull/137) | fix(ux): clarify supplier document net merchandise subtotal (#135) | DEFERRED — bug no verificado | Cerrado sin merge 2026-11-06; contexto y SHA en comentario |
+| [#138](https://github.com/gclp96/zaping/pull/138) | fix(receipts): conditional equipment section (#133) | DEFERRED — bug no verificado | Cerrado sin merge 2026-11-06; contexto y SHA en comentario |
 
 ## Inventario FEFO (1)
 
@@ -94,7 +94,7 @@ No se ha autorizado ninguna fusión, cierre ni borrado por el hecho de figurar e
 
 | PR | Nombre | Estado de triage | Decisión final |
 |---|---|---|---|
-| [#119](https://github.com/gclp96/zaping/pull/119) | feat(inventory): consumo FEFO autorizado sin lote para NONE/OPTIONAL | NEEDS_REVIEW | Pendiente |
+| [#119](https://github.com/gclp96/zaping/pull/119) | feat(inventory): consumo FEFO autorizado sin lote para NONE/OPTIONAL | DEFERRED | Cerrado sin merge 2026-11-06; contexto y SHA en comentario |
 
 ## Smart Station (1)
 
@@ -119,3 +119,7 @@ No se ha autorizado ninguna fusión, cierre ni borrado por el hecho de figurar e
 - Revisión del inventario de ramas remotas (165 al corte inicial), eliminación en orden seguro hasta dejar main y qa/integration.
 - CI en los SHA finales y regresiones funcionales aceptadas.
 - Gobernanza de agentes y protecciones de GitHub verificadas, no solo documentadas.
+
+## Advertencia de cierre administrativo
+
+El cierre de 47 PR **NO** acredita que el ERP esté estable ni que la funcionalidad descartada haya sido incorporada. Algunos PR contienen código único y deben seguir consultables; los SHA/rutas de recuperación están en comentarios de PR y ramas todavía existentes. No eliminar ramas sin inventario y copia verificada. Los issues #133 y #135 siguen siendo candidatos de revisión visual, no se declaran resueltos.
