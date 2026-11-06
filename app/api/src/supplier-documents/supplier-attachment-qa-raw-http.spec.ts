@@ -11,7 +11,11 @@ import { SupplierAttachmentQaBinaryUploadService } from './supplier-attachment-q
 
 describe('ZFILES QA raw HTTP boundary (no DB or network)', () => {
   let app: INestApplication<App>;
-  const reserved = { reserve: jest.fn(), status: jest.fn() };
+  const reserved = {
+    reserve: jest.fn(),
+    status: jest.fn(),
+    cancelBeforeWrite: jest.fn(),
+  };
   const uploaded = { receive: jest.fn() };
   const qaEnv = {
     reservations: process.env.ZFILES_QA_RESERVATIONS_ENABLED,
@@ -138,6 +142,37 @@ describe('ZFILES QA raw HTTP boundary (no DB or network)', () => {
       'qa-actor',
       'qa-reservation',
     );
+  });
+
+  it('routes scoped cancellation only when enabled in QA', async () => {
+    reserved.cancelBeforeWrite.mockResolvedValue({
+      id: 'qa-reservation',
+      status: 'RELEASED_VERIFIED_EMPTY',
+    });
+    await request(app.getHttpServer())
+      .post(
+        '/supplier-documents/qa-document/attachments/reservations/qa-reservation/cancel',
+      )
+      .expect(200, {
+        id: 'qa-reservation',
+        status: 'RELEASED_VERIFIED_EMPTY',
+      });
+    expect(reserved.cancelBeforeWrite).toHaveBeenCalledWith({
+      companyId: 'qa-company',
+      actorId: 'qa-actor',
+      documentId: 'qa-document',
+      reservationId: 'qa-reservation',
+    });
+
+    jest.clearAllMocks();
+    delete process.env.ZFILES_QA_RESERVATIONS_ENABLED;
+    await request(app.getHttpServer())
+      .post(
+        '/supplier-documents/qa-document/attachments/reservations/qa-reservation/cancel',
+      )
+      .expect(503);
+    expect(reserved.cancelBeforeWrite).not.toHaveBeenCalled();
+    process.env.ZFILES_QA_RESERVATIONS_ENABLED = '1';
   });
 
   it('blocks status HTTP before service access when QA flag is disabled', async () => {
