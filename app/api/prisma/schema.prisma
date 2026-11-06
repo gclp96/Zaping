@@ -419,7 +419,6 @@ model Purchase {
   supplierDocumentAllocations PurchaseReceiptDocument[]
   supplierDocumentApprovals PurchaseReceiptReconciliationApproval[]
   documentLinks PurchaseReceiptSupplierDocumentLink[]
-  attachments PurchaseReceiptAttachment[]
 
   @@unique([id, companyId, supplierId])
   @@unique([companyId, folio])
@@ -467,6 +466,7 @@ model PurchaseReceipt {
   supplierDocumentAllocations PurchaseReceiptDocument[]
   supplierDocumentApprovals PurchaseReceiptReconciliationApproval[]
   documentLinks PurchaseReceiptSupplierDocumentLink[]
+  attachments PurchaseReceiptAttachment[]
 
   @@unique([id, companyId])
   @@unique([id, companyId, purchaseId])
