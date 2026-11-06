@@ -40,6 +40,40 @@ type ReserveInput = {
 export class SupplierAttachmentUploadReservationsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Read-only QA recovery status: an authenticated operator may inspect only
+   * reservations they created. No storage key, checksum or internal proof is
+   * exposed; REGISTERED means quarantine was verified, NOT virus-scanned.
+   */
+  async status(companyId: string, documentId: string, actorId: string, reservationId: string) {
+    const actor = await this.prisma.user.findFirst({
+      where: { id: actorId, companyId, isActive: true },
+      select: { role: true },
+    });
+    if (!actor || (actor.role !== UserRole.ADMIN && actor.role !== UserRole.MANAGER)) {
+      throw new ForbiddenException('Sin permiso para consultar adjuntos');
+    }
+    const reservation = await this.prisma.supplierAttachmentUploadReservation.findFirst({
+      where: {
+        id: reservationId,
+        companyId,
+        documentId,
+        createdById: actorId,
+        document: { is: { status: 'ACTIVE' } },
+      },
+      select: {
+        id: true,
+        status: true,
+        sizeBytes: true,
+        createdAt: true,
+      },
+    });
+    if (!reservation) {
+      throw new NotFoundException('Reserva de adjunto no encontrada');
+    }
+    return reservation;
+  }
+
   async reserve(input: ReserveInput) {
     const { companyId, documentId, actorId, metadata } = input;
     const key = input.requestKey.trim();
