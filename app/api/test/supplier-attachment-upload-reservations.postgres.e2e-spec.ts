@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { Readable } from 'node:stream';
 import {
   ConflictException,
   ForbiddenException,
@@ -6,11 +7,13 @@ import {
 } from '@nestjs/common';
 import {
   PrismaClient,
+  SupplierAttachmentReconcileAction,
   SupplierAttachmentUploadReservationStatus,
   SupplierDocumentType,
 } from '@prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { SupplierAttachmentUploadReservationsService } from '../src/supplier-documents/supplier-attachment-upload-reservations.service';
+import { SupplierAttachmentQaBinaryUploadService } from '../src/supplier-documents/supplier-attachment-qa-binary-upload.service';
 
 const describePg =
   process.env.RUN_SUPPLIER_UPLOAD_RESERVATIONS_PG === '1'
@@ -165,6 +168,140 @@ describePg('B3d2 real PostgreSQL quota and concurrency', () => {
       service.status(randomUUID(), f.documentId, f.actorId, created.id),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
+
+  it('cancels a never-started reservation with audit and recovers one quota slot', async () => {
+    const f = await fixture();
+    const reserved = await Promise.all(
+      Array.from({ length: 10 }, () => service.reserve(input(f))),
+    );
+    const first = reserved[0];
+    await expect(service.reserve(input(f))).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    const cancelled = await service.cancelBeforeWrite({
+      ...f,
+      reservationId: first.id,
+    });
+    expect(cancelled.status).toBe(
+      SupplierAttachmentUploadReservationStatus.RELEASED_VERIFIED_EMPTY,
+    );
+    await expect(
+      service.cancelBeforeWrite({ ...f, reservationId: first.id }),
+    ).resolves.toEqual(cancelled);
+    expect(
+      await db.supplierAttachmentReconcileEvent.count({
+        where: {
+          companyId: f.companyId,
+          reservationId: first.id,
+          action: SupplierAttachmentReconcileAction.CANCELLED_BEFORE_WRITE,
+        },
+      }),
+    ).toBe(1);
+    await expect(
+      service.reserve({ ...input(f), requestKey: (await db.supplierAttachmentUploadReservation.findUniqueOrThrow({ where: { id: first.id } })).requestKey }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    const recovered = await service.reserve(input(f));
+    expect(recovered.status).toBe(SupplierAttachmentUploadReservationStatus.RESERVED);
+    expect(
+      await db.supplierAttachmentUploadReservation.count({
+        where: {
+          companyId: f.companyId,
+          documentId: f.documentId,
+          status: SupplierAttachmentUploadReservationStatus.RESERVED,
+        },
+      }),
+    ).toBe(10);
+  }, 60_000);
+
+  it('serializes cancel-vs-PUT; never both cancel and write to R2', async () => {
+    const f = await fixture();
+    const bytes = Buffer.from('%PDF-1.7\\nverified fixture\\n%%EOF\\n');
+    const reserved = await service.reserve({
+      ...input(f),
+      metadata: {
+        originalName: 'evidencia.pdf',
+        contentType: 'application/pdf',
+        sizeBytes: bytes.length,
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+      },
+    });
+    const writer = { put: jest.fn().mockResolvedValue(undefined) };
+    const uploads = new SupplierAttachmentQaBinaryUploadService(
+      db as unknown as PrismaService,
+      writer,
+    );
+    const outcomes = await Promise.allSettled([
+      service.cancelBeforeWrite({ ...f, reservationId: reserved.id }),
+      uploads.receive({
+        ...f,
+        reservationId: reserved.id,
+        declaredLength: String(bytes.length),
+        contentType: 'application/pdf',
+        contentEncoding: undefined,
+        transferEncoding: undefined,
+        source: Readable.from([bytes]),
+      }),
+    ]);
+    const successes = outcomes.filter((r) => r.status === 'fulfilled');
+    expect(successes).toHaveLength(1);
+    const persisted =
+      await db.supplierAttachmentUploadReservation.findUniqueOrThrow({
+        where: { id: reserved.id },
+      });
+    if (
+      persisted.status ===
+      SupplierAttachmentUploadReservationStatus.RELEASED_VERIFIED_EMPTY
+    ) {
+      expect(persisted.writeAttemptedAt).toBeNull();
+      expect(writer.put).not.toHaveBeenCalled();
+    } else {
+      expect(persisted.status).toBe(
+        SupplierAttachmentUploadReservationStatus.RESERVED,
+      );
+      expect(persisted.writeAttemptedAt).not.toBeNull();
+      expect(writer.put).toHaveBeenCalledTimes(1);
+      await expect(
+        service.cancelBeforeWrite({ ...f, reservationId: reserved.id }),
+      ).rejects.toBeInstanceOf(ConflictException);
+    }
+  }, 60_000);
+
+  it('retains quota after an ambiguous R2 write exception', async () => {
+    const f = await fixture();
+    const bytes = Buffer.from('%PDF-1.7\\nambiguous fixture\\n%%EOF\\n');
+    const reserved = await service.reserve({
+      ...input(f),
+      metadata: {
+        originalName: 'evidencia.pdf',
+        contentType: 'application/pdf',
+        sizeBytes: bytes.length,
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+      },
+    });
+    const uploads = new SupplierAttachmentQaBinaryUploadService(
+      db as unknown as PrismaService,
+      { put: jest.fn().mockRejectedValue(new Error('simulated timeout')) },
+    );
+    await expect(
+      uploads.receive({
+        ...f,
+        reservationId: reserved.id,
+        declaredLength: String(bytes.length),
+        contentType: 'application/pdf',
+        contentEncoding: undefined,
+        transferEncoding: undefined,
+        source: Readable.from([bytes]),
+      }),
+    ).rejects.toThrow('simulated timeout');
+    const persisted =
+      await db.supplierAttachmentUploadReservation.findUniqueOrThrow({
+        where: { id: reserved.id },
+      });
+    expect(persisted.writeAttemptedAt).not.toBeNull();
+    await expect(
+      service.cancelBeforeWrite({ ...f, reservationId: reserved.id }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  }, 60_000);
 
   it('serializes concurrent attempts and never admits more than 10 files', async () => {
     const f = await fixture();
