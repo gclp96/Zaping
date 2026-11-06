@@ -39,7 +39,9 @@ export class SupplierAttachmentUploadReservationsController {
       process.env.ZFILES_QA_RESERVATIONS_ENABLED !== '1' ||
       process.env.ZFILES_DEPLOYMENT_SCOPE !== 'qa'
     ) {
-      throw new ServiceUnavailableException('Reservas de adjuntos no habilitadas');
+      throw new ServiceUnavailableException(
+        'Reservas de adjuntos no habilitadas',
+      );
     }
     return this.reservations.reserve({
       companyId: req.user.companyId,

@@ -150,6 +150,16 @@ jobs:
           RUN_ZFILES_ATTACHMENT_FOUNDATION_PG: "1"
         run: npm run test:e2e -- --runInBand test/zfiles-attachment-foundation.postgres.e2e-spec.ts
 
+      - name: Verify ZFILES upload reservations and concurrency on ephemeral PostgreSQL
+        env:
+          RUN_SUPPLIER_UPLOAD_RESERVATIONS_PG: "1"
+        run: npm run test:e2e -- --runInBand test/supplier-attachment-upload-reservations.postgres.e2e-spec.ts
+
+      - name: Verify ZFILES quarantine reconciliation on ephemeral PostgreSQL
+        env:
+          RUN_SUPPLIER_UPLOAD_RECONCILIATION_PG: "1"
+        run: npm run test:e2e -- --runInBand test/supplier-attachment-upload-reconciliation.postgres.e2e-spec.ts
+
       - name: Verify R2A-01 supplier documents on ephemeral PostgreSQL
         env:
           RUN_SUPPLIER_DOC_PG: "1"

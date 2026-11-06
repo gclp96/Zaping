@@ -1,6 +1,5 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
-import { ROLES_KEY } from '../auth/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { SupplierAttachmentUploadReservationsController } from './supplier-attachment-upload-reservations.controller';
 
@@ -81,7 +80,7 @@ describe('ZFILES first-stage reservation endpoint', () => {
     ) as unknown[];
     expect(guards).toHaveLength(2);
     expect(Reflect.getMetadata(
-      ROLES_KEY,
+      'roles',
       SupplierAttachmentUploadReservationsController,
     )).toEqual([UserRole.ADMIN, UserRole.MANAGER]);
   });

@@ -1,11 +1,12 @@
 import { Readable } from 'node:stream';
+import { createHash } from 'node:crypto';
 import { GetObjectCommand, type S3Client } from '@aws-sdk/client-s3';
 import {
   BadRequestException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { requireTenantQuarantineR2Key } from './cloudflare-r2-object-keys';
-import { consumeAndVerifyPrivateAttachment } from './supplier-document-attachment-download';
+
 
 /** Internal worker-only boundary. Never exposed to a controller or user. */
 export abstract class QuarantineObjectVerifier {
@@ -53,7 +54,32 @@ export class CloudflareR2QuarantineVerifier extends QuarantineObjectVerifier {
       }
       // A complete, size-limited GET + digest check; ETag is NOT SHA-256.
       // This helper destroys the upstream stream on error or mismatch.
-      await consumeAndVerifyPrivateAttachment(result.Body, sizeBytes, sha256);
+      if (
+        !Number.isSafeInteger(sizeBytes) ||
+        sizeBytes < 1 ||
+        sizeBytes > 10 * 1024 * 1024 ||
+        !/^[0-9a-f]{64}$/.test(sha256)
+      ) {
+        result.Body.destroy();
+        throw new Error('Invalid quarantine metadata');
+      }
+      let seen = 0;
+      const digest = createHash('sha256');
+      try {
+        for await (const raw of result.Body) {
+          const bytes = Buffer.from(raw as Uint8Array);
+          seen += bytes.length;
+          if (seen > sizeBytes) {
+            throw new Error('Oversized quarantine object');
+          }
+          digest.update(bytes);
+        }
+      } finally {
+        result.Body.destroy();
+      }
+      if (seen !== sizeBytes || digest.digest('hex') !== sha256) {
+        throw new Error('Quarantine integrity mismatch');
+      }
     } catch {
       // A missing object, network timeout and wrong digest all remain
       // uncertain, and must NEVER silently release the quota reservation.

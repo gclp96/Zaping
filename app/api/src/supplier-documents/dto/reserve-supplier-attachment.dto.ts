@@ -1,4 +1,12 @@
-import { IsIn, IsInt, IsString, Max, MaxLength, Min, Matches } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { SUPPLIER_ATTACHMENT_MAX_BYTES } from '../supplier-document-attachment-validation';
 
 export class ReserveSupplierAttachmentDto {
