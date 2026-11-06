@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import {
   PrismaClient,
   SupplierAttachmentReconcileAction,
@@ -22,7 +22,7 @@ describePg('B3d3 isolated PostgreSQL quarantine reconciliation', () => {
   let reconciliation: SupplierAttachmentUploadReconciliationService;
   const verifier = { verify: jest.fn() };
 
-  async function fixture() {
+  async function fixture(markWriteIntent = true) {
     const companyId = randomUUID();
     const actorId = randomUUID();
     await db.company.create({
@@ -65,6 +65,13 @@ describePg('B3d3 isolated PostgreSQL quarantine reconciliation', () => {
         sha256: 'a'.repeat(64),
       },
     });
+    if (markWriteIntent) {
+      // Simulate the persisted intent of the authorized R2 writer in QA.
+      await db.supplierAttachmentUploadReservation.update({
+        where: { id: reserved.id },
+        data: { writeAttemptedAt: new Date() },
+      });
+    }
     return {
       companyId,
       documentId: document.id,
@@ -111,6 +118,19 @@ describePg('B3d3 isolated PostgreSQL quarantine reconciliation', () => {
 
   afterAll(async () => {
     await db?.$disconnect();
+  });
+
+  it('refuses a fabricated quarantine object with no recorded write attempt', async () => {
+    const f = await fixture(false);
+    await expect(
+      reconciliation.reconcile(f),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(verifier.verify).not.toHaveBeenCalled();
+    expect(
+      await db.supplierDocumentAttachment.count({
+        where: { id: f.reservationId },
+      }),
+    ).toBe(0);
   });
 
   it('verifies quarantined object and atomically registers PENDING_SCAN, never AVAILABLE', async () => {
