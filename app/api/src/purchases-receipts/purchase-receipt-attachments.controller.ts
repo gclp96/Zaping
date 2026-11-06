@@ -29,12 +29,10 @@ export class PurchaseReceiptAttachmentsController {
       process.env.ZFILES_DEPLOYMENT_SCOPE !== 'qa' ||
       process.env.ZFILES_RECEIPT_ATTACHMENT_METADATA_QA_ENABLED !== '1'
     ) {
-      throw new ServiceUnavailableException('Adjuntos de recepción no habilitados');
+      throw new ServiceUnavailableException(
+        'Adjuntos de recepción no habilitados',
+      );
     }
-    return this.attachments.list(
-      req.user.companyId,
-      req.user.id,
-      receiptId,
-    );
+    return this.attachments.list(req.user.companyId, req.user.id, receiptId);
   }
 }

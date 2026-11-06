@@ -5,9 +5,7 @@ import { PurchaseReceiptAttachmentsController } from './purchase-receipt-attachm
 
 describe('receipt-owned attachment HTTP read gate', () => {
   const service = { list: jest.fn() };
-  const controller = new PurchaseReceiptAttachmentsController(
-    service as never,
-  );
+  const controller = new PurchaseReceiptAttachmentsController(service as never);
   const req = { user: { companyId: 'company-a', id: 'actor-a' } } as never;
   const initialScope = process.env.ZFILES_DEPLOYMENT_SCOPE;
   const initialGate = process.env.ZFILES_RECEIPT_ATTACHMENT_METADATA_QA_ENABLED;

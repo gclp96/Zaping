@@ -1,9 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import {
-  PrismaClient,
-  PurchaseReceiptAttachmentStatus,
-} from '@prisma/client';
+import { PrismaClient, PurchaseReceiptAttachmentStatus } from '@prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { PurchaseReceiptAttachmentsService } from '../src/purchases-receipts/purchase-receipt-attachments.service';
 
@@ -102,9 +99,7 @@ describePg('ZFILES-03E2 receipt-native attachment PostgreSQL boundary', () => {
     const f = await fixture();
     const data = pending(f);
     const created = await db.purchaseReceiptAttachment.create({ data });
-    expect(created.status).toBe(
-      PurchaseReceiptAttachmentStatus.PENDING_SCAN,
-    );
+    expect(created.status).toBe(PurchaseReceiptAttachmentStatus.PENDING_SCAN);
     expect(created.scanEngine).toBeNull();
     expect(created.scannedAt).toBeNull();
     expect(
@@ -170,11 +165,10 @@ describePg('ZFILES-03E2 receipt-native attachment PostgreSQL boundary', () => {
     await expect(
       db.purchaseReceiptAttachment.delete({ where: { id: valid.id } }),
     ).rejects.toThrow();
-    expect(
-      (await db.purchaseReceiptAttachment.findUniqueOrThrow({
-        where: { id: valid.id },
-      })).status,
-    ).toBe(PurchaseReceiptAttachmentStatus.PENDING_SCAN);
+    const persisted = await db.purchaseReceiptAttachment.findUniqueOrThrow({
+      where: { id: valid.id },
+    });
+    expect(persisted.status).toBe(PurchaseReceiptAttachmentStatus.PENDING_SCAN);
   });
 
   it('rejects foreign tenant lookups and non-management actor', async () => {
@@ -196,7 +190,10 @@ describePg('ZFILES-03E2 receipt-native attachment PostgreSQL boundary', () => {
     await db.purchaseReceiptAttachment.create({ data: valid });
     for (const change of [
       { storageKey: valid.storageKey },
-      { storageKey: 'private/' + f.companyId + '/' + f.receiptId + '/' + randomUUID() },
+      {
+        storageKey:
+          'private/' + f.companyId + '/' + f.receiptId + '/' + randomUUID(),
+      },
       { storageKey: 'quarantine/receipts/' + f.companyId },
       { contentType: 'text/plain' },
       { sizeBytes: 0 },

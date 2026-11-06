@@ -11,7 +11,10 @@ import { PurchaseReceiptAttachmentsService } from './purchase-receipt-attachment
 
 @Module({
   imports: [InventoryPhysicalAuthorityModule, PrismaModule, EquipmentModule],
-  controllers: [PurchaseReceiptsController, PurchaseReceiptAttachmentsController],
+  controllers: [
+    PurchaseReceiptsController,
+    PurchaseReceiptAttachmentsController,
+  ],
   providers: [
     ReceiptPhysicalIntegrationService,
     PurchaseReceiptsService,
