@@ -72,7 +72,9 @@ describe('ZFILES reservation read-only recovery status', () => {
   });
 
   it('does not reveal another actor or tenant reservation', async () => {
-    prisma.supplierAttachmentUploadReservation.findFirst.mockResolvedValue(null);
+    prisma.supplierAttachmentUploadReservation.findFirst.mockResolvedValue(
+      null,
+    );
     await expect(
       service.status('company-b', 'document-a', 'actor-b', 'reservation-a'),
     ).rejects.toBeInstanceOf(NotFoundException);

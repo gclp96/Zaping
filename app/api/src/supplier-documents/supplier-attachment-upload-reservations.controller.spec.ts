@@ -83,9 +83,9 @@ describe('ZFILES first-stage reservation endpoint', () => {
   });
 
   it('does not expose recovery status outside QA', () => {
-    expect(() =>
-      controller.status(req, 'document-a', 'reservation-a'),
-    ).toThrow(ServiceUnavailableException);
+    expect(() => controller.status(req, 'document-a', 'reservation-a')).toThrow(
+      ServiceUnavailableException,
+    );
     expect(reservations.status).not.toHaveBeenCalled();
   });
 

@@ -122,7 +122,9 @@ describe('ZFILES QA raw HTTP boundary (no DB or network)', () => {
       createdAt: '2026-11-05T12:00:00.000Z',
     });
     const response = await request(app.getHttpServer())
-      .get('/supplier-documents/qa-document/attachments/reservations/qa-reservation')
+      .get(
+        '/supplier-documents/qa-document/attachments/reservations/qa-reservation',
+      )
       .expect(200);
     expect(response.body).toEqual({
       id: 'qa-reservation',
@@ -141,7 +143,9 @@ describe('ZFILES QA raw HTTP boundary (no DB or network)', () => {
   it('blocks status HTTP before service access when QA flag is disabled', async () => {
     delete process.env.ZFILES_QA_RESERVATIONS_ENABLED;
     await request(app.getHttpServer())
-      .get('/supplier-documents/qa-document/attachments/reservations/qa-reservation')
+      .get(
+        '/supplier-documents/qa-document/attachments/reservations/qa-reservation',
+      )
       .expect(503);
     expect(reserved.status).not.toHaveBeenCalled();
     process.env.ZFILES_QA_RESERVATIONS_ENABLED = '1';

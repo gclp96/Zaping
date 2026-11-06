@@ -61,21 +61,22 @@ export class SupplierAttachmentUploadReservationsService {
     ) {
       throw new ForbiddenException('Sin permiso para consultar adjuntos');
     }
-    const reservation = await this.prisma.supplierAttachmentUploadReservation.findFirst({
-      where: {
-        id: reservationId,
-        companyId,
-        documentId,
-        createdById: actorId,
-        document: { is: { status: 'ACTIVE' } },
-      },
-      select: {
-        id: true,
-        status: true,
-        sizeBytes: true,
-        createdAt: true,
-      },
-    });
+    const reservation =
+      await this.prisma.supplierAttachmentUploadReservation.findFirst({
+        where: {
+          id: reservationId,
+          companyId,
+          documentId,
+          createdById: actorId,
+          document: { is: { status: 'ACTIVE' } },
+        },
+        select: {
+          id: true,
+          status: true,
+          sizeBytes: true,
+          createdAt: true,
+        },
+      });
     if (!reservation) {
       throw new NotFoundException('Reserva de adjunto no encontrada');
     }
