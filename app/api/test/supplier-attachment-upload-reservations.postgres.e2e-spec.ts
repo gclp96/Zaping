@@ -123,6 +123,49 @@ describePg('B3d2 real PostgreSQL quota and concurrency', () => {
     expect(persisted.sha256).toBe(metadata.sha256);
   });
 
+  it('recovers only owner-scoped reservation metadata from real PostgreSQL', async () => {
+    const f = await fixture();
+    const created = await service.reserve(input(f));
+    const result = await service.status(
+      f.companyId,
+      f.documentId,
+      f.actorId,
+      created.id,
+    );
+    expect(result.id).toBe(created.id);
+    expect(result.status).toBe(
+      SupplierAttachmentUploadReservationStatus.RESERVED,
+    );
+    expect(Object.keys(result).sort()).toEqual([
+      'createdAt',
+      'id',
+      'sizeBytes',
+      'status',
+    ]);
+
+    const secondActorId = randomUUID();
+    await db.user.create({
+      data: {
+        id: secondActorId,
+        companyId: f.companyId,
+        firstName: 'Second',
+        lastName: 'Operator',
+        email: secondActorId + '@example.invalid',
+        passwordHash: 'NOT_A_LOGIN',
+        role: 'ADMIN',
+      },
+    });
+    await expect(
+      service.status(f.companyId, f.documentId, secondActorId, created.id),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.status(f.companyId, randomUUID(), f.actorId, created.id),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.status(randomUUID(), f.documentId, f.actorId, created.id),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('serializes concurrent attempts and never admits more than 10 files', async () => {
     const f = await fixture();
     const results = await Promise.allSettled(
