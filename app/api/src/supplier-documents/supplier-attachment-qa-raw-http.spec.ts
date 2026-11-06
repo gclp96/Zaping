@@ -11,7 +11,7 @@ import { SupplierAttachmentQaBinaryUploadService } from './supplier-attachment-q
 
 describe('ZFILES QA raw HTTP boundary (no DB or network)', () => {
   let app: INestApplication<App>;
-  const reserved = { reserve: jest.fn() };
+  const reserved = { reserve: jest.fn(), status: jest.fn() };
   const uploaded = { receive: jest.fn() };
   const qaEnv = {
     reservations: process.env.ZFILES_QA_RESERVATIONS_ENABLED,
@@ -112,6 +112,39 @@ describe('ZFILES QA raw HTTP boundary (no DB or network)', () => {
         contentType: 'application/pdf',
       }),
     );
+  });
+
+  it('returns only scoped reservation metadata through real Nest HTTP routing', async () => {
+    reserved.status.mockResolvedValue({
+      id: 'qa-reservation',
+      status: 'RESERVED',
+      sizeBytes: 110,
+      createdAt: '2026-11-05T12:00:00.000Z',
+    });
+    const response = await request(app.getHttpServer())
+      .get('/supplier-documents/qa-document/attachments/reservations/qa-reservation')
+      .expect(200);
+    expect(response.body).toEqual({
+      id: 'qa-reservation',
+      status: 'RESERVED',
+      sizeBytes: 110,
+      createdAt: '2026-11-05T12:00:00.000Z',
+    });
+    expect(reserved.status).toHaveBeenCalledWith(
+      'qa-company',
+      'qa-document',
+      'qa-actor',
+      'qa-reservation',
+    );
+  });
+
+  it('blocks status HTTP before service access when QA flag is disabled', async () => {
+    delete process.env.ZFILES_QA_RESERVATIONS_ENABLED;
+    await request(app.getHttpServer())
+      .get('/supplier-documents/qa-document/attachments/reservations/qa-reservation')
+      .expect(503);
+    expect(reserved.status).not.toHaveBeenCalled();
+    process.env.ZFILES_QA_RESERVATIONS_ENABLED = '1';
   });
 
   it('blocks raw HTTP before accessing the service when disabled', async () => {
