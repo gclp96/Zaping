@@ -4,7 +4,11 @@ import { UserRole } from '@prisma/client';
 import { SupplierAttachmentUploadReservationsController } from './supplier-attachment-upload-reservations.controller';
 
 describe('ZFILES first-stage reservation endpoint', () => {
-  const reservations = { reserve: jest.fn(), status: jest.fn() };
+  const reservations = {
+    reserve: jest.fn(),
+    status: jest.fn(),
+    cancelBeforeWrite: jest.fn(),
+  };
   const uploads = { receive: jest.fn() };
   const controller = new SupplierAttachmentUploadReservationsController(
     reservations as never,
@@ -107,6 +111,31 @@ describe('ZFILES first-stage reservation endpoint', () => {
       'actor-a',
       'reservation-a',
     );
+  });
+
+  it('blocks cancellation when the QA scope or switch is OFF', () => {
+    expect(() =>
+      controller.cancelBeforeWrite(req, 'document-a', 'reservation-a'),
+    ).toThrow(ServiceUnavailableException);
+    expect(reservations.cancelBeforeWrite).not.toHaveBeenCalled();
+  });
+
+  it('passes authenticated tenant and actor for never-started cancellation', async () => {
+    process.env.ZFILES_QA_RESERVATIONS_ENABLED = '1';
+    process.env.ZFILES_DEPLOYMENT_SCOPE = 'qa';
+    reservations.cancelBeforeWrite.mockResolvedValue({
+      id: 'reservation-a',
+      status: 'RELEASED_VERIFIED_EMPTY',
+    });
+    await expect(
+      controller.cancelBeforeWrite(req, 'document-a', 'reservation-a'),
+    ).resolves.toMatchObject({ status: 'RELEASED_VERIFIED_EMPTY' });
+    expect(reservations.cancelBeforeWrite).toHaveBeenCalledWith({
+      companyId: 'company-a',
+      documentId: 'document-a',
+      actorId: 'actor-a',
+      reservationId: 'reservation-a',
+    });
   });
 
   it('blocks binary PUT until both QA switches are enabled', () => {
