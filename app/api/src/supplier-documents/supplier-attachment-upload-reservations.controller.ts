@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Headers,
   HttpCode,
   Param,
@@ -61,6 +62,28 @@ export class SupplierAttachmentUploadReservationsController {
       },
     });
   }
+  @Get(':id/attachments/reservations/:reservationId')
+  status(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') documentId: string,
+    @Param('reservationId') reservationId: string,
+  ) {
+    if (
+      process.env.ZFILES_QA_RESERVATIONS_ENABLED !== '1' ||
+      process.env.ZFILES_DEPLOYMENT_SCOPE !== 'qa'
+    ) {
+      throw new ServiceUnavailableException(
+        'Consulta de reservas no habilitada',
+      );
+    }
+    return this.reservations.status(
+      req.user.companyId,
+      documentId,
+      req.user.id,
+      reservationId,
+    );
+  }
+
   @Put(':id/attachments/reservations/:reservationId/content')
   @HttpCode(202)
   receiveBytes(
