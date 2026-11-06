@@ -23,6 +23,11 @@ CREATE UNIQUE INDEX "SARE_cancelled_before_write_once"
   ON "SupplierAttachmentReconcileEvent" ("companyId", "reservationId")
   WHERE "action" = 'CANCELLED_BEFORE_WRITE';
 
+-- A reservation may be registered only once after durable verification evidence.
+CREATE UNIQUE INDEX "SARE_quarantine_verified_once"
+  ON "SupplierAttachmentReconcileEvent" ("companyId", "reservationId")
+  WHERE "action" = 'QUARANTINE_VERIFIED';
+
 ALTER TABLE "SupplierAttachmentReconcileEvent" ADD CONSTRAINT "SARE_company_fkey"
   FOREIGN KEY ("companyId") REFERENCES "Company"("id")
   ON DELETE RESTRICT ON UPDATE RESTRICT;
@@ -111,6 +116,13 @@ BEGIN
 
   IF OLD."status" IN ('RESERVED','RECONCILE_REQUIRED')
     AND NEW."status" = 'REGISTERED'
+    AND OLD."writeAttemptedAt" IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM "SupplierAttachmentReconcileEvent" audit
+      WHERE audit."companyId" = OLD."companyId"
+        AND audit."reservationId" = OLD."id"
+        AND audit."action" = 'QUARANTINE_VERIFIED'
+    )
     AND EXISTS (
       SELECT 1 FROM "SupplierDocumentAttachment" a
       WHERE a."id" = NEW."id"

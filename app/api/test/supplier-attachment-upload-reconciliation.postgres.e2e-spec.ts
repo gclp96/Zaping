@@ -133,6 +133,62 @@ describePg('B3d3 isolated PostgreSQL quarantine reconciliation', () => {
     ).toBe(0);
   });
 
+
+  it('database rejects REGISTERED with forged pending metadata but missing intent or verification', async () => {
+    async function seedPending(f: Awaited<ReturnType<typeof fixture>>) {
+      const reservation =
+        await db.supplierAttachmentUploadReservation.findUniqueOrThrow({
+          where: { id: f.reservationId },
+        });
+      await db.supplierDocumentAttachment.create({
+        data: {
+          id: reservation.id,
+          companyId: reservation.companyId,
+          documentId: reservation.documentId,
+          uploadedById: reservation.createdById,
+          storageKey: reservation.quarantineKey.replace(
+            /^quarantine\//,
+            'private/',
+          ),
+          originalName: reservation.originalName,
+          contentType: reservation.contentType,
+          sizeBytes: reservation.sizeBytes,
+          sha256: reservation.sha256,
+          status: SupplierDocumentAttachmentStatus.PENDING_SCAN,
+        },
+      });
+    }
+
+    // Even matching attachment + forged verification event are insufficient
+    // without a durable pre-PUT intent marker.
+    const withoutIntent = await fixture(false);
+    await seedPending(withoutIntent);
+    await db.supplierAttachmentReconcileEvent.create({
+      data: {
+        companyId: withoutIntent.companyId,
+        reservationId: withoutIntent.reservationId,
+        action: SupplierAttachmentReconcileAction.QUARANTINE_VERIFIED,
+      },
+    });
+    await expect(
+      db.supplierAttachmentUploadReservation.update({
+        where: { id: withoutIntent.reservationId },
+        data: { status: SupplierAttachmentUploadReservationStatus.REGISTERED },
+      }),
+    ).rejects.toThrow();
+
+    // A write-intent marker and matching attachment still cannot skip the
+    // required QUARANTINE_VERIFIED audit event.
+    const withoutEvidence = await fixture();
+    await seedPending(withoutEvidence);
+    await expect(
+      db.supplierAttachmentUploadReservation.update({
+        where: { id: withoutEvidence.reservationId },
+        data: { status: SupplierAttachmentUploadReservationStatus.REGISTERED },
+      }),
+    ).rejects.toThrow();
+  });
+
   it('verifies quarantined object and atomically registers PENDING_SCAN, never AVAILABLE', async () => {
     const f = await fixture();
     const result = await reconciliation.reconcile(f);

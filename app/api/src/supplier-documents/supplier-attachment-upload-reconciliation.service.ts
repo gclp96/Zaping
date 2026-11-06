@@ -153,17 +153,19 @@ export class SupplierAttachmentUploadReconciliationService {
           status: SupplierDocumentAttachmentStatus.PENDING_SCAN,
         },
       });
-      await tx.supplierAttachmentUploadReservation.update({
-        where: { id: reservation.id },
-        data: {
-          status: SupplierAttachmentUploadReservationStatus.REGISTERED,
-        },
-      });
+      // The trigger requires this durable verification event before changing
+      // reservation status. Both writes and the attachment INSERT commit atomically.
       await tx.supplierAttachmentReconcileEvent.create({
         data: {
           companyId,
           reservationId: reservation.id,
           action: SupplierAttachmentReconcileAction.QUARANTINE_VERIFIED,
+        },
+      });
+      await tx.supplierAttachmentUploadReservation.update({
+        where: { id: reservation.id },
+        data: {
+          status: SupplierAttachmentUploadReservationStatus.REGISTERED,
         },
       });
       return {
