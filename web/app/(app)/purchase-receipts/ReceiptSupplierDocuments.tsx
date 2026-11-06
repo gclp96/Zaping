@@ -11,6 +11,7 @@ import { getApiErrorMessage } from '@/services/errors';
 
 import { validLinks, type LinkedSupplierDocument } from './receipt-document-contract';
 import ExistingSupplierDocumentPicker from './ExistingSupplierDocumentPicker';
+import ReceiptAvailableAttachments from './ReceiptAvailableAttachments';
 
 function documentLabel(document: LinkedSupplierDocument['document']) {
   const number = [document.series, document.number].filter(Boolean).join('-');
@@ -176,6 +177,15 @@ function DocumentLinks({ receiptId, supplierId, legacyReference, session, canVie
               >
                 Ver documento
               </Link>
+              {link.document.status === 'ACTIVE' ? (
+                <ReceiptAvailableAttachments
+                  key={link.document.id}
+                  documentId={link.document.id}
+                  enabled={
+                    process.env.NEXT_PUBLIC_ZFILES_RECEIPT_ATTACHMENTS_QA_ENABLED === '1'
+                  }
+                />
+              ) : null}
             </li>
           ))}
         </ul>
