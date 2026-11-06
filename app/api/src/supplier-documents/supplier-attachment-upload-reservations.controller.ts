@@ -84,6 +84,29 @@ export class SupplierAttachmentUploadReservationsController {
     );
   }
 
+  @Post(':id/attachments/reservations/:reservationId/cancel')
+  @HttpCode(200)
+  cancelBeforeWrite(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') documentId: string,
+    @Param('reservationId') reservationId: string,
+  ) {
+    if (
+      process.env.ZFILES_QA_RESERVATIONS_ENABLED !== '1' ||
+      process.env.ZFILES_DEPLOYMENT_SCOPE !== 'qa'
+    ) {
+      throw new ServiceUnavailableException(
+        'Cancelación de reservas no habilitada',
+      );
+    }
+    return this.reservations.cancelBeforeWrite({
+      companyId: req.user.companyId,
+      documentId,
+      actorId: req.user.id,
+      reservationId,
+    });
+  }
+
   @Put(':id/attachments/reservations/:reservationId/content')
   @HttpCode(202)
   receiveBytes(
