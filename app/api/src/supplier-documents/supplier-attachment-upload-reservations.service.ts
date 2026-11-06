@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import {
   Prisma,
+  SupplierAttachmentReconcileAction,
   SupplierAttachmentUploadReservationStatus,
   SupplierDocumentAttachmentStatus,
   UserRole,
@@ -81,6 +82,100 @@ export class SupplierAttachmentUploadReservationsService {
       throw new NotFoundException('Reserva de adjunto no encontrada');
     }
     return reservation;
+  }
+
+  /**
+   * Reclaim quota ONLY if no R2 PUT attempt was ever fenced in the ledger.
+   * Serializes on the same SupplierDocument lock as write-intent claims.
+   * A network-ambiguous or already-started upload is NOT cancellable.
+   */
+  async cancelBeforeWrite(input: {
+    companyId: string;
+    documentId: string;
+    actorId: string;
+    reservationId: string;
+  }): Promise<{ id: string; status: SupplierAttachmentUploadReservationStatus }> {
+    const { companyId, documentId, actorId, reservationId } = input;
+    return this.prisma.$transaction(
+      async (tx) => {
+        const locked = await tx.$queryRaw<Array<{ id: string }>>(
+          Prisma.sql`SELECT "id" FROM "SupplierDocument"
+            WHERE "id" = ${documentId} AND "companyId" = ${companyId}
+              AND "status" = 'ACTIVE'
+            FOR UPDATE`,
+        );
+        if (locked.length !== 1) {
+          throw new NotFoundException('Documento activo no encontrado');
+        }
+        const actor = await tx.user.findFirst({
+          where: { id: actorId, companyId, isActive: true },
+          select: { role: true },
+        });
+        if (
+          !actor ||
+          (actor.role !== UserRole.ADMIN && actor.role !== UserRole.MANAGER)
+        ) {
+          throw new ForbiddenException('Sin permiso para cancelar adjuntos');
+        }
+        const current = await tx.supplierAttachmentUploadReservation.findFirst({
+          where: { id: reservationId, companyId, documentId, createdById: actorId },
+          select: { id: true, status: true, writeAttemptedAt: true },
+        });
+        if (!current) {
+          throw new NotFoundException('Reserva de adjunto no encontrada');
+        }
+        if (
+          current.status ===
+          SupplierAttachmentUploadReservationStatus.RELEASED_VERIFIED_EMPTY
+        ) {
+          return { id: reservationId, status: current.status };
+        }
+        if (
+          current.status !== SupplierAttachmentUploadReservationStatus.RESERVED ||
+          current.writeAttemptedAt !== null
+        ) {
+          throw new ConflictException(
+            'La escritura pudo haber iniciado; requiere conciliación',
+          );
+        }
+
+        // Audit row and quota change commit atomically. The SQL guard below
+        // rejects a direct cancellation without this matching audit event.
+        await tx.supplierAttachmentReconcileEvent.create({
+          data: {
+            companyId,
+            reservationId,
+            action: SupplierAttachmentReconcileAction.CANCELLED_BEFORE_WRITE,
+          },
+        });
+        const updated = await tx.supplierAttachmentUploadReservation.updateMany({
+          where: {
+            id: reservationId,
+            companyId,
+            documentId,
+            createdById: actorId,
+            status: SupplierAttachmentUploadReservationStatus.RESERVED,
+            writeAttemptedAt: null,
+          },
+          data: {
+            status:
+              SupplierAttachmentUploadReservationStatus.RELEASED_VERIFIED_EMPTY,
+          },
+        });
+        if (updated.count !== 1) {
+          throw new ConflictException('Reserva ya no cancelable');
+        }
+        return {
+          id: reservationId,
+          status: SupplierAttachmentUploadReservationStatus.RELEASED_VERIFIED_EMPTY,
+        };
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+        maxWait: 5000,
+        timeout: 15000,
+      },
+    );
   }
 
   async reserve(input: ReserveInput) {
