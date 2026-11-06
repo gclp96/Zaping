@@ -14,6 +14,9 @@ export async function consumeAndVerifyPrivateAttachment(
     declaredBytes > SUPPLIER_ATTACHMENT_MAX_BYTES ||
     !/^[a-f0-9]{64}$/.test(expectedSha256)
   ) {
+    // Metadata may be corrupted after the private stream has been opened.
+    // Close it before rejecting to avoid a leaked R2 connection.
+    source.destroy();
     throw new ConflictException('Metadatos de archivo inválidos');
   }
 

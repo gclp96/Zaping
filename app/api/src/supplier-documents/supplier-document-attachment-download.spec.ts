@@ -50,6 +50,14 @@ describe('private supplier attachment download boundary', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('closes the private stream when metadata is rejected before reading', async () => {
+    const source = Readable.from([bytes]);
+    await expect(
+      consumeAndVerifyPrivateAttachment(source, 0, digest),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(source.destroyed).toBe(true);
+  });
+
   it('rejects corrupt metadata and an oversized declared length', async () => {
     for (const [size, checksum] of [
       [0, digest],
