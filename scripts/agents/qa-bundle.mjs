@@ -399,7 +399,7 @@ export function collect(args, testOptions) {
     let manifest = { schemaVersion: 1, issueNumber: number, approvedIssueSha256: approval,
       ...before, inventory, snapshotSha256: hash(snapshotBytes), fingerprintSha256: fingerprint,
       status: inventory.some(x => x.excluded || x.status.includes('D') || /[AMRC]/.test(x.status[0])) ? 'INSUFFICIENT_EVIDENCE' : 'QA_REVIEW',
-      limits: LIMITS, checks: [{ name: 'verify-local', status: 'NOT_RUN', source: { kind: 'NOT_RUN', id: 'not-run' }, binding: 'UNVERIFIED' }],
+      limits: LIMITS, checks: [{ name: 'verify-local', status: 'NOT_RUN', binding: 'UNVERIFIED' }],
       limitations: ['Human review required before model delivery; secret detection is heuristic.', 'Only current working-file text is exported; base/index contents and raw diffs are hash-only. Staged additions/modifications/renames require supplementary human evidence.', 'No test result is cryptographically bound to this snapshot.', 'No QA approval, merge or deploy authority.', 'Read-only commands are not an OS sandbox; concurrent hostile writers require external isolation.'] };
     if (version === 2) {
       const metadata = layer => layer === null ? null : { size: layer.size, sha256: layer.sha256 };
