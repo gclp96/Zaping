@@ -3,7 +3,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { SupplierDocumentAttachmentStatus } from '@prisma/client';
+import {
+  SupplierDocumentAttachmentStatus,
+  SupplierDocumentStatus,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PrivateAttachmentObjectStore } from './private-attachment-object-store';
 import { consumeAndVerifyPrivateAttachment } from './supplier-document-attachment-download';
@@ -22,7 +25,7 @@ export class SupplierDocumentAttachmentsService {
    */
   async listAvailable(companyId: string, documentId: string) {
     const document = await this.prisma.supplierDocument.findFirst({
-      where: { companyId, id: documentId },
+      where: { companyId, id: documentId, status: SupplierDocumentStatus.ACTIVE },
       select: { id: true },
     });
     if (!document) {
@@ -64,7 +67,7 @@ export class SupplierDocumentAttachmentsService {
     originalName: string;
   }> {
     const document = await this.prisma.supplierDocument.findFirst({
-      where: { companyId, id: documentId },
+      where: { companyId, id: documentId, status: SupplierDocumentStatus.ACTIVE },
       select: { id: true },
     });
     if (!document) {
