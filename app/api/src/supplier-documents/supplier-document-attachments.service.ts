@@ -25,7 +25,11 @@ export class SupplierDocumentAttachmentsService {
    */
   async listAvailable(companyId: string, documentId: string) {
     const document = await this.prisma.supplierDocument.findFirst({
-      where: { companyId, id: documentId, status: SupplierDocumentStatus.ACTIVE },
+      where: {
+        companyId,
+        id: documentId,
+        status: SupplierDocumentStatus.ACTIVE,
+      },
       select: { id: true },
     });
     if (!document) {
@@ -67,7 +71,11 @@ export class SupplierDocumentAttachmentsService {
     originalName: string;
   }> {
     const document = await this.prisma.supplierDocument.findFirst({
-      where: { companyId, id: documentId, status: SupplierDocumentStatus.ACTIVE },
+      where: {
+        companyId,
+        id: documentId,
+        status: SupplierDocumentStatus.ACTIVE,
+      },
       select: { id: true },
     });
     if (!document) {
