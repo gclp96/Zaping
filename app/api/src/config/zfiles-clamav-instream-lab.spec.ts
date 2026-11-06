@@ -19,9 +19,10 @@ type Fixture = {
 
 async function clamdFixture(response: string | null): Promise<Fixture> {
   const dir = await mkdtemp(join(tmpdir(), 'zaping-clamd-'));
-  const socketPath = process.platform === 'win32'
-    ? '\\\\.\\pipe\\zaping-clamd-' + randomUUID()
-    : join(dir, 'clamd.sock');
+  const socketPath =
+    process.platform === 'win32'
+      ? '\\\\.\\pipe\\zaping-clamd-' + randomUUID()
+      : join(dir, 'clamd.sock');
   const received: Buffer[] = [];
   const server = createServer((socket: Socket) => {
     let pending = Buffer.alloc(0);
