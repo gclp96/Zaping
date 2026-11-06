@@ -20,7 +20,10 @@ import {
     SupplierReceiptVarianceService,
     ReceiptDocumentLinksService,
     SupplierDocumentAttachmentsService,
-    { provide: PrivateAttachmentObjectStore, useClass: UnconfiguredPrivateAttachmentStore },
+    {
+      provide: PrivateAttachmentObjectStore,
+      useClass: UnconfiguredPrivateAttachmentStore,
+    },
   ],
 })
 export class SupplierDocumentsModule {}
