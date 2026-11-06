@@ -1,6 +1,6 @@
 # Registro de depuración de PR — 2026-11-06
 
-**Repositorio:** gclp96/zaping. **Estado:** auditoría preliminar / solo lectura. **Fuente:** PR abiertos en GitHub consultados el 2026-11-06. **Total inicial:** 47.
+**Repositorio:** gclp96/zaping. **Estado:** auditoría preliminar / solo lectura. **Fuente:** PR abiertos en GitHub consultados el 2026-11-06. **Total inicial:** 47. **Cerrados en esta limpieza:** 1 (#223). **Abiertos restantes a este corte:** 46.
 
 No se ha autorizado ninguna fusión, cierre ni borrado por el hecho de figurar en esta lista. El objetivo es resolver cada registro con trazabilidad y sin perder trabajo; los números son identificadores históricos que deben conservarse.
 
@@ -102,7 +102,7 @@ No se ha autorizado ninguna fusión, cierre ni borrado por el hecho de figurar e
 
 | PR | Nombre | Estado de triage | Decisión final |
 |---|---|---|---|
-| [#223](https://github.com/gclp96/zaping/pull/223) | docs: propuesta arquitectónica Zaping Smart Station y roadmap de piloto INSAP | NEEDS_REVIEW | Pendiente |
+| [#223](https://github.com/gclp96/zaping/pull/223) | docs: propuesta arquitectónica Zaping Smart Station y roadmap de piloto INSAP | DEFERRED | Cerrado sin merge 2026-11-06; preservar diseño en PR #223 |
 
 ## Evidencia y protocolo de cierre
 
