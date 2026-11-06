@@ -1,5 +1,8 @@
 import { NotFoundException } from '@nestjs/common';
-import { SupplierDocumentAttachmentStatus } from '@prisma/client';
+import {
+  SupplierDocumentAttachmentStatus,
+  SupplierDocumentStatus,
+} from '@prisma/client';
 import { SupplierDocumentAttachmentsService } from './supplier-document-attachments.service';
 
 describe('SupplierDocumentAttachmentsService', () => {
@@ -26,7 +29,11 @@ describe('SupplierDocumentAttachmentsService', () => {
       service.listAvailable('company-a', 'document-from-company-b'),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(prisma.supplierDocument.findFirst).toHaveBeenCalledWith({
-      where: { companyId: 'company-a', id: 'document-from-company-b' },
+      where: {
+        companyId: 'company-a',
+        id: 'document-from-company-b',
+        status: SupplierDocumentStatus.ACTIVE,
+      },
       select: { id: true },
     });
     expect(prisma.supplierDocumentAttachment.findMany).not.toHaveBeenCalled();
