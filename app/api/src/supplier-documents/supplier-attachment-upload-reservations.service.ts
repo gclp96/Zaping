@@ -45,12 +45,20 @@ export class SupplierAttachmentUploadReservationsService {
    * reservations they created. No storage key, checksum or internal proof is
    * exposed; REGISTERED means quarantine was verified, NOT virus-scanned.
    */
-  async status(companyId: string, documentId: string, actorId: string, reservationId: string) {
+  async status(
+    companyId: string,
+    documentId: string,
+    actorId: string,
+    reservationId: string,
+  ) {
     const actor = await this.prisma.user.findFirst({
       where: { id: actorId, companyId, isActive: true },
       select: { role: true },
     });
-    if (!actor || (actor.role !== UserRole.ADMIN && actor.role !== UserRole.MANAGER)) {
+    if (
+      !actor ||
+      (actor.role !== UserRole.ADMIN && actor.role !== UserRole.MANAGER)
+    ) {
       throw new ForbiddenException('Sin permiso para consultar adjuntos');
     }
     const reservation = await this.prisma.supplierAttachmentUploadReservation.findFirst({
