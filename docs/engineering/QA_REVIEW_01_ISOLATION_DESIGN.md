@@ -1,11 +1,11 @@
-# QA-REVIEW-01A — Diseño de aislamiento y contrato de seguridad (DRAFT PR #260)
+# QA-REVIEW-01A — Diseño de aislamiento y contrato de seguridad (PR #260, Ready for Review)
 
 **Proyecto:** Zaping Quality Agent
 **Ticket:** [#258](https://github.com/gclp96/Zaping/issues/258)
 **Fecha de corte:** 2026-11-08
 **Base contractual fijada para revisión:** commit `83ca497c7a91cbe127b74a279e642749ac718c0c` (QA-BUNDLE V2); blob `qa-bundle.mjs` `af42de25a2948359e4c0a2315cade25c10cd3817`
 **Tipo:** C — diseño/arquitectura; no ejecutable por el despachador V1
-**Estado del documento:** en revisión humana mediante Draft PR #260; no aprobado, no habilita IA
+**Estado del documento:** en revisión humana mediante PR #260 (Ready for Review); alcance documental separado y aprobado por el propietario, pero diseño aún pendiente de aceptación formal; no habilita IA
 **Dependencias:** [QA-01 #222](https://github.com/gclp96/Zaping/issues/222), [QA-CONTRACT-02 #246](https://github.com/gclp96/Zaping/issues/246), [QA-BUNDLE-02 #250](https://github.com/gclp96/Zaping/issues/250), [PR #256](https://github.com/gclp96/Zaping/pull/256)
 
 > Este documento fue preparado inicialmente fuera del repositorio y después incorporado únicamente en la rama `docs/qa-review-01a-isolation` mediante el Draft PR #260, con el issue #258 reabierto por autorización del propietario. Su publicación documental no implica aprobación de seguridad, merge, ejecución de código propuesto, despliegue ni habilitación de un agente.
@@ -182,24 +182,26 @@ Salida candidata JSON con identidad del paquete, `findings[]` y `limitations[]`.
 
 **DoR #258:** revisar contratos #222/#246/#250 y el laboratorio WSL/Docker; alcance documental solamente; autor identificado; hechos y restricciones trazables.
 
-**DoD propuesto #258:** esta especificación revisada y aprobada por responsable humano; amenazas/gates/limitaciones documentadas; plan de tickets y rollback; diff documental inspeccionado en rama separada y PR bajo autorización posterior. Cerrar un issue en GitHub no equivale a cumplirlo.
+**DoD documental #258 (separación de alcance autorizada):** especificación y threat model revisados y aceptados por el propietario; riesgos residuales, límites de evidencia sintética, gates y rollback documentados; AC-02/AC-03 operativos asignados a 01C/PILOT, sin afirmar que sus pruebas ya pasaron; diff documental inspeccionado y PR integrado exclusivamente bajo autorización humana posterior. Cerrar un issue en GitHub no equivale a cumplirlo ni a autorizar runtime de IA.
 
 **Pendientes que impiden declarar seguridad aprobada:** pruebas adversariales de prompt/output JSON; staging privado y TOCTOU; host/daemon/imagen endurecidos y atestados; clasificación confidencial y aprobación de modelo remoto; definición del punto de relectura del operador; verificar experimentalmente el límite temporal global al implementar el runtime futuro, sin reinterpretar los dos límites existentes. Durante la preparación autorizada del Draft PR #260, el issue #258 fue reabierto y el documento se agregó exclusivamente a una rama separada; el documento aún no se ha integrado a `main`. La aceptación de diseño y el merge permanecen pendientes de revisión y autorización humanas.
+
+**Decisión humana de alcance (08/11/2026):** #258 conserva como DoD exclusivamente la especificación arquitectónica y su revisión formal; las verificaciones operativas de AC-02 (host, permisos, aislamiento) y AC-03 (prompt injection/parser) son gates bloqueantes de QA-REVIEW-01C y QA-PILOT-01. No se han transferido sus resultados ni se ha concedido permiso de uso de IA. La aceptación del diseño, el merge y el cierre de #258 siguen sujetos a decisiones humanas posteriores.
 
 ## 11. Evaluación contra los ocho criterios del issue #258 (sin aprobación automática)
 
 | AC | Estado a fecha de corte | Evidencia y límite |
 | --- | --- | --- |
 | AC-01 Amenazas y controles | **Documentado** | Matriz de §4; incluye límites, pruebas requeridas y amenazas residuales. |
-| AC-02 Denegar host/HOME/Git/socket | **Parcial / bloqueo de runtime** | Laboratorio sintético sin mounts comprobó rutas de host ausentes, UID no root y escritura EROFS; falta prueba adversarial exhaustiva y separación de origen/UID frente al proponente. No habilitar código real. |
-| AC-03 Prompt injection | **Pendiente de prueba** | Casos definidos en §4 y gates B/C; no se ejecutó modelo ni postvalidador de salida real. |
+| AC-02 Diseñar aislamiento host/HOME/Git/socket | **Diseño documentado; gate operativo pendiente en 01C** | Laboratorio sintético sin mounts comprobó rutas de host ausentes, UID no root y escritura EROFS; pruebas negativas exhaustivas y separación de origen/UID siguen siendo obligatorias en 01C antes de IA real. |
+| AC-03 Diseñar defensa ante prompt injection | **Plan documentado; gates operativos pendientes en 01C/PILOT** | Fixtures hostiles, ausencia de tools y postvalidador descritos en §4/§7/§8. No se ejecutó modelo ni parser real: pruebas adversariales de gateway/parser en 01C y piloto con fixtures en QA-PILOT-01. |
 | AC-04 Integridad y transporte | **Diseñado / prueba parcial** | SHA de fixture antes/dentro/después PASS; no demuestra procedencia Git, scope real ni protección total TOCTOU. |
 | AC-05 Política LLM remoto | **Documentado** | §5 exige autorización humana de proveedor, datos y confidencialidad; ninguna autorización otorgada. |
 | AC-06 Hallazgos consultivos | **Documentado / implementación posterior** | §7 contiene formato, severidades, confianza y evidencia; parser y tests quedan para 01C. |
 | AC-07 DoR/DoD, stop, rollback | **Documentado** | §8–10; no se ejecutaron cambios productivos por esta revisión. |
-| AC-08 Revisión humana | **En curso** | Documento incluido en Draft PR #260; diff documental cotejado, CI del commit inicial aprobado; faltan la revisión y aceptación humanas del contenido. |
+| AC-08 Revisión humana | **En curso** | Documento incluido en PR #260, Ready for Review; diff documental cotejado; faltan la revisión y aceptación humanas del contenido. |
 
-**Dictamen:** apto para revisión de arquitectura en el Draft PR #260, **NO** aceptado como runtime seguro ni como issue técnicamente terminado. Si la aceptación del #258 exige pruebas ejecutadas para AC-02/AC-03, deben permanecer abiertas hasta un gate explícito o una modificación de alcance aprobada por el propietario. Nunca declarar un PASS que no se ha observado.
+**Dictamen:** apto para revisión documental de arquitectura en el PR #260. El propietario autorizó expresamente separar AC-02/AC-03 **de diseño** (en #258) de sus pruebas operativas **aún pendientes** (01C/PILOT). Esta decisión no constituye aceptación formal del contenido, cierre de #258 ni aprobación del runtime. Nunca declarar un PASS que no se ha observado.
 
 **Invariantes de publicación:** incluir solo `docs/engineering/QA_REVIEW_01_ISOLATION_DESIGN.md`; no tocar `main` directamente, no asignar `agent:ready`, no habilitar modelos, no crear políticas, no alterar CI, no publicar código real. La reapertura de #258 y la creación de rama/PR fueron autorizadas; el merge, la aceptación del diseño y el cierre del issue requieren decisiones humanas separadas.
 
@@ -209,4 +211,4 @@ Salida candidata JSON con identidad del paquete, `findings[]` y `limitations[]`.
 - Ubuntu: [CVE-2026-87766](https://ubuntu.com/security/CVE-2026-87766); [USN-8779-2](https://ubuntu.com/security/notices/USN-8779-2); [advisory upstream](https://github.com/containers/bubblewrap/security/advisories/GHSA-pxhw-h44j-8pfx).
 - Docker: [Engine security](https://docs.docker.com/engine/security/); [seccomp](https://docs.docker.com/engine/security/seccomp/).
 
-**Control de versión:** documento publicado solamente en la rama del Draft PR #260, aún no aceptado ni integrado en `main`. El CI inicial del PR pasó para el commit `3a7f4136a3d205fa3ac9b65f1cb48242c35c16bc`; cualquier commit posterior requiere nueva validación. No se ejecutaron pruebas de propuestas ni modelos de IA. Antes de autorizar 01B deben revisarse los invariantes exactos del productor y formalizar el contrato de ticket.
+**Control de versión:** documento publicado solamente en la rama del PR #260 (Ready for Review), aún no aceptado ni integrado en `main`. Tras cada cambio debe verificarse CI sobre el nuevo HEAD; el CI histórico no se extrapola. No se ejecutaron modelos ni pruebas de propuestas reales. Antes de autorizar 01B deben revisarse los invariantes exactos del productor y formalizar el contrato de ticket.
