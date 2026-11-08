@@ -1,14 +1,14 @@
-# QA-REVIEW-01A — Diseño de aislamiento y contrato de seguridad (CANDIDATO PARA PR DOCUMENTAL)
+# QA-REVIEW-01A — Diseño de aislamiento y contrato de seguridad (DRAFT PR #260)
 
 **Proyecto:** Zaping Quality Agent
 **Ticket:** [#258](https://github.com/gclp96/Zaping/issues/258)
 **Fecha de corte:** 2026-11-08
 **Base contractual fijada para revisión:** commit `83ca497c7a91cbe127b74a279e642749ac718c0c` (QA-BUNDLE V2); blob `qa-bundle.mjs` `af42de25a2948359e4c0a2315cade25c10cd3817`
 **Tipo:** C — diseño/arquitectura; no ejecutable por el despachador V1
-**Estado del documento:** CANDIDATO PARA REVISIÓN HUMANA Y PR DOCUMENTAL; no aprobado, no habilita IA
+**Estado del documento:** en revisión humana mediante Draft PR #260; no aprobado, no habilita IA
 **Dependencias:** [QA-01 #222](https://github.com/gclp96/Zaping/issues/222), [QA-CONTRACT-02 #246](https://github.com/gclp96/Zaping/issues/246), [QA-BUNDLE-02 #250](https://github.com/gclp96/Zaping/issues/250), [PR #256](https://github.com/gclp96/Zaping/pull/256)
 
-> Este archivo se preparó **fuera del repositorio**. No implica commit, creación/reapertura de issue, aprobación de seguridad, ejecución de código propuesto, despliegue ni habilitación de un agente.
+> Este documento fue preparado inicialmente fuera del repositorio y después incorporado únicamente en la rama `docs/qa-review-01a-isolation` mediante el Draft PR #260, con el issue #258 reabierto por autorización del propietario. Su publicación documental no implica aprobación de seguridad, merge, ejecución de código propuesto, despliegue ni habilitación de un agente.
 
 ## 1. Decisión propuesta
 
@@ -184,7 +184,7 @@ Salida candidata JSON con identidad del paquete, `findings[]` y `limitations[]`.
 
 **DoD propuesto #258:** esta especificación revisada y aprobada por responsable humano; amenazas/gates/limitaciones documentadas; plan de tickets y rollback; diff documental inspeccionado en rama separada y PR bajo autorización posterior. Cerrar un issue en GitHub no equivale a cumplirlo.
 
-**Pendientes que impiden declarar seguridad aprobada:** pruebas adversariales de prompt/output JSON; staging privado y TOCTOU; host/daemon/imagen endurecidos y atestados; clasificación confidencial y aprobación de modelo remoto; definición del punto de relectura del operador; reconciliar límite temporal 30s/120s. A fecha de revisión el issue #258 figura cerrado en GitHub mientras el documento requerido no está en `main`: proponer corrección administrativa **solo tras aprobación del responsable**, nunca automática.
+**Pendientes que impiden declarar seguridad aprobada:** pruebas adversariales de prompt/output JSON; staging privado y TOCTOU; host/daemon/imagen endurecidos y atestados; clasificación confidencial y aprobación de modelo remoto; definición del punto de relectura del operador; reconciliar límite temporal 30s/120s. Durante la preparación autorizada del Draft PR #260, el issue #258 fue reabierto y el documento se agregó exclusivamente a una rama separada; el documento aún no se ha integrado a `main`. La aceptación de diseño y el merge permanecen pendientes de revisión y autorización humanas.
 
 ## 11. Evaluación contra los ocho criterios del issue #258 (sin aprobación automática)
 
@@ -197,11 +197,11 @@ Salida candidata JSON con identidad del paquete, `findings[]` y `limitations[]`.
 | AC-05 Política LLM remoto | **Documentado** | §5 exige autorización humana de proveedor, datos y confidencialidad; ninguna autorización otorgada. |
 | AC-06 Hallazgos consultivos | **Documentado / implementación posterior** | §7 contiene formato, severidades, confianza y evidencia; parser y tests quedan para 01C. |
 | AC-07 DoR/DoD, stop, rollback | **Documentado** | §8–10; no se ejecutaron cambios productivos por esta revisión. |
-| AC-08 Revisión humana | **Pendiente** | Documento fuera del repositorio, sin revisión de diff en rama ni PR aprobado. |
+| AC-08 Revisión humana | **En curso** | Documento incluido en Draft PR #260; diff documental cotejado, CI del commit inicial aprobado; faltan la revisión y aceptación humanas del contenido. |
 
-**Dictamen:** apto para revisión de arquitectura y eventual PR *documental*, **NO** aceptado como runtime seguro ni como issue técnicamente terminado. Si la aceptación del #258 exige pruebas ejecutadas para AC-02/AC-03, deben permanecer abiertas hasta un gate explícito o una modificación de alcance aprobada por el propietario. Nunca declarar un PASS que no se ha observado.
+**Dictamen:** apto para revisión de arquitectura en el Draft PR #260, **NO** aceptado como runtime seguro ni como issue técnicamente terminado. Si la aceptación del #258 exige pruebas ejecutadas para AC-02/AC-03, deben permanecer abiertas hasta un gate explícito o una modificación de alcance aprobada por el propietario. Nunca declarar un PASS que no se ha observado.
 
-**Invariantes de publicación:** incluir solo `docs/engineering/QA_REVIEW_01_ISOLATION_DESIGN.md`; no tocar `main` directamente, no asignar `agent:ready`, no habilitar modelos, no crear políticas, no alterar CI, no publicar código real. La apertura/reapertura administrativa de #258, rama, commit, PR y merge requieren autorizaciones separadas.
+**Invariantes de publicación:** incluir solo `docs/engineering/QA_REVIEW_01_ISOLATION_DESIGN.md`; no tocar `main` directamente, no asignar `agent:ready`, no habilitar modelos, no crear políticas, no alterar CI, no publicar código real. La reapertura de #258 y la creación de rama/PR fueron autorizadas; el merge, la aceptación del diseño y el cierre del issue requieren decisiones humanas separadas.
 
 ## 12. Referencias de verificación
 
@@ -209,4 +209,4 @@ Salida candidata JSON con identidad del paquete, `findings[]` y `limitations[]`.
 - Ubuntu: [CVE-2026-87766](https://ubuntu.com/security/CVE-2026-87766); [USN-8779-2](https://ubuntu.com/security/notices/USN-8779-2); [advisory upstream](https://github.com/containers/bubblewrap/security/advisories/GHSA-pxhw-h44j-8pfx).
 - Docker: [Engine security](https://docs.docker.com/engine/security/); [seccomp](https://docs.docker.com/engine/security/seccomp/).
 
-**Control de versión:** candidato documental fuera del repo; aún no aceptado. Revisar los invariantes exactos del productor contra el commit base antes de autorizar 01B; no se ejecutaron pruebas ni hubo cambios en GitHub. Cualquier implementación posterior requiere revisión humana y contrato de ticket específico.
+**Control de versión:** documento publicado solamente en la rama del Draft PR #260, aún no aceptado ni integrado en `main`. El CI inicial del PR pasó para el commit `3a7f4136a3d205fa3ac9b65f1cb48242c35c16bc`; cualquier commit posterior requiere nueva validación. No se ejecutaron pruebas de propuestas ni modelos de IA. Antes de autorizar 01B deben revisarse los invariantes exactos del productor y formalizar el contrato de ticket.
