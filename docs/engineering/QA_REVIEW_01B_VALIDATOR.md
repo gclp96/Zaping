@@ -1,8 +1,8 @@
 # QA-REVIEW-01B — Validador determinista QA-BUNDLE V2
 
-**Issue:** [#261](https://github.com/gclp96/Zaping/issues/261)  
-**Contrato preexistente:** QA-REVIEW-01A, [#258](https://github.com/gclp96/Zaping/issues/258), PR #260  
-**Base de diseño:** `8f2fa7fe25f3032f6c29a7ac107f0dcbd9e03fa6`  
+**Issue:** [#261](https://github.com/gclp96/Zaping/issues/261)
+**Contrato preexistente:** QA-REVIEW-01A, [#258](https://github.com/gclp96/Zaping/issues/258), PR #260
+**Base de diseño:** `8f2fa7fe25f3032f6c29a7ac107f0dcbd9e03fa6`
 **Código productor fijado:** `qa-bundle.mjs` blob `af42de25a2948359e4c0a2315cade25c10cd3817`; `qa-contract.mjs` blob `0530f19ba2c610c8741d923b5be2ec2052b6b69e`.
 
 ## Propósito y frontera
