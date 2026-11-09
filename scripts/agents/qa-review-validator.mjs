@@ -164,7 +164,14 @@ function validateInternal(manifest, snapshot, scope, expected, snapshotBytes, sc
       check(equal(item[k], summary), 'LAYER_METADATA_MISMATCH');
     }
     if (m.excluded !== null) check(file.working === null && file.base === null && file.index === null, 'EXCLUDED_CONTENT');
-    if (item.status.includes('D')) check(file.working === null, 'DELETED_CONTENT');
+    if (item.status.includes('D')) {
+      check(file.working === null, 'DELETED_CONTENT');
+      // captureLayers() emits no current-file size/hash/identity for either deletion status.
+      check(item.size === null && item.sha256 === null && m.identity === null, 'INVALID_DELETED_METADATA');
+    } else if (file.working !== null) {
+      // readEntry() always records nine-field identity for a captured working file.
+      check(m.identity !== null, 'INVALID_IDENTITY_METADATA');
+    }
     if (file.working !== null) check(file.working.size === item.size && file.working.sha256 === item.sha256, 'WORKING_METADATA_MISMATCH');
     else if (item.size !== null && m.excluded === null && !item.status.includes('D')) fail('WORKING_CONTENT_MISSING');
     reconstructed.push({path:m.path, status:m.status, ...(own(m,'originalPath') ? {originalPath:m.originalPath} : {}),
@@ -209,7 +216,7 @@ export function validateQaBundleV2({manifestBytes, snapshotBytes, approvedScopeB
       'UNKNOWN_VERSION','INVALID_PRODUCER_LIMITS','SCOPE_HASH_MISMATCH','IDENTITY_MISMATCH','SCOPE_MISMATCH',
       'SNAPSHOT_HASH_MISMATCH','FORGED_CHECK','FORGED_LIMITATIONS','INVENTORY_MISMATCH','INVALID_IDENTITY_METADATA',
       'INVALID_LAYER_SIZE','LAYER_HASH_MISMATCH','INVALID_LAYER_TEXT','LAYER_METADATA_MISMATCH','EXCLUDED_CONTENT',
-      'DELETED_CONTENT','WORKING_METADATA_MISMATCH','WORKING_CONTENT_MISSING','FINGERPRINT_MISMATCH',
+      'DELETED_CONTENT','INVALID_DELETED_METADATA','WORKING_METADATA_MISMATCH','WORKING_CONTENT_MISSING','FINGERPRINT_MISMATCH',
       'INVALID_ENVELOPE','RESULT_MISMATCH','FORGED_RESULT']);
     return {status:'BLOCKED',reasons:[typeof error === 'string' && codes.has(error) ? error : 'INVALID_SCHEMA'],
       verified:{provenance:'UNVERIFIED_EXTERNALLY'}, limitations:['No permission to disclose content or invoke a model.']};
