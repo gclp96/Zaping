@@ -93,6 +93,12 @@ test('present working file must carry current-file identity',()=>{
   const e=entry('src/a.mjs','??');e.identity=null;
   blocked(packageV2([e]),'INVALID_IDENTITY_METADATA');
 });
+test('excluded live file still requires captured physical identity',()=>{
+  const e=entry('src/a.mjs','??');
+  e.excluded='POSSIBLE_SECRET';e.evidenceGaps=['POSSIBLE_SECRET'];
+  e.working=e.base=e.index=null;e.identity=null;
+  blocked(packageV2([e]),'INVALID_IDENTITY_METADATA');
+});
 test('missing excluded content has no layer leak',()=>{
   const e=entry('src/a.mjs');e.excluded='POSSIBLE_SECRET';e.evidenceGaps=['POSSIBLE_SECRET'];e.working=e.base=e.index=null;
   insufficient(packageV2([e]));
