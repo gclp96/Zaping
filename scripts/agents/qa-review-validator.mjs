@@ -168,8 +168,9 @@ function validateInternal(manifest, snapshot, scope, expected, snapshotBytes, sc
       check(file.working === null, 'DELETED_CONTENT');
       // captureLayers() emits no current-file size/hash/identity for either deletion status.
       check(item.size === null && item.sha256 === null && m.identity === null, 'INVALID_DELETED_METADATA');
-    } else if (file.working !== null) {
-      // readEntry() always records nine-field identity for a captured working file.
+    } else {
+      // readEntry() records nine-field identity for every non-deleted file,
+      // including a file whose layers were excluded for secrets/size/binary.
       check(m.identity !== null, 'INVALID_IDENTITY_METADATA');
     }
     if (file.working !== null) check(file.working.size === item.size && file.working.sha256 === item.sha256, 'WORKING_METADATA_MISMATCH');
