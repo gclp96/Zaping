@@ -81,6 +81,18 @@ for (const [name,st] of [['unstaged',' M'],['staged','M '],['staged+unstaged','M
   test(`valid synthetic ${name} ${JSON.stringify(st)} remains insufficient`,()=>insufficient(packageV2([entry('src/test.mjs',st)])));
 }
 test('multiple entries preserve order',()=>insufficient(packageV2([entry('src/a.mjs'),entry('src/b.mjs','??','another'),entry('src/c.mjs','R ')])));
+test('deleted entry cannot claim a current-file size and hash',()=>{
+  const e=entry('src/deleted.mjs','D ');e.size=1;e.sha256=digest('x');
+  blocked(packageV2([e]),'INVALID_DELETED_METADATA');
+});
+test('deleted entry cannot claim current-file stat identity',()=>{
+  const e=entry('src/deleted.mjs',' D');e.identity=[...stat];
+  blocked(packageV2([e]),'INVALID_DELETED_METADATA');
+});
+test('present working file must carry current-file identity',()=>{
+  const e=entry('src/a.mjs','??');e.identity=null;
+  blocked(packageV2([e]),'INVALID_IDENTITY_METADATA');
+});
 test('missing excluded content has no layer leak',()=>{
   const e=entry('src/a.mjs');e.excluded='POSSIBLE_SECRET';e.evidenceGaps=['POSSIBLE_SECRET'];e.working=e.base=e.index=null;
   insufficient(packageV2([e]));
