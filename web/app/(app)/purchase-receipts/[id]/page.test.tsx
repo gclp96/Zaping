@@ -450,10 +450,8 @@ describe('PurchaseReceiptDetailPage', () => {
     expect(screen.queryByText(quantityReceipt.folio)).toBeNull();
     expect(screen.getByRole('button', { name: 'Reintentar' })).toBeTruthy();
   });
-});
 
-
-it('presenta caducidad conocida sin lote ni Batch, conservando documento del proveedor', async () => {
+  it('presenta caducidad conocida sin lote ni Batch, conservando documento del proveedor', async () => {
   vi.mocked(api.get).mockResolvedValue({ data: {
     ...quantityReceipt, supplierDocumentType: 'REMISION', supplierDocumentNumber: 'REM-77',
     items: [{ ...quantityReceipt.items[0], lotNumber: null, batchId: null, batch: null, expirationDate: '2028-12-31T00:00:00.000Z' }],
@@ -463,4 +461,5 @@ it('presenta caducidad conocida sin lote ni Batch, conservando documento del pro
   expect(screen.queryByText('BATCH-LOT-PREFERRED')).toBeNull();
   expect(screen.queryByText('ITEM-LOT-IGNORED')).toBeNull();
   expect(screen.getAllByText('31 dic 2028').length).toBeGreaterThan(0);
+  });
 });
