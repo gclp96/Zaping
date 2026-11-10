@@ -171,9 +171,24 @@ function parseStrict(bytes, maximumDepth, maximumNodes) {
   try { return JSON.parse(source); } catch { reject('INVALID_JSON'); }
 }
 
+// This is a heuristic, not a proof that accepted text is non-sensitive.
+// Apply it to paths as well as file bodies: accepted paths are returned as metadata.
+const possibleSecret = text => /-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]{16,}|AKIA[A-Z0-9]{16}|\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|(?:password|secret|token|api[_-]?key)\s*[=:]\s*["']?[^\s"';,]{8,}|[a-z]{1,16}:\/\/[^\s/:]+:[^\s/@]+@/i.test(text);
+
+// Closed, intentionally conservative V1 deny profile for executable build/tool
+// configuration files. Future additions must be contract-reviewed, not inferred.
+function criticalConfigName(name) {
+  return /^(?:dockerfile|containerfile|(?:docker-)?compose)(?:[.-]|$)/.test(name)
+    || /^(?:next|nuxt|vite|vitest|webpack|rollup|jest|eslint|prettier|babel|postcss|tailwind|playwright|cypress|tsup|turbo)\.config(?:[.-]|$)/.test(name)
+    || /^(?:tsconfig|jsconfig)\./.test(name)
+    || /^(?:nest-cli|angular|nx|lerna|turbo)\.json$/.test(name)
+    || name === 'pnpm-workspace.yaml';
+}
+
 function validatePath(path) {
   ensure(typeof path === 'string' && path.length > 0 && path.length <= LIMITS.pathBytes
     && /^[\x00-\x7f]+$/.test(path), 'UNSAFE_PATH');
+  ensure(!possibleSecret(path), 'POSSIBLE_SECRET');
   const segments = path.split('/');
   for (const segment of segments) {
     ensure(/^[A-Za-z0-9_][A-Za-z0-9._-]*$/.test(segment) && !segment.endsWith('.'), 'UNSAFE_PATH');
@@ -182,8 +197,7 @@ function validatePath(path) {
     ensure(!new Set(['.git', '.github', '.env', '.ssh', 'node_modules',
       'package.json', 'package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock',
       'pnpm-lock.yaml', 'bun.lock', 'bun.lockb', 'cargo.lock', 'poetry.lock',
-      'pipfile.lock', 'dockerfile']).has(lower) && !lower.startsWith('docker-compose'),
-    'UNSAFE_PATH');
+      'pipfile.lock']).has(lower) && !criticalConfigName(lower), 'UNSAFE_PATH');
   }
   ensure(!(segments[0]?.toLowerCase() === 'scripts' && segments[1]?.toLowerCase() === 'agents'), 'UNSAFE_PATH');
   return path;
@@ -223,7 +237,6 @@ function validateScope(scope, expected, copiedScope) {
   return new Set(scope.allowedPaths);
 }
 
-const possibleSecret = text => /-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]{16,}|AKIA[A-Z0-9]{16}|\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|(?:password|secret|token|api[_-]?key)\s*[=:]\s*["']?[^\s"';,]{8,}|[a-z]{1,16}:\/\/[^\s/:]+:[^\s/@]+@/i.test(text);
 
 function validatePackage(pack, expected, allowed) {
   ensure(hasExactKeys(pack, ['schemaVersion', 'kind', 'declaredBaseSha', 'entries'])

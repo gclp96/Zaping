@@ -202,6 +202,43 @@ const badPaths = ['../x', '/x', 'a//b', 'a/./b', 'a/../b', 'C:/x', 'a\\b',
 for (const path of badPaths) test(`rejects unsafe path ${JSON.stringify(path)}`, () => {
   blocked(fixture([entry(path)]), 'UNSAFE_PATH');
 });
+test('rejects secret-shaped paths before exposing any entries metadata', () => {
+  for (const path of [
+    'docs/AKIAABCDEFGHIJKLMNOP.txt',
+    'src/ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.txt',
+  ]) {
+    const result = blocked(fixture([entry(path)]), 'POSSIBLE_SECRET');
+    assert.equal(JSON.stringify(result).includes(path), false);
+  }
+});
+test('rejects secret-shaped paths even when only in the external scope', () => {
+  const safe = fixture([entry('docs/ordinary.txt')]);
+  for (const key of ['allowedPaths', 'forbiddenPaths']) {
+    const f = alterScope(safe, scope => {
+      scope[key].push('docs/AKIAABCDEFGHIJKLMNOP.txt');
+    });
+    blocked(f, 'POSSIBLE_SECRET');
+  }
+});
+test('rejects critical configuration file families in any path segment', () => {
+  const critical = [
+    'Dockerfile.prod', 'src/Dockerfile.dev', 'src/Containerfile.prod',
+    'src/docker-compose.override.yaml', 'src/compose.yaml',
+    'next.config.mjs', 'src/next.config.ts', 'src/nuxt.config.mjs',
+    'tsconfig.json', 'src/tsconfig.build.json', 'src/jsconfig.json',
+    'vite.config.ts', 'src/vitest.config.mts', 'src/webpack.config.js',
+    'src/eslint.config.mjs', 'src/playwright.config.ts',
+    'src/nx.json', 'src/pnpm-workspace.yaml',
+    'src/NEXT.CONFIG.MJS', 'src/DOCKERFILE.PROD',
+  ];
+  for (const path of critical) blocked(fixture([entry(path)]), 'UNSAFE_PATH');
+});
+test('does not block ordinary files with similar but non-configuration names', () => {
+  accepted(fixture([entry('docs/DockerfileGuide.txt')]));
+  accepted(fixture([entry('docs/next.configuration.txt')]));
+  accepted(fixture([entry('docs/tsconfig-guide.txt')]));
+});
+
 test('rejects out-of-scope entry even with internally consistent hash', () => {
   blocked(alterPack(fixture(),p=>{p.entries[0].path='docs/other.txt';}), 'OUT_OF_SCOPE');
 });
