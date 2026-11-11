@@ -94,3 +94,57 @@ Fuente oficial de precios: https://developers.cloudflare.com/r2/pricing/
 - https://developers.cloudflare.com/r2/reference/data-location/
 
 **Principio final:** R2 almacena objetos privados; Zaping mantiene autoridad sobre identidad, acceso, escaneo e historial.
+
+## 10. Enmienda propuesta ZFILES-ADR-01 (11/11/2026)
+
+**Estado:** propuesta documentada sobre `qa/integration`; requiere revisión de seguridad, QA y commit.
+**Motivo:** conciliar el ADR-016 original (subida recibida por NestJS) con la carga directa a cuarentena por URL PUT firmada prevista en ZFILES-R2-01.
+**Regla de precedencia tras su aprobación:** esta sección modifica **el transporte de subida, la extensión de propietarios y la exposición mínima inevitable de una URL PUT** de las secciones 2, 4, 6 y 7. Permanecen vigentes todas las exigencias de bucket privado, antivirus, autorización, auditoría y descarga autenticada del ADR original. No activa endpoints ni elimina los bloqueos SQL actuales.
+
+### 10.1 Propietarios y compatibilidad
+
+- `SUPPLIER_DOCUMENT` identifica un archivo comercial vinculado por `companyId` y `documentId`. La persistencia actual `SupplierDocumentAttachment` y sus restricciones siguen intactas.
+- `PURCHASE_RECEIPT` identifica evidencia propia de la recepción mediante `companyId` y `receiptId` (por ejemplo, fotografía de mercancía o acuse). No se deduce pertenencia a partir de folios ni de vínculos con un documento comercial.
+- `PurchaseReceiptSupplierDocumentLink` continúa relacionando documentos comerciales existentes con recepciones. `PurchaseReceiptDocument` continúa representando conciliación monetaria; ninguno se sustituye ni modifica por esta enmienda.
+- Se reutilizará el contrato tipado `ZfilesAttachmentOwner` y la generación de claves opacas del incremento ZFILES-OWN-01. Su validación sintáctica de UUID no autoriza una operación: siempre es necesaria la comprobación real de empresa, entidad, estado y rol en PostgreSQL.
+- **Persistencia aún por decidir** en ZFILES-DB-01: esquema específico para adjuntos propios de recepción o generalización auditada del almacenamiento de metadatos. En cualquiera de los dos casos, exigir relaciones/FK compuestas por Company y propiedad inequívoca a nivel SQL, y conservar la migración existente sin reescribirla.
+
+### 10.2 Transporte de subida: decisión condicionada a QA
+
+1. El usuario autenticado solicita una **reserva de carga** a NestJS. El backend verifica JWT/RBAC, `companyId`, propietario activo, límites de PDF/JPEG y cuota transaccional. No se acepta una key, bucket, ruta ni URL enviados por el cliente.
+2. La aplicación reserva una identidad de adjunto y una key única de cuarentena, genera un `writeId`/identificador de intento y emite **una URL PUT firmada de duración breve**, exclusivamente para esa key y `zaping-quarantine-qa` en el ambiente QA. La expiración inicial se definirá mediante ensayos de conectividad de archivos de hasta 10 MiB; no reutilizarla como autorización de negocio.
+3. La firma debe vincular los encabezados críticos que sean compatibles, al menos `Content-Type`, `If-None-Match: *` y el identificador de intento. Confirmar en QA que `X-Amz-SignedHeaders` y R2 **rechazan solicitudes que omitan o cambien los encabezados**, y que el segundo PUT no sobrescriba el primero. No fiarse de colocar encabezados sin firmarlos. Probar la restricción efectiva de tamaño de extremo a extremo; una URL firmada con carga no acotada **no se habilita** en producción. Si el SDK/R2 no permite aplicar los controles requeridos, usar temporalmente carga autenticada por backend hasta resolverlos.
+4. Configurar CORS **solo** en cuarentena, con orígenes concretos autorizados, método PUT y encabezados necesarios. CORS no sustituye autenticación ni impide el abuso de una URL filtrada. Mantener deshabilitados `r2.dev` y dominios públicos; no hay presigned GET.
+5. **Excepción explícita al punto 2 del ADR original:** para efectuar PUT directo, el navegador recibe transitoriamente la URL firmada, que incluye host del endpoint R2, bucket de cuarentena y key objetivo. Esa exposición temporal no constituye permiso para otros objetos ni autoriza revelar `storageKey`/bucket en endpoints de listados, logs o metadatos generales. Revisar que los componentes de key no filtren datos sensibles antes de habilitar cargas. Tratar la URL como credencial bearer temporal. Nunca registrarla completa en logs, analítica, traces, auditoría visible ni mensajes de error. No entregar credenciales R2 permanentes, claves del bucket privado ni ubicación interna de este último a Web.
+6. Tras el PUT, el navegador solicita **confirmación** por la API. NestJS recupera y coteja el objeto por la identidad reservada: existencia, intento, tamaño, SHA-256 sobre bytes reales, firma/magic bytes PDF/JPEG, MIME y cuota. `ETag`, `HEAD` aislado y MIME enviado por el navegador **no prueban integridad ni ausencia de malware**.
+7. Un timeout, caída de conexión o PUT de resultado ambiguo no libera cuota ni autoriza reintentar con la misma key. Conservar estado de reconciliación hasta demostrar el resultado; `HEAD 404` momentáneo no es prueba suficiente de ausencia tras escritura en vuelo. Reintentos usan una nueva reserva solo cuando la anterior quede reconciliada conforme a política segura.
+
+### 10.3 Estados, escaneo y promoción
+
+- Separar el estado de **reserva/transporte** del estado de **seguridad/publicación**. El objeto cargado o confirmado permanece en cuarentena y en estado no descargable (`PENDING_SCAN` o equivalente).
+- Un proceso aislado lee los bytes originales desde cuarentena y comprueba tamaño/SHA-256 antes de analizarlos con **ClamAV real**, con política explícita de disponibilidad, versión y actualización de firmas. Un resultado de laboratorio `CLAMD_OK_UNATTESTED` no autoriza `AVAILABLE`.
+- Aceptar promoción únicamente tras evidencia verificable asociada a Company/propietario/adjunto/bytes/nonce; separación de identidades SQL y de tokens R2; rechazo de replay. Comparar íntegramente bytes origen/destino, garantizar destino no sobrescribible y registrar transiciones de estado/auditoría con privilegios mínimos.
+- PostgreSQL y R2 **no comparten una transacción atómica**: fallos entre copia y commit pueden dejar objetos huérfanos privados pero no liberados. Reconciliar mediante eventos/idempotencia, sin publicar por inferencia ni borrar automáticamente objetos de estado incierto.
+- El trigger actual que impide UPDATE/DELETE sobre `SupplierDocumentAttachment` permanece cerrado hasta una migración separada y auditada. Esta enmienda no autoriza transiciones directas a `AVAILABLE`, `REJECTED` o `REMOVED`.
+
+### 10.4 Descarga, eliminación y UX
+
+- La **descarga permanece vía NestJS autenticado** en V1: validar rol, Company, propietario y asociación, que el archivo siga `AVAILABLE`, auditar acceso y emitir `Content-Disposition`/tipo/seguridad apropiados. No ofrecer URL GET firmada al navegador.
+- La eliminación es **lógica y auditada**; no se equipara a borrado físico inmediato en R2. Establecer retención y purga posterior con reconciliación y autorización expresa. La revocación de acceso en API debe ser efectiva aunque subsistan objetos.
+- La UI actual `ReceiptFilesPreview` continúa siendo local y sin persistencia. No cambiar `NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI` ni mostrar botón de descarga o progreso real hasta integrar API, escaneo y gates.
+
+### 10.5 Criterios de aceptación para ejecutar esta decisión
+
+- Prueba real QA de firma: operación/key exactos, expiración, replay, `Content-Type`, `If-None-Match` y encabezados obligatorios alterados/omitidos; CORS con origen autorizado y no autorizado.
+- Rechazo de tamaños mayores a 10 MiB **antes de permitir uso productivo**; ante incertidumbre en el PUT firmado, fallback a upload proxy validado o a otro mecanismo que imponga el límite efectivo.
+- Reserva y cuota concurrentes, tenencia/RBAC, propietario ajeno, cancelación segura antes de escritura y recuperación de intentos ambiguos validados sobre PostgreSQL efímero.
+- ClamAV QA real con firmas vigentes, EICAR sintético controlado, daemon caído, timeout y resultado ambiguo, siempre fail-closed.
+- Verificación de integridad cuarentena/privado, no sobrescritura, reintentos, anti-replay, inmutabilidad SQL, auditoría, huérfanos y revocación de descarga.
+- Tests unitarios, integración, E2E con servicios aislados, revisión de dependencias, TypeScript/ESLint/build, CI y QA de navegador. **No afirmar PASS sin evidencia.**
+- Ningún bucket o credencial productiva, ninguna escritura sobre `zaping_dev`/`zaping_qa`, ningún deploy ni activación de flags se autoriza por aprobar este documento.
+
+**Referencias técnicas de la enmienda:**
+- https://developers.cloudflare.com/r2/api/s3/presigned-urls/
+- https://developers.cloudflare.com/r2/api/s3/conditional-operations/
+- https://developers.cloudflare.com/r2/buckets/cors/
+- https://developers.cloudflare.com/r2/api/s3/extensions/
