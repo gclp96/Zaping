@@ -1,0 +1,129 @@
+name: ZFILES-SCAN-01A isolated real ClamAV QA
+
+on:
+  push:
+    branches:
+      - qa/integration
+    paths:
+      - .github/workflows/zfiles-clamav-isolated-qa.yml
+      - app/api/test/zfiles-clamav-real-lab.qa.e2e-spec.ts
+      - app/api/src/config/zfiles-clamav-instream-lab.ts
+      - docs/modules/erp/ZFILES_SCAN_01A_REAL_CLAMAV_QA.md
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zfiles-clamav-qa-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  real-clamav:
+    # Explicitly reviewed opt-in ONLY. Ordinary pushes skip the expensive lab.
+    if: contains(github.event.head_commit.message, '[run-zfiles-clamav-qa]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLAM_IMAGE: clamav/clamav-debian@sha256:c21aa18cc0a358678255a3dfb343a4555b58f71b97d7b869df8fdf7ea0a5b4b1
+    steps:
+      - name: Checkout without retained credentials
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: app/api/package-lock.json
+
+      - name: Install API dependencies
+        working-directory: app/api
+        run: npm ci
+
+      - name: Pull reviewed image and prepare disposable resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull "$CLAM_IMAGE"
+          echo "ZFILES_CLAMD_IMAGE_DIGEST=$CLAM_IMAGE" >> "$GITHUB_ENV"
+          socket_volume="zfiles_clamav_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          container_name="zfiles_clamd_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          echo "ZFILES_CLAMD_SOCKET_VOLUME=$socket_volume" >> "$GITHUB_ENV"
+          echo "ZFILES_CLAMD_CONTAINER=$container_name" >> "$GITHUB_ENV"
+          docker volume create "$socket_volume" > /dev/null
+
+      - name: Run network-isolated ClamAV daemon
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach \
+            --name "$ZFILES_CLAMD_CONTAINER" \
+            --network none \
+            --memory 4g --memory-swap 4g --cpus 2 \
+            --pids-limit 256 \
+            --security-opt no-new-privileges \
+            --env CLAMAV_NO_FRESHCLAMD=true \
+            --env TZ=UTC \
+            --mount "type=volume,src=$ZFILES_CLAMD_SOCKET_VOLUME,dst=/tmp" \
+            "$CLAM_IMAGE" > /dev/null
+
+      - name: Wait for Unix socket and restrict socket permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          ready=false
+          for attempt in $(seq 1 75); do
+            if docker exec "$ZFILES_CLAMD_CONTAINER" test -S /tmp/clamd.sock; then
+              ready=true
+              break
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' "$ZFILES_CLAMD_CONTAINER")" != true ]; then
+              break
+            fi
+            sleep 3
+          done
+          if [ "$ready" != true ]; then
+            echo 'ClamAV isolated daemon unavailable; FAIL CLOSED.'
+            exit 1
+          fi
+          docker exec --user 0 "$ZFILES_CLAMD_CONTAINER" chgrp "$(id -g)" /tmp/clamd.sock
+          docker exec --user 0 "$ZFILES_CLAMD_CONTAINER" chmod 0660 /tmp/clamd.sock
+
+      - name: Execute real INSTREAM E2E in separate isolated Node container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --network none \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=128m \
+            --pids-limit 128 \
+            --memory 1g --cpus 2 \
+            --user "$(id -u):$(id -g)" \
+            --env CI=true \
+            --env GITHUB_ACTIONS=true \
+            --env TZ=UTC \
+            --env RUN_ZFILES_CLAMAV_REAL_QA=1 \
+            --env CLAMD_SOCKET=/run/zaping-clamd/clamd.sock \
+            --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/work,readonly" \
+            --mount "type=volume,src=$ZFILES_CLAMD_SOCKET_VOLUME,dst=/run/zaping-clamd,readonly" \
+            --workdir /work/app/api \
+            node:24-bookworm-slim \
+            ./node_modules/.bin/jest --config ./test/jest-e2e.json --runInBand --no-cache \
+              test/zfiles-clamav-real-lab.qa.e2e-spec.ts
+
+      - name: Cleanup only resources created by this run
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          if [ -n "${ZFILES_CLAMD_CONTAINER:-}" ]; then
+            docker rm -f "$ZFILES_CLAMD_CONTAINER" >/dev/null 2>&1
+          fi
+          if [ -n "${ZFILES_CLAMD_SOCKET_VOLUME:-}" ]; then
+            docker volume rm "$ZFILES_CLAMD_SOCKET_VOLUME" >/dev/null 2>&1
+          fi
