@@ -59,3 +59,14 @@ npm run lint:check
 - [Imagen ClamAV Debian oficial](https://github.com/Cisco-Talos/clamav-docker/blob/main/clamav/README-debian.md)
 - [PR #212](https://github.com/gclp96/Zaping/pull/212)
 - [PR #220](https://github.com/gclp96/Zaping/pull/220)
+
+## Activación puntual ZFILES-SCAN-01B (2026-11-11)
+
+**Alcance:** un intento aislado en GitHub Actions para validar clamd real con archivos sintéticos. Este registro de autorización no cambia código productivo, credenciales, bases de datos ni despliegues.
+
+- Base remota previa: `7761858b83e43710c5e909b79cad7c31efca5a35`, CI API/Web/Historical/Agents 4/4 PASS en run 43085134756.
+- Se activa únicamente mediante el marcador de commit `[run-zfiles-clamav-qa]` y este cambio de documentación vigilado por el workflow.
+- Imagen por digest histórico fijado en el workflow; el runner debe verificar disponibilidad mediante `docker pull`. Ante error de imagen, socket, PING/VERSION, PDF/JPEG o EICAR: FAIL/BLOCKED, sin cambio automático de digest ni reintento automático.
+- No hay R2, PostgreSQL, secretos, red en los contenedores de daemon/cliente, endpoints HTTP ni transición `AVAILABLE`. Los resultados `CLAMD_OK_UNATTESTED` nunca permiten publicar.
+- Un PASS de laboratorio NO avala frescura de firmas, certificación de PDF, procedencia verificable ni despliegue. El gate de FreshClam/firmas recientes permanece pendiente.
+- Registrar SHA del commit disparador, workflow run, resultado de cada step y limpieza de recursos efímeros. No repetir la activación sin nueva revisión humana.
