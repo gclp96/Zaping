@@ -1,0 +1,188 @@
+name: ZFILES-SCAN-01C2 isolated FreshClam real QA
+
+on:
+  push:
+    branches:
+      - qa/integration
+    paths:
+      - .github/workflows/zfiles-clamav-freshclam-qa.yml
+      - app/api/test/zfiles-clamav-freshclam.qa.e2e-spec.ts
+      - app/api/src/config/zfiles-clamav-readiness-lab.ts
+      - docs/modules/erp/ZFILES_SCAN_01C2_FRESHCLAM_REAL_QA.md
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zfiles-clamav-freshclam-qa-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  freshclam-lab:
+    # A normal push MUST skip this job. One deliberately reviewed marker is
+    # necessary; GitHub's manual re-run must not be used without new review.
+    if: contains(github.event.head_commit.message, '[run-zfiles-freshclam-qa]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Same immutable official digest demonstrated in SCAN-01B.
+      CLAM_IMAGE: clamav/clamav-debian@sha256:c21aa18cc0a358678255a3dfb343a4555b58f71b97d7b869df8fdf7ea0a5b4b1
+      NODE_IMAGE: node:24-bookworm-slim@sha256:0998f9a7af5bba96fb32e2aeafde650a625012cb194a57e7f3939bf3e592721f
+    steps:
+      - name: Checkout source without retained credentials
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Node for build-time tests only
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: app/api/package-lock.json
+
+      - name: Install API dependencies without storage credentials
+        working-directory: app/api
+        run: npm ci
+
+      - name: Set run-exclusive names and pull pinned ClamAV image
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "ZFILES_DB_VOLUME=zfiles_fresh_db_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+          echo "ZFILES_SOCKET_VOLUME=zfiles_fresh_sock_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+          echo "ZFILES_CLAMD_CONTAINER=zfiles_fresh_clamd_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+          docker pull "$CLAM_IMAGE" > /dev/null
+          docker run --rm --network none --entrypoint clamd "$CLAM_IMAGE" --version \
+            | grep -Eq '^ClamAV 1\.5\.4/'
+          echo 'Pinned ClamAV engine checked (offline).'
+
+      - name: Seed a disposable official signature database volume
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker volume create "$ZFILES_DB_VOLUME" > /dev/null
+          docker volume create "$ZFILES_SOCKET_VOLUME" > /dev/null
+          # Empty Docker named volumes copy up existing image content once.
+          # Refuse to download a full initial database if the seed is absent.
+          docker run --rm --network none --user clamav --entrypoint /bin/sh \
+            --mount "type=volume,src=$ZFILES_DB_VOLUME,dst=/var/lib/clamav" \
+            "$CLAM_IMAGE" -ec '
+              test -s /var/lib/clamav/main.cvd
+              test -s /var/lib/clamav/daily.cvd || test -s /var/lib/clamav/daily.cld
+              test -w /var/lib/clamav
+            '
+          echo 'Disposable database seed available.'
+
+      - name: Run FreshClam exactly once (isolated updater, no secrets)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Only this ephemeral container has external network access.
+          # There are no cloud credentials, repository files, or Docker socket mounts.
+          set +e
+          docker run --rm \
+            --network bridge \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --read-only \
+            --tmpfs /tmp:rw,nosuid,noexec,size=256m \
+            --tmpfs /var/log/clamav:rw,nosuid,noexec,size=16m,mode=1777 \
+            --user clamav \
+            --pids-limit 128 \
+            --memory 4g --cpus 2 \
+            --env TZ=UTC \
+            --mount "type=volume,src=$ZFILES_DB_VOLUME,dst=/var/lib/clamav" \
+            --entrypoint freshclam \
+            "$CLAM_IMAGE" --stdout \
+            > "$RUNNER_TEMP/zfiles-freshclam-once.log" 2>&1
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo 'FreshClam failed in the single permitted attempt. QA BLOCKED.'
+            echo 'No automatic retries, manual database download or raw HTTP logs.'
+            exit 1
+          fi
+          echo 'ZFILES_FRESHCLAM_ONE_SHOT_EXIT_OK_QA=1' >> "$GITHUB_ENV"
+          echo 'FreshClam exited successfully; daemon freshness must still be checked.'
+
+      - name: Start a networkless clamd after the FreshClam update
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach \
+            --name "$ZFILES_CLAMD_CONTAINER" \
+            --network none \
+            --memory 4g --memory-swap 4g --cpus 2 \
+            --pids-limit 256 \
+            --security-opt no-new-privileges \
+            --env CLAMAV_NO_FRESHCLAMD=true \
+            --env TZ=UTC \
+            --mount "type=volume,src=$ZFILES_DB_VOLUME,dst=/var/lib/clamav" \
+            --mount "type=volume,src=$ZFILES_SOCKET_VOLUME,dst=/tmp" \
+            "$CLAM_IMAGE" > /dev/null
+
+      - name: Wait for socket and restrict its permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          ready=false
+          for attempt in $(seq 1 75); do
+            if docker exec "$ZFILES_CLAMD_CONTAINER" test -S /tmp/clamd.sock; then
+              ready=true
+              break
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' "$ZFILES_CLAMD_CONTAINER")" != true ]; then
+              break
+            fi
+            sleep 3
+          done
+          if [ "$ready" != true ]; then
+            echo 'ClamAV daemon socket unavailable: QA BLOCKED.'
+            exit 1
+          fi
+          docker exec --user 0 "$ZFILES_CLAMD_CONTAINER" chgrp "$(id -g)" /tmp/clamd.sock
+          docker exec --user 0 "$ZFILES_CLAMD_CONTAINER" chmod 0660 /tmp/clamd.sock
+
+      - name: Verify current UTC signatures and scan synthetic samples
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${ZFILES_FRESHCLAM_ONE_SHOT_EXIT_OK_QA:-}" = 1
+          docker run --rm \
+            --network none \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=128m \
+            --pids-limit 128 \
+            --memory 1g --cpus 2 \
+            --user "$(id -u):$(id -g)" \
+            --env CI=true \
+            --env GITHUB_ACTIONS=true \
+            --env TZ=UTC \
+            --env RUN_ZFILES_FRESHCLAM_REAL_QA=1 \
+            --env ZFILES_FRESHCLAM_ONE_SHOT_EXIT_OK_QA=1 \
+            --env CLAMD_SOCKET=/run/zaping-clamd/clamd.sock \
+            --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/work,readonly" \
+            --mount "type=volume,src=$ZFILES_SOCKET_VOLUME,dst=/run/zaping-clamd,readonly" \
+            --workdir /work/app/api \
+            "$NODE_IMAGE" \
+            ./node_modules/.bin/jest --config ./test/jest-e2e.json --runInBand --no-cache \
+              test/zfiles-clamav-freshclam.qa.e2e-spec.ts
+
+      - name: Clean up only this run's disposable resources
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          if [ -n "${ZFILES_CLAMD_CONTAINER:-}" ]; then
+            docker rm -f "$ZFILES_CLAMD_CONTAINER" > /dev/null 2>&1
+          fi
+          if [ -n "${ZFILES_SOCKET_VOLUME:-}" ]; then
+            docker volume rm "$ZFILES_SOCKET_VOLUME" > /dev/null 2>&1
+          fi
+          if [ -n "${ZFILES_DB_VOLUME:-}" ]; then
+            docker volume rm "$ZFILES_DB_VOLUME" > /dev/null 2>&1
+          fi
+          rm -f "$RUNNER_TEMP/zfiles-freshclam-once.log"
