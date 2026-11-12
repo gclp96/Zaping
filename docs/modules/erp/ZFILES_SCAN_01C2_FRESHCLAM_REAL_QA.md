@@ -51,3 +51,13 @@ La suite E2E real queda `describe.skip` sin el flag CI de laboratorio; no correr
 - https://docs.clamav.net/manual/Usage/SignatureManagement.html
 - https://docs.clamav.net/faq/faq-freshclam.html
 - https://github.com/gclp96/Zaping/pull/220
+
+## Activación puntual SCAN-01C2 — 12/11/2026
+
+**Autorización:** un solo intento de laboratorio FreshClam, solicitada al continuar el ticket tras CI 4/4 PASS del SHA `78cab91346b02b56a88677c82d5b6ffc0a65150f` (run #43269200703).
+
+- El commit disparador contiene `[run-zfiles-freshclam-qa]` y modifica únicamente este documento vigilado por el workflow.
+- El workflow debe ejecutar un solo proceso FreshClam con el digest fijo, sin credenciales R2/PostgreSQL ni datos reales; el motor y el cliente quedan sin acceso a red.
+- GitHub Actions no debe reintentarse manualmente ni repetirse mediante otro commit sin revisión expresa. Ante 403, 429, permisos, error de red, versión o vigencia: **BLOCKED**, no cambiar imagen, espejo ni condiciones para obtener PASS.
+- El reporte final debe referenciar el commit y los identificadores exactos de CI/laboratorio, incluyendo las pruebas sintéticas y la limpieza de recursos.
+- Esta autorización **no habilita** uploads, descargas, promoción a `AVAILABLE`, despliegue ni merge a `main`. La evidencia del laboratorio mantiene `attested: false`.
