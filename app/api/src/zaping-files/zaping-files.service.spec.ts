@@ -33,7 +33,11 @@ describe('ZapingFilesService', () => {
   let tx: {
     $queryRaw: jest.Mock;
     zapingFileReceiptLink: { count: jest.Mock; create: jest.Mock };
-    zapingFile: { create: jest.Mock; findFirst: jest.Mock; updateMany: jest.Mock };
+    zapingFile: {
+      create: jest.Mock;
+      findFirst: jest.Mock;
+      updateMany: jest.Mock;
+    };
     zapingFileEvent: { create: jest.Mock };
   };
   let prisma: {
@@ -65,11 +69,15 @@ describe('ZapingFilesService', () => {
       zapingFileEvent: { create: jest.fn().mockResolvedValue({}) },
     };
     prisma = {
-      purchaseReceipt: { findFirst: jest.fn().mockResolvedValue({ id: receiptId }) },
+      purchaseReceipt: {
+        findFirst: jest.fn().mockResolvedValue({ id: receiptId }),
+      },
       zapingFileReceiptLink: { findMany: jest.fn().mockResolvedValue([]) },
       zapingFile: { findFirst: jest.fn().mockResolvedValue(file) },
       zapingFileEvent: { create: jest.fn().mockResolvedValue({}) },
-      $transaction: jest.fn(async (callback: (tx: typeof tx) => Promise<unknown>) => callback(tx)),
+      $transaction: jest.fn(
+        async (callback: (tx: typeof tx) => Promise<unknown>) => callback(tx),
+      ),
     };
     storage = {
       upload: jest.fn().mockResolvedValue(undefined),
@@ -86,12 +94,14 @@ describe('ZapingFilesService', () => {
 
   it('never calls R2 if the receipt does not belong to the authenticated tenant', async () => {
     prisma.purchaseReceipt.findFirst.mockResolvedValue(null);
-    await expect(service.upload(companyId, actorId, 'foreign', {
-      buffer: pdf,
-      size: pdf.length,
-      originalname: 'test.pdf',
-      mimetype: 'application/pdf',
-    })).rejects.toThrow(NotFoundException);
+    await expect(
+      service.upload(companyId, actorId, 'foreign', {
+        buffer: pdf,
+        size: pdf.length,
+        originalname: 'test.pdf',
+        mimetype: 'application/pdf',
+      }),
+    ).rejects.toThrow(NotFoundException);
     expect(storage.upload).not.toHaveBeenCalled();
   });
 
@@ -103,7 +113,9 @@ describe('ZapingFilesService', () => {
       mimetype: 'application/pdf',
     });
     expect(storage.upload).toHaveBeenCalledWith(
-      expect.stringMatching(/^tenants\/company-a\/purchase-receipts\/receipt-a\//),
+      expect.stringMatching(
+        /^tenants\/company-a\/purchase-receipts\/receipt-a\//,
+      ),
       pdf,
       'application/pdf',
     );
@@ -117,45 +129,53 @@ describe('ZapingFilesService', () => {
       }),
     );
     expect(tx.zapingFileEvent.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ type: 'UPLOADED' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ type: 'UPLOADED' }),
+      }),
     );
     expect(result).not.toHaveProperty('objectKey');
   });
 
   it('prevents exceeding the per-receipt limit and compensates R2', async () => {
     tx.zapingFileReceiptLink.count.mockResolvedValue(5);
-    await expect(service.upload(companyId, actorId, receiptId, {
-      buffer: pdf,
-      size: pdf.length,
-      originalname: 'test.pdf',
-      mimetype: 'application/pdf',
-    })).rejects.toThrow(ConflictException);
+    await expect(
+      service.upload(companyId, actorId, receiptId, {
+        buffer: pdf,
+        size: pdf.length,
+        originalname: 'test.pdf',
+        mimetype: 'application/pdf',
+      }),
+    ).rejects.toThrow(ConflictException);
     expect(storage.discardUnlinkedObject).toHaveBeenCalledTimes(1);
     expect(tx.zapingFile.create).not.toHaveBeenCalled();
   });
 
   it('does not ingest third-party files in production without scanner', async () => {
     config.get.mockReturnValue('production');
-    await expect(service.upload(companyId, actorId, receiptId, {
-      buffer: pdf,
-      size: pdf.length,
-      originalname: 'test.pdf',
-      mimetype: 'application/pdf',
-    })).rejects.toThrow('Carga de archivos no habilitada');
+    await expect(
+      service.upload(companyId, actorId, receiptId, {
+        buffer: pdf,
+        size: pdf.length,
+        originalname: 'test.pdf',
+        mimetype: 'application/pdf',
+      }),
+    ).rejects.toThrow('Carga de archivos no habilitada');
     expect(storage.upload).not.toHaveBeenCalled();
   });
 
   it('denies download of unscanned files in production', async () => {
     config.get.mockReturnValue('production');
-    await expect(service.download(companyId, actorId, receiptId, file.id))
-      .rejects.toThrow(ForbiddenException);
+    await expect(
+      service.download(companyId, actorId, receiptId, file.id),
+    ).rejects.toThrow(ForbiddenException);
     expect(storage.download).not.toHaveBeenCalled();
   });
 
   it('requires file membership for read and never returns foreign objects', async () => {
     prisma.zapingFile.findFirst.mockResolvedValue(null);
-    await expect(service.download(companyId, actorId, receiptId, 'foreign-file'))
-      .rejects.toThrow(NotFoundException);
+    await expect(
+      service.download(companyId, actorId, receiptId, 'foreign-file'),
+    ).rejects.toThrow(NotFoundException);
     expect(prisma.zapingFile.findFirst).toHaveBeenCalledWith({
       where: {
         companyId,
@@ -167,13 +187,22 @@ describe('ZapingFilesService', () => {
   });
 
   it('records a download request only after storage integrity passes', async () => {
-    const result = await service.download(companyId, actorId, receiptId, file.id);
+    const result = await service.download(
+      companyId,
+      actorId,
+      receiptId,
+      file.id,
+    );
     expect(result.bytes).toEqual(pdf);
     expect(prisma.zapingFileEvent.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ type: 'DOWNLOAD_REQUESTED' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ type: 'DOWNLOAD_REQUESTED' }),
+      }),
     );
     expect(storage.download).toHaveBeenCalledWith(
-      file.objectKey, file.sizeBytes, file.sha256,
+      file.objectKey,
+      file.sizeBytes,
+      file.sha256,
     );
   });
 
@@ -186,7 +215,9 @@ describe('ZapingFilesService', () => {
       }),
     );
     expect(tx.zapingFileEvent.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ type: 'SOFT_DELETED' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ type: 'SOFT_DELETED' }),
+      }),
     );
   });
 });
