@@ -27,6 +27,7 @@ import { HealthcareEquipmentAssignmentsModule } from './healthcare/equipment-ass
 import { HealthcareCaseKitsModule } from './healthcare/case-kits/healthcare-case-kits.module';
 import { HealthcareCaseAvailabilityModule } from './healthcare/case-availability/healthcare-case-availability.module';
 import { HealthModule } from './health/health.module';
+import { ZapingFilesModule } from './zaping-files/zaping-files.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { validateEnvironment } from './config/env.validation';
 import { healthcareCompanyTransactionTimeoutConfiguration } from './healthcare/common/healthcare-company-transaction-timeout.config';
@@ -49,6 +50,7 @@ import { healthcareCompanyTransactionTimeoutConfiguration } from './healthcare/c
     QuotesModule,
     PurchasesModule,
     PurchaseReceiptsModule,
+    ZapingFilesModule,
     SalesModule,
     SuppliersModule,
     SupplierDocumentsModule,
