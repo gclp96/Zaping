@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ZapingFile, ZapingFileScanStatus } from '@prisma/client';
+import { Prisma, ZapingFile, ZapingFileScanStatus } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -82,11 +82,9 @@ export class ZapingFilesService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // Fixed SQL with bound parameters. Serialize uploads to a receipt.
-        const locked = await tx.$queryRawUnsafe<Array<{ id: string }>>(
-          'SELECT "id" FROM "PurchaseReceipt" WHERE "id"=$1 AND "companyId"=$2 FOR UPDATE',
-          receiptId,
-          companyId,
+        // Serialize concurrent uploads using a tenant-scoped row lock.
+        const locked = await tx.$queryRaw<Array<{ id: string }>>(
+          Prisma.sql`SELECT "id" FROM "PurchaseReceipt" WHERE "id"=${receiptId} AND "companyId"=${companyId} FOR UPDATE`,
         );
         if (locked.length !== 1) throw new NotFoundException('Recepción no encontrada');
         const count = await tx.zapingFileReceiptLink.count({
