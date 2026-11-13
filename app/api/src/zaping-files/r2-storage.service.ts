@@ -26,6 +26,9 @@ export class R2StorageService {
             region: 'auto',
             endpoint: 'https://' + accountId + '.r2.cloudflarestorage.com',
             forcePathStyle: true,
+            // R2 does not implement every optional AWS flexible checksum header.
+            requestChecksumCalculation: 'WHEN_REQUIRED',
+            responseChecksumValidation: 'WHEN_REQUIRED',
             credentials: { accessKeyId, secretAccessKey },
           })
         : null;
