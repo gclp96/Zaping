@@ -31,7 +31,7 @@ describe('ZapingFilesService', () => {
 
   let service: ZapingFilesService;
   let tx: {
-    $queryRawUnsafe: jest.Mock;
+    $queryRaw: jest.Mock;
     zapingFileReceiptLink: { count: jest.Mock; create: jest.Mock };
     zapingFile: { create: jest.Mock; findFirst: jest.Mock; updateMany: jest.Mock };
     zapingFileEvent: { create: jest.Mock };
@@ -52,7 +52,7 @@ describe('ZapingFilesService', () => {
 
   beforeEach(() => {
     tx = {
-      $queryRawUnsafe: jest.fn().mockResolvedValue([{ id: receiptId }]),
+      $queryRaw: jest.fn().mockResolvedValue([{ id: receiptId }]),
       zapingFileReceiptLink: {
         count: jest.fn().mockResolvedValue(0),
         create: jest.fn().mockResolvedValue({}),
