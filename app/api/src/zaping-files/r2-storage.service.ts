@@ -36,12 +36,18 @@ export class R2StorageService {
 
   private requireClient() {
     if (!this.client || !this.bucket) {
-      throw new ServiceUnavailableException('Cloudflare R2 no está configurado');
+      throw new ServiceUnavailableException(
+        'Cloudflare R2 no está configurado',
+      );
     }
     return { client: this.client, bucket: this.bucket };
   }
 
-  async upload(objectKey: string, body: Buffer, contentType: string): Promise<void> {
+  async upload(
+    objectKey: string,
+    body: Buffer,
+    contentType: string,
+  ): Promise<void> {
     const { client, bucket } = this.requireClient();
     try {
       await client.send(
@@ -56,11 +62,17 @@ export class R2StorageService {
         }),
       );
     } catch {
-      throw new ServiceUnavailableException('No fue posible almacenar el archivo');
+      throw new ServiceUnavailableException(
+        'No fue posible almacenar el archivo',
+      );
     }
   }
 
-  async download(objectKey: string, expectedSize: number, expectedHash: string): Promise<Buffer> {
+  async download(
+    objectKey: string,
+    expectedSize: number,
+    expectedHash: string,
+  ): Promise<Buffer> {
     const { client, bucket } = this.requireClient();
     try {
       const result = await client.send(
@@ -83,13 +95,17 @@ export class R2StorageService {
       }
       return buffer;
     } catch {
-      throw new ServiceUnavailableException('Archivo no disponible o integridad inválida');
+      throw new ServiceUnavailableException(
+        'Archivo no disponible o integridad inválida',
+      );
     }
   }
 
   // Compensation for database failures; deletion of accepted files is deferred.
   async discardUnlinkedObject(objectKey: string): Promise<void> {
     const { client, bucket } = this.requireClient();
-    await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: objectKey }));
+    await client.send(
+      new DeleteObjectCommand({ Bucket: bucket, Key: objectKey }),
+    );
   }
 }
