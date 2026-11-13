@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, ZapingFile, ZapingFileScanStatus } from '@prisma/client';
@@ -67,6 +68,11 @@ export class ZapingFilesService {
     receiptId: string,
     incoming: IncomingFile | undefined,
   ) {
+    if (this.config.get<string>('NODE_ENV') === 'production') {
+      throw new ServiceUnavailableException(
+        'Carga de archivos no habilitada en producción sin análisis antivirus',
+      );
+    }
     const file = validateIncomingFile(incoming);
     await this.ensureReceipt(companyId, receiptId);
 
