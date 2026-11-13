@@ -20,7 +20,9 @@ export interface ValidatedFile {
   sha256: string;
 }
 
-export function validateIncomingFile(file: IncomingFile | undefined): ValidatedFile {
+export function validateIncomingFile(
+  file: IncomingFile | undefined,
+): ValidatedFile {
   if (!file?.buffer || !Buffer.isBuffer(file.buffer)) {
     throw new BadRequestException('Selecciona un archivo PDF o JPEG');
   }
@@ -29,13 +31,12 @@ export function validateIncomingFile(file: IncomingFile | undefined): ValidatedF
     file.size > FILE_MAX_BYTES ||
     file.size !== file.buffer.length
   ) {
-    throw new BadRequestException('El archivo debe tener entre 1 byte y 10 MiB');
+    throw new BadRequestException(
+      'El archivo debe tener entre 1 byte y 10 MiB',
+    );
   }
 
-  const name = (file.originalname ?? '')
-    .split(/[\\/]/)
-    .pop()
-    ?.normalize('NFC');
+  const name = (file.originalname ?? '').split(/[\\/]/).pop()?.normalize('NFC');
   if (
     !name ||
     name.length > 255 ||
