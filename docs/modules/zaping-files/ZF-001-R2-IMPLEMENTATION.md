@@ -13,7 +13,7 @@
 - Modelo Prisma `ZapingFile` reutilizable como metadatos de objeto; relación tenant-scoped `ZapingFileReceiptLink` y auditoría `ZapingFileEvent`.
 - Identidad de empresa y actor derivadas del JWT; roles autorizados ADMIN/MANAGER/WAREHOUSE.
 - SHA-256 registrado y verificado al descargar. Descargas forzadas como attachment/octet-stream; no preview activo.
-- Estado `NOT_SCANNED`. En `NODE_ENV=production`, archivos sin estado `CLEAN` no pueden descargarse. **No existe scanner en esta versión**, por lo que la descarga productiva permanecerá cerrada.
+- Estado `NOT_SCANNED`. En `NODE_ENV=production`, **también se bloquean las cargas**, y los archivos sin estado `CLEAN` no pueden descargarse. **No existe scanner en esta versión**, por lo que la descarga productiva permanecerá cerrada.
 - Frontend: panel de archivos en el detalle de Purchase Receipts; la carga se realiza después de crear la recepción. La vista previa local provisional de captura no se utiliza.
 
 ## API (JWT, roles y companyId exigidos)
@@ -68,7 +68,7 @@ Ninguna respuesta JSON devuelve el storageKey ni credenciales. Las operaciones c
 - [ ] 404 a UUID de otra empresa, otra recepción o archivo eliminado.
 - [ ] Roles SALES sin permiso para ver/cargar/descargar.
 - [ ] Archivo listado, descargado y eliminado desde UI; descargas sin render embebido.
-- [ ] En modo production, NOT_SCANNED devuelve 403 al descargar.
+- [ ] En modo production, la carga devuelve 503 y NOT_SCANNED devuelve 403 al descargar.
 - [ ] Acceso público al bucket denegado.
 - [ ] Ausencia de contraseñas/tokens en logs y cambios versionados.
 - [ ] Revisión de riesgo por archivos de terceros antes de cualquier piloto comercial.
