@@ -54,6 +54,11 @@ describe('ZapingFilesService', () => {
   };
   let config: { get: jest.Mock };
 
+  function firstCallArg(mock: jest.Mock): unknown {
+    const calls: unknown[][] = mock.mock.calls as unknown[][];
+    return calls[0]?.[0];
+  }
+
   beforeEach(() => {
     tx = {
       $queryRaw: jest.fn().mockResolvedValue([{ id: receiptId }]),
@@ -119,7 +124,7 @@ describe('ZapingFilesService', () => {
       pdf,
       'application/pdf',
     );
-    const createArgs: unknown = tx.zapingFile.create.mock.calls[0]?.[0];
+    const createArgs: unknown = firstCallArg(tx.zapingFile.create);
     expect(createArgs).toMatchObject({
       data: {
         companyId,
@@ -127,8 +132,7 @@ describe('ZapingFilesService', () => {
         scanStatus: 'NOT_SCANNED',
       },
     });
-    const uploadedEvent: unknown =
-      tx.zapingFileEvent.create.mock.calls[0]?.[0];
+    const uploadedEvent: unknown = firstCallArg(tx.zapingFileEvent.create);
     expect(uploadedEvent).toMatchObject({
       data: { type: 'UPLOADED' },
     });
@@ -193,8 +197,7 @@ describe('ZapingFilesService', () => {
       file.id,
     );
     expect(result.bytes).toEqual(pdf);
-    const downloadEvent: unknown =
-      prisma.zapingFileEvent.create.mock.calls[0]?.[0];
+    const downloadEvent: unknown = firstCallArg(prisma.zapingFileEvent.create);
     expect(downloadEvent).toMatchObject({
       data: { type: 'DOWNLOAD_REQUESTED' },
     });
@@ -213,8 +216,7 @@ describe('ZapingFilesService', () => {
         where: { id: file.id, companyId, deletedAt: null },
       }),
     );
-    const deleteEvent: unknown =
-      tx.zapingFileEvent.create.mock.calls[0]?.[0];
+    const deleteEvent: unknown = firstCallArg(tx.zapingFileEvent.create);
     expect(deleteEvent).toMatchObject({
       data: { type: 'SOFT_DELETED' },
     });
