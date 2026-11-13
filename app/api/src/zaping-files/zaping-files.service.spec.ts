@@ -119,20 +119,19 @@ describe('ZapingFilesService', () => {
       pdf,
       'application/pdf',
     );
-    expect(tx.zapingFile.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          companyId,
-          uploadedById: actorId,
-          scanStatus: 'NOT_SCANNED',
-        }),
-      }),
-    );
-    expect(tx.zapingFileEvent.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ type: 'UPLOADED' }),
-      }),
-    );
+    const createArgs: unknown = tx.zapingFile.create.mock.calls[0]?.[0];
+    expect(createArgs).toMatchObject({
+      data: {
+        companyId,
+        uploadedById: actorId,
+        scanStatus: 'NOT_SCANNED',
+      },
+    });
+    const uploadedEvent: unknown =
+      tx.zapingFileEvent.create.mock.calls[0]?.[0];
+    expect(uploadedEvent).toMatchObject({
+      data: { type: 'UPLOADED' },
+    });
     expect(result).not.toHaveProperty('objectKey');
   });
 
@@ -194,11 +193,11 @@ describe('ZapingFilesService', () => {
       file.id,
     );
     expect(result.bytes).toEqual(pdf);
-    expect(prisma.zapingFileEvent.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ type: 'DOWNLOAD_REQUESTED' }),
-      }),
-    );
+    const downloadEvent: unknown =
+      prisma.zapingFileEvent.create.mock.calls[0]?.[0];
+    expect(downloadEvent).toMatchObject({
+      data: { type: 'DOWNLOAD_REQUESTED' },
+    });
     expect(storage.download).toHaveBeenCalledWith(
       file.objectKey,
       file.sizeBytes,
@@ -214,10 +213,10 @@ describe('ZapingFilesService', () => {
         where: { id: file.id, companyId, deletedAt: null },
       }),
     );
-    expect(tx.zapingFileEvent.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ type: 'SOFT_DELETED' }),
-      }),
-    );
+    const deleteEvent: unknown =
+      tx.zapingFileEvent.create.mock.calls[0]?.[0];
+    expect(deleteEvent).toMatchObject({
+      data: { type: 'SOFT_DELETED' },
+    });
   });
 });
