@@ -5,7 +5,7 @@
 ## Alcance, runtime y archivos
 
 - GitHub: [#268](https://github.com/gclp96/Zaping/issues/268) → [#266](https://github.com/gclp96/Zaping/issues/266) → [#263](https://github.com/gclp96/Zaping/issues/263).
-- Rama de trabajo prevista: `feature/qa-review-01c1-b-logic-268`; baseline autorizado `c6ffc331c5e776e04f78e68aa2025aa362a8fa92`.
+- Rama de implementación original: `feature/qa-review-01c1-b-logic-268`, basada en `c6ffc331c5e776e04f78e68aa2025aa362a8fa92`; integrada mediante [PR #269](https://github.com/gclp96/Zaping/pull/269) en `main@d52fc5832ad3fd055b18c1f58cbc3b67465424ca`.
 - Runtime **exacto** `Node v24.20.0`, SQLite integrado **3.53.4** (`node:sqlite`, Stability 1.2/release candidate). Sin npm ni drivers externos.
 - Solo **cuatro archivos nuevos**: el motor `.mjs`, su `.test.mjs`, el `-worker.mjs` exclusivamente de test y este documento.
 - Solo fixtures de SQLite desechables en un subdirectorio `zaping-logic-268-*` de la carpeta temporal del sistema, archivo `ledger.sqlite`. No utilizar rutas reales del ERP. La comprobación de rutas **no es protección contra host adversarial ni TOCTOU**.
@@ -40,9 +40,9 @@ El objeto de test debe contener exactamente los campos primitivos `repository` (
 - El contrato de esquema V1 compara los SQL `CREATE` de todas las tablas e índices esperados con `sqlite_schema`, y rechaza **triggers, vistas, columnas nuevas o restricciones modificadas**. Esta comprobación es lógica, no un mecanismo contra un administrador del host.
 - `simulateServiceRestartV1` revalida **generación, health y reloj después de `BEGIN IMMEDIATE`**, dentro del bloqueo de escritura, para evitar la carrera entre inspección previa y actualización del reloj. La prueba L07 incluye una escritura concurrente simulada determinísticamente mediante un hook solo del harness.
 
-## Plan de comprobación — solo ejecución local autorizada
+## Comprobaciones reproducibles — ejecutadas con autorización de LOGIC
 
-Partir desde el worktree sin cambiar `main` ni otros worktrees. En Windows, utilizar la **ruta absoluta del `node.exe` 24.20.0 portátil** guardada por el operador en `$nodeExe` (no el Node global). Ejemplo de comandos **después de incorporar únicamente los cuatro archivos**:
+El siguiente bloque conserva los comandos usados durante la validación local original. Para repetirla se debe utilizar un entorno de pruebas autorizado, sin alterar `main` ni otros worktrees, y la **ruta absoluta del `node.exe` 24.20.0 portátil** (no el Node global). Ejemplo histórico de ejecución con los cuatro archivos ya incorporados:
 
 ```powershell
 cd C:\dev\zaping-logic-268
@@ -60,29 +60,35 @@ git status --short
 git diff --check
 ```
 
-En Windows PowerShell, la lista `Get-ChildItem` expande los tests antes de enviarlos a Node para evitar depender del glob de la shell. No modificar CI. En Ubuntu Actions, el workflow ya usa el glob del shell. El job `Agents` ya contempla `node --test scripts/agents/*.test.mjs` en Ubuntu; **no ha sido ejecutado/validado por este paquete**.
+En Windows PowerShell, `Get-ChildItem` expande los tests antes de enviarlos a Node para evitar depender del glob de la shell. No se modificó CI. En Ubuntu Actions, el workflow ejecuta `node --test scripts/agents/*.test.mjs`; **Agents pasó en Linux** tanto en el [PR #269](https://github.com/gclp96/Zaping/actions/runs/43336973195) como [después del merge en `main`](https://github.com/gclp96/Zaping/actions/runs/43339475477). No se dispone aquí del conteo individual de casos Linux extraído de los logs.
 
 ### Matriz L01–L12 y F01–F08
 
-| Caso | Expectativa | Estado de entrega |
+**Corte de resultados (12 de noviembre de 2026):** los 12 criterios L01–L12 están cubiertos por **16 pruebas focales PASS**, incluidas dos pruebas adicionales de L07 (revalidación del reloj bajo lock) y L09 (SQL drift y triggers). La evidencia focal corresponde al Windows del mantenedor con Node.js **24.20.0** y SQLite **3.53.4**, sin fallos ni omisiones. La suite Agents Windows reportó **386 total = 290 PASS + 96 SKIP + 0 FAIL**; los SKIP son `linuxTest` del módulo `qa-bundle.test.mjs` que se omiten deliberadamente en Windows. El job **Agents Linux de GitHub Actions terminó en SUCCESS**; esto no significa que se haya extraído un conteo específico de cada caso de sus logs.
+
+| Caso | Expectativa | Resultado lógico y evidencia |
 |---|---|---|
-| L01 | Esquema/PRAGMAs y Node/SQLite exactos | `NOT_RUN` en Node 24.20.0 del operador |
-| L02 | Unicidad y tombstones | `NOT_RUN` |
-| L03 | Dos PIDs reales compiten por consumir, un solo ganador | `NOT_RUN` |
-| L04 | Carrera consume/revoke, un terminal | `NOT_RUN` |
-| L05 | Binding íntegro rechaza mismatches | `NOT_RUN` |
-| L06 | TTL exacto, clock rollback y safe integer | `NOT_RUN` |
-| L07 | `attach != restart`, generación nueva invalida pendientes | `NOT_RUN` |
-| L08 | Failpoints F01–F08, bloqueo/cuarentena/recovery | `NOT_RUN` |
-| L09 | DB ausente/corrupta, esquema/PRAGMA incompatible | `NOT_RUN` |
-| L10 | Replay/entrada malformada/no secretos en claro | `NOT_RUN` |
-| L11 | Imports/side effects y ausencia de integración operacional | `NOT_RUN` |
-| L12 | Respuestas no operativas, suite focal y Agents con SHA | `NOT_RUN` |
+| L01 | Esquema/PRAGMAs y Node/SQLite exactos | **PASS** — suite focal Windows 16/16; Node 24.20.0 / SQLite 3.53.4 |
+| L02 | Unicidad y tombstones | **PASS** — prueba focal L02 |
+| L03 | Dos PIDs reales compiten por consumir, un solo ganador | **PASS** — prueba focal L03, multiproceso |
+| L04 | Carrera consume/revoke, un terminal | **PASS** — prueba focal L04, multiproceso |
+| L05 | Binding íntegro rechaza mismatches | **PASS** — prueba focal L05 |
+| L06 | TTL exacto, clock rollback y safe integer | **PASS** — prueba focal L06 |
+| L07 | `attach != restart`, generación nueva invalida pendientes | **PASS** — 2 pruebas L07, incluida verificación del reloj bajo bloqueo |
+| L08 | Failpoints F01–F08, bloqueo/cuarentena/recovery | **PASS lógico** — casos L08/F01–F07 y L09/F08; fallos **simulados**, no cortes físicos |
+| L09 | DB ausente/corrupta, esquema/PRAGMA incompatible | **PASS** — 2 pruebas L09, incluyendo CREATE SQL modificado y triggers |
+| L10 | Replay/entrada malformada/no secretos en claro | **PASS** — prueba focal L10 |
+| L11 | Imports/side effects y ausencia de integración operacional | **PASS** — prueba focal L11 y revisión de imports |
+| L12 | Respuestas no operativas, suite focal y Agents con SHA | **PASS LOGIC** — focal 16/16; Agents en PR y `main` SUCCESS; HOST/Gate C siguen `NOT_RUN` |
+
+**Evidencia de integración:** [PR #269 integrado](https://github.com/gclp96/Zaping/pull/269), head `af20ee848c3e281d9e377ac39674b8b1bf7cc31d`, merge `d52fc5832ad3fd055b18c1f58cbc3b67465424ca`; cuatro archivos nuevos, 923 líneas, sin alterar código existente. GitHub Actions terminó en `success` para los cuatro jobs de [push previo](https://github.com/gclp96/Zaping/actions/runs/43336811705), [pull request](https://github.com/gclp96/Zaping/actions/runs/43336973195) y [push post-merge a main](https://github.com/gclp96/Zaping/actions/runs/43339475477): **Agents, API, Web y Historical upgrade pre-S1**. Esta evidencia **no equivale a revisión independiente de seguridad** ni a permisos operativos. La excepción de autorrevisión de mantenedor único aplica solo a LOGIC.
 
 F01 antes de BEGIN; F02 después de BEGIN; F03 tras UPDATE; F04 tras evento y antes de COMMIT; F05 error inyectado de resultado incierto al intentar COMMIT; F06 respuesta perdida tras COMMIT; F07 proceso externo sostiene un writer real para `SQLITE_BUSY`; F08 DB corrupta/incompatible. **Son simulaciones: no prueban corte de energía, fsync real, autenticación, Linux UID/ACL/SSH/SO_PEERCRED ni control de cambios remotos.**
 
-## Evidencia y salida esperada
+## Evidencia y límites posteriores a la integración
 
-La persona que ejecute debe copiar a #268 versión de Node/SQLite, SHA inicial, rama, lista de archivos nuevos, salida focal, PID de ambos workers (distintos), suite Agents, y checks/diff. Un resultado `NOT_RUN`, FAIL o BLOCKED **no se transforma** en PASS por la existencia de este documento. Si hay incompatibilidad de runtime, otra ruta, un quinto archivo, filtración, CAS inconsistente o fallo de atomicidad: **STOP**, reportar, no instalar drivers ni relajar el contrato.
+Las ejecuciones y los SHA de referencia quedaron registrados en [#268](https://github.com/gclp96/Zaping/issues/268) y en el [PR #269](https://github.com/gclp96/Zaping/pull/269). En una revalidación futura deberán cotejarse entorno, commit, alcance y salidas; un resultado `NOT_RUN`, FAIL o BLOCKED **no se transforma** en PASS por existir este documento. Ante incompatibilidad, archivo extra, filtración, CAS inconsistente o fallo de atomicidad: **STOP**, reportar; no instalar drivers ni relajar el contrato.
 
-**No hay autorización para commit/push/PR/merge/CI remota, staging, VM, clouds, credenciales, agentes ni código real en esta entrega.**
+**Nota histórica (entrega inicial de 2026-11-12):** el paquete original no autorizaba commit, push, PR, merge ni CI remota. Esos pasos fueron **autorizados posteriormente, por separado, y completados para el PR #269**. Esta actualización documental no concede permisos nuevos.
+
+**Restricciones que siguen vigentes:** el ledger es un simulador; no habilita `agent:ready`, agentes, LLM, código o datos reales, staging, credenciales ni infraestructura VM/cloud. La identidad/aislamiento HOST del [#266](https://github.com/gclp96/Zaping/issues/266) y Gate C del [#263](https://github.com/gclp96/Zaping/issues/263) continúan **`NOT_RUN` / `OPEN`**. #268 permanece abierto hasta decisión humana expresa de cierre; este documento no lo cierra.
