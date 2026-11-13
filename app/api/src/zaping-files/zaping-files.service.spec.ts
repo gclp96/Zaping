@@ -134,6 +134,17 @@ describe('ZapingFilesService', () => {
     expect(tx.zapingFile.create).not.toHaveBeenCalled();
   });
 
+  it('does not ingest third-party files in production without scanner', async () => {
+    config.get.mockReturnValue('production');
+    await expect(service.upload(companyId, actorId, receiptId, {
+      buffer: pdf,
+      size: pdf.length,
+      originalname: 'test.pdf',
+      mimetype: 'application/pdf',
+    })).rejects.toThrow('Carga de archivos no habilitada');
+    expect(storage.upload).not.toHaveBeenCalled();
+  });
+
   it('denies download of unscanned files in production', async () => {
     config.get.mockReturnValue('production');
     await expect(service.download(companyId, actorId, receiptId, file.id))
