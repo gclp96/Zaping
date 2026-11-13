@@ -40,7 +40,10 @@ export function validateIncomingFile(
   if (
     !name ||
     name.length > 255 ||
-    /[\x00-\x1f\x7f]/.test(name) ||
+    [...name].some((character) => {
+      const code = character.charCodeAt(0);
+      return code < 32 || code === 127;
+    }) ||
     name === '.' ||
     name === '..'
   ) {
