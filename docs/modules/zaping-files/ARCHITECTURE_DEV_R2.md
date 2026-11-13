@@ -14,13 +14,13 @@ No confundir *almacenamiento operativo* con *archivo analizado*. Cloudflare R2 *
 
 1. Usuario autenticado solicita adjuntar PDF/JPEG a una recepción.
 2. NestJS valida permisos, pertenencia a `companyId`, tipo real de archivo, extensión, tamaño, límites y entidad destino.
-3. El backend emite una autorización de carga de duración corta para un objeto con clave generada por el servidor; bucket privado, sin ACL pública.
-4. Al completar la carga, NestJS valida metadatos e identidad del objeto y persiste vínculo, checksum y auditoría. Nunca confiar en un `companyId` o en una key de R2 aportados sin autorización.
+3. Para V1, el navegador envía un archivo pequeño (`multipart/form-data`, hasta 10 MiB) a NestJS; el backend valida sus bytes y genera la clave de objeto. El bucket R2 permanece privado.
+4. NestJS sube el archivo a R2 mediante S3 API y persiste vínculo, checksum y auditoría. Nunca confiar en un `companyId` o una key aportados por el cliente.
 5. El archivo queda con estado explícito `NOT_SCANNED` durante desarrollo, **no** `CLEAN`.
-6. Lectura y descarga solo mediante backend que verifica permisos, registra auditoría y expide URL de descarga temporal cuando la política del entorno lo permite.
+6. Las descargas pasan por NestJS, que verifica permisos, integridad y auditoría. En producción, las descargas `NOT_SCANNED` quedan bloqueadas hasta habilitar el scanner.
 7. Borrado lógico del vínculo y política de limpieza del objeto físico documentada por separado.
 
-La selección entre carga directa firmada y proxy backend se validará según el cliente HTTP, límites de tamaño y requisitos de verificación de contenido. No se autoriza contenido activo ejecutable ni previews HTML/PDF incrustadas sin endurecimiento.
+La V1 utiliza carga y descarga a través del backend para validar bytes y evitar exponer credenciales; las URLs firmadas directas se reevaluarán si la escala lo exige. No se autoriza contenido activo ejecutable ni vistas previas HTML/PDF incrustadas sin endurecimiento.
 
 ## Seguridad mínima que no se pospone
 
