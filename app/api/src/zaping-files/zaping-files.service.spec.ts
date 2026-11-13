@@ -30,10 +30,25 @@ describe('ZapingFilesService', () => {
   };
 
   let service: ZapingFilesService;
-  let tx: any;
-  let prisma: any;
-  let storage: any;
-  let config: any;
+  let tx: {
+    $queryRawUnsafe: jest.Mock;
+    zapingFileReceiptLink: { count: jest.Mock; create: jest.Mock };
+    zapingFile: { create: jest.Mock; findFirst: jest.Mock; updateMany: jest.Mock };
+    zapingFileEvent: { create: jest.Mock };
+  };
+  let prisma: {
+    purchaseReceipt: { findFirst: jest.Mock };
+    zapingFileReceiptLink: { findMany: jest.Mock };
+    zapingFile: { findFirst: jest.Mock };
+    zapingFileEvent: { create: jest.Mock };
+    $transaction: jest.Mock;
+  };
+  let storage: {
+    upload: jest.Mock;
+    download: jest.Mock;
+    discardUnlinkedObject: jest.Mock;
+  };
+  let config: { get: jest.Mock };
 
   beforeEach(() => {
     tx = {
@@ -54,7 +69,7 @@ describe('ZapingFilesService', () => {
       zapingFileReceiptLink: { findMany: jest.fn().mockResolvedValue([]) },
       zapingFile: { findFirst: jest.fn().mockResolvedValue(file) },
       zapingFileEvent: { create: jest.fn().mockResolvedValue({}) },
-      $transaction: jest.fn(async (callback: (tx: any) => Promise<unknown>) => callback(tx)),
+      $transaction: jest.fn(async (callback: (tx: typeof tx) => Promise<unknown>) => callback(tx)),
     };
     storage = {
       upload: jest.fn().mockResolvedValue(undefined),
@@ -63,9 +78,9 @@ describe('ZapingFilesService', () => {
     };
     config = { get: jest.fn().mockReturnValue('development') };
     service = new ZapingFilesService(
-      prisma as PrismaService,
-      storage as R2StorageService,
-      config as ConfigService,
+      prisma as unknown as PrismaService,
+      storage as unknown as R2StorageService,
+      config as unknown as ConfigService,
     );
   });
 
