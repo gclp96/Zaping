@@ -13,7 +13,7 @@ import {
 } from 'react';
 
 import StatusBadge from '@/app/components/business/StatusBadge';
-import ReceiptFilesPreview from '@/app/components/files/ReceiptFilesPreview';
+import ReceiptFilesPanel from '@/app/components/files/ReceiptFilesPanel';
 import Button from '@/app/components/ui/Button';
 import Loading from '@/app/components/ui/Loading';
 import StaticTable, {
@@ -486,12 +486,7 @@ export default function PurchaseReceiptDetailPage() {
         </Section>
       </div>
 
-      {process.env.NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI === 'true' ? (
-        <ReceiptFilesPreview
-          key={receipt.id}
-          receiptFolio={receipt.folio}
-        />
-      ) : null}
+      <ReceiptFilesPanel key={receipt.id} receiptId={receipt.id} />
 
       <div className="rounded-xl border border-border bg-surface p-4 sm:p-6">
         <Section
