@@ -1,7 +1,7 @@
 # INF-CLAMAV-LAB-01 — Laboratorio de análisis de archivos (archivo de cierre)
 
 **Fecha de corte:** 2026-11-13  
-**Estado:** VALIDATED (laboratorio) / DECOMMISSION PLANNED  
+**Estado:** VALIDATED (laboratorio) / DROPLET REMOVED (evidencia de consola; verificación de recursos asociados pendiente)  
 **Alcance:** Prueba de concepto de ClamAV para Zaping Files. **No** es un despliegue productivo ni una integración funcional con Cloudflare R2.
 
 ## 1. Propósito y decisión
@@ -89,16 +89,20 @@ En Ubuntu, el generador de `clamav-daemon.socket` tomó `LocalSocketMode` de `cl
 ## 6. Checklist de decomisión del laboratorio
 
 - [ ] Confirmar que el Droplet está dedicado al laboratorio y **no** aloja servicios o datos de clientes.
-- [ ] Guardar este registro técnico y comprobar que no incluye secretos.
+- [x] Guardar este registro técnico y comprobar que no incluye secretos.
 - [ ] Revisar en DigitalOcean si hay snapshots, discos/volúmenes, IPs reservadas, balanceadores, DNS u otros recursos dependientes.
-- [ ] Destruir **solo** el Droplet dedicado desde el panel de DigitalOcean.
+- [x] Retirar el Droplet dedicado: el usuario compartió captura de la página Droplets sin instancias listadas (evidencia de consola, 2026-11-13).
 - [ ] Decidir explícitamente si se eliminan snapshots/volúmenes asociados; los que permanezcan pueden seguir generando cargos.
 - [ ] Revisar backups retenidos por DigitalOcean y cualquier recurso con facturación independiente.
-- [ ] Comprobar que el Droplet ya no aparece en la lista y revisar el panel de facturación.
-- [ ] Registrar fecha y evidencia del cierre, sin publicar tokens ni datos sensibles.
+- [x] Comprobar en la captura que la lista Droplets aparece vacía y el panel Billing muestra **saldo estimado US$0.00** para noviembre. Este dato **no** es liquidación final; la interfaz indica actualización diaria.
+- [x] Registrar fecha (2026-11-13) y evidencia textual de las capturas aportadas en el chat, sin publicar capturas con identificadores de cuenta.
 
 **Importante:** apagar la VM no detiene su facturación; destruirla elimina irreversiblemente su disco y libera su IP. El firewall cloud asociado puede ser un recurso independiente. Nunca borrar un recurso cuyo uso no esté confirmado.
 
-## 7. Reapertura
+## 7. Registro de retirada — 2026-11-13
+
+El usuario mostró la vista de Droplets sin instancias y Billing con estimación **US$0.00** para el periodo actual. Se interpreta que el Droplet del laboratorio fue retirado. **No se ha verificado** mediante API de DigitalOcean la ausencia de recursos con facturación independiente (snapshots, backups, volúmenes, IPs reservadas, otros). Los checks correspondientes permanecen abiertos y requieren inspección manual. No volver a crear el laboratorio por esta tarea.
+
+## 8. Reapertura
 
 Reabrir esta iniciativa cuando el MVP/piloto necesite recepción de archivos de terceros con verificación antivirus, o antes del lanzamiento público si la evaluación de riesgos lo exige. Revalidar versiones, precios, capacidades y dependencias. El laboratorio no establece por sí mismo un proveedor obligatorio para producción.
