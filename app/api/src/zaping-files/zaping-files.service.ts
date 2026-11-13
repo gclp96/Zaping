@@ -37,7 +37,10 @@ export class ZapingFilesService {
     private readonly config: ConfigService,
   ) {}
 
-  private async ensureReceipt(companyId: string, receiptId: string): Promise<void> {
+  private async ensureReceipt(
+    companyId: string,
+    receiptId: string,
+  ): Promise<void> {
     const receipt = await this.prisma.purchaseReceipt.findFirst({
       where: { id: receiptId, companyId },
       select: { id: true },
@@ -92,7 +95,8 @@ export class ZapingFilesService {
         const locked = await tx.$queryRaw<Array<{ id: string }>>(
           Prisma.sql`SELECT "id" FROM "PurchaseReceipt" WHERE "id"=${receiptId} AND "companyId"=${companyId} FOR UPDATE`,
         );
-        if (locked.length !== 1) throw new NotFoundException('Recepción no encontrada');
+        if (locked.length !== 1)
+          throw new NotFoundException('Recepción no encontrada');
         const count = await tx.zapingFileReceiptLink.count({
           where: { companyId, receiptId, file: { deletedAt: null } },
         });
@@ -125,13 +129,19 @@ export class ZapingFilesService {
       try {
         await this.storage.discardUnlinkedObject(objectKey);
       } catch {
-        this.logger.error('Zaping Files: orphan cleanup failed; review storage reconciliation');
+        this.logger.error(
+          'Zaping Files: orphan cleanup failed; review storage reconciliation',
+        );
       }
       throw error;
     }
   }
 
-  private async requireLinkedFile(companyId: string, receiptId: string, fileId: string) {
+  private async requireLinkedFile(
+    companyId: string,
+    receiptId: string,
+    fileId: string,
+  ) {
     const file = await this.prisma.zapingFile.findFirst({
       where: {
         companyId,
@@ -144,7 +154,12 @@ export class ZapingFilesService {
     return file;
   }
 
-  async download(companyId: string, actorId: string, receiptId: string, fileId: string) {
+  async download(
+    companyId: string,
+    actorId: string,
+    receiptId: string,
+    fileId: string,
+  ) {
     const file = await this.requireLinkedFile(companyId, receiptId, fileId);
 
     // No scanner is part of this slice; production must not serve unscanned files.
@@ -162,14 +177,23 @@ export class ZapingFilesService {
       throw new ForbiddenException('Archivo no disponible');
     }
 
-    const bytes = await this.storage.download(file.objectKey, file.sizeBytes, file.sha256);
+    const bytes = await this.storage.download(
+      file.objectKey,
+      file.sizeBytes,
+      file.sha256,
+    );
     await this.prisma.zapingFileEvent.create({
       data: { companyId, fileId, actorId, type: 'DOWNLOAD_REQUESTED' },
     });
     return { bytes, name: file.originalName };
   }
 
-  async remove(companyId: string, actorId: string, receiptId: string, fileId: string) {
+  async remove(
+    companyId: string,
+    actorId: string,
+    receiptId: string,
+    fileId: string,
+  ) {
     await this.prisma.$transaction(async (tx) => {
       const file = await tx.zapingFile.findFirst({
         where: {
