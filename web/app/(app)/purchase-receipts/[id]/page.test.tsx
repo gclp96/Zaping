@@ -30,6 +30,14 @@ vi.mock('@/services/api', () => ({
   },
 }));
 
+vi.mock('@/app/components/files/ReceiptFilesPanel', () => ({
+  default: ({ receiptId }: { receiptId: string }) => (
+    <section data-testid="receipt-files" data-receipt-id={receiptId}>
+      Documentos adjuntos · Zaping Files
+    </section>
+  ),
+}));
+
 vi.mock('../ReceiptSupplierDocuments', () => ({
   default: ({ receiptId, supplierId, legacyReference }: { receiptId: string; supplierId: string; legacyReference: string | null }) => (
     <span data-testid="receipt-documents" data-receipt-id={receiptId} data-supplier-id={supplierId}>
@@ -241,31 +249,20 @@ describe('PurchaseReceiptDetailPage', () => {
     expect(documents.getAttribute('data-supplier-id')).toBe(quantityReceipt.purchase.supplier.id);
   });
 
-  it('oculta Zaping Files cuando la bandera no está habilitada', async () => {
-    vi.stubEnv('NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI', 'false');
-    render(<PurchaseReceiptDetailPage />);
+  it.each(['false', 'true'])(
+    'renderiza el panel de archivos en el detalle sin depender del flag %s',
+    async (value) => {
+      vi.stubEnv('NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI', value);
+      render(<PurchaseReceiptDetailPage />);
 
-    await screen.findByRole('heading', {
-      name: 'Recepción REC-20260826-4D1F98E8',
-    });
-    expect(
-      screen.queryByRole('heading', { name: 'Documentos adjuntos' }),
-    ).toBeNull();
-  });
-
-  it('muestra únicamente la vista previa local cuando se habilita', async () => {
-    vi.stubEnv('NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI', 'true');
-    render(<PurchaseReceiptDetailPage />);
-
-    await screen.findByRole('heading', {
-      name: 'Recepción REC-20260826-4D1F98E8',
-    });
-    expect(
-      screen.getByRole('heading', { name: 'Documentos adjuntos' }),
-    ).toBeTruthy();
-    expect(screen.getByText(/no se guardan ni se envían/i)).toBeTruthy();
-    expect(api.get).toHaveBeenCalledTimes(1);
-  });
+      await screen.findByRole('heading', {
+        name: 'Recepción REC-20260826-4D1F98E8',
+      });
+      const files = screen.getByTestId('receipt-files');
+      expect(files.getAttribute('data-receipt-id')).toBe(quantityReceipt.id);
+      expect(api.get).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it('presenta la recepción QUANTITY y su movimiento IN sin inventar equipos', async () => {
     render(<PurchaseReceiptDetailPage />);

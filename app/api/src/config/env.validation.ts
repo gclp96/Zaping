@@ -190,5 +190,30 @@ export function validateEnvironment(
     }
   }
 
+  const r2Settings = [
+    'R2_ACCOUNT_ID',
+    'R2_BUCKET',
+    'R2_ACCESS_KEY_ID',
+    'R2_SECRET_ACCESS_KEY',
+  ] as const;
+  // R2 is optional until a developer enables the feature, but never partially configured.
+  if (r2Settings.some((name) => Boolean(environment[name]?.trim()))) {
+    for (const name of r2Settings) {
+      validatedEnvironment[name] = requiredValue(environment, name);
+    }
+    if (!/^[a-f0-9]{32}$/i.test(validatedEnvironment.R2_ACCOUNT_ID!)) {
+      throw new Error(
+        'R2_ACCOUNT_ID must be a 32-character hexadecimal account ID',
+      );
+    }
+    if (
+      !/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(
+        validatedEnvironment.R2_BUCKET!,
+      )
+    ) {
+      throw new Error('R2_BUCKET has an invalid name');
+    }
+  }
+
   return validatedEnvironment;
 }
