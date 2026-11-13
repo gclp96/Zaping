@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
-import ReceiptFilesPreview from '@/app/components/files/ReceiptFilesPreview';
 import Button from '@/app/components/ui/Button';
 import Input from '@/app/components/ui/Input';
 import Modal from '@/app/components/ui/Modal';
@@ -37,7 +36,6 @@ export default function CreateReceiptFlow({ enabled, onReceiptCreated }: {
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [localAttachmentCount, setLocalAttachmentCount] = useState(0);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -117,7 +115,6 @@ export default function CreateReceiptFlow({ enabled, onReceiptCreated }: {
 
   function close() {
     if (receipt.receiptSaving) return;
-    setLocalAttachmentCount(0);
     opened.current = false;
     version.current += 1;
     inFlight.current = null;
@@ -246,12 +243,10 @@ export default function CreateReceiptFlow({ enabled, onReceiptCreated }: {
         onSupplierDocumentNumberChange={receipt.setSupplierDocumentNumber}
         saving={receipt.receiptSaving} error={receipt.receiptFormError} fieldErrors={receipt.receiptFieldErrors}
         createdReceipt={receipt.createdReceipt} onClose={close}
-        pendingAttachmentCount={localAttachmentCount}
-        attachmentPreview={process.env.NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI === 'true' && receipt.purchaseToReceive && !receipt.createdReceipt ? (
-          <ReceiptFilesPreview key={receipt.purchaseToReceive.id} mode="registration" receiptFolio={receipt.purchaseToReceive.folio} onSelectionCountChange={setLocalAttachmentCount} />
-        ) : null}
+        pendingAttachmentCount={0}
+        attachmentPreview={null}
         onItemChange={receipt.handleReceiptItemChange} onNotesChange={receipt.handleReceiptNotesChange}
-        onSubmit={() => { if (enabled && localAttachmentCount === 0) void receipt.handleCreateReceipt(); }} onViewReceipt={viewReceipt}
+        onSubmit={() => { if (enabled) void receipt.handleCreateReceipt(); }} onViewReceipt={viewReceipt}
         onViewInventory={(id, folio) => { close(); router.push(getPurchaseReceiptInventoryHref(id, folio)); }}
       />
       <Modal isOpen={!enabled && open && receipt.createdReceipt !== null} onClose={close}
