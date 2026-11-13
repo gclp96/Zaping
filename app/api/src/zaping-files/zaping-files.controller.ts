@@ -29,12 +29,17 @@ export class ZapingFilesController {
 
   @Get()
   @Header('Cache-Control', 'no-store')
-  list(@Req() req: AuthenticatedRequest, @Param('receiptId') receiptId: string) {
+  list(
+    @Req() req: AuthenticatedRequest,
+    @Param('receiptId') receiptId: string,
+  ) {
     return this.files.list(req.user.companyId, receiptId);
   }
 
   @Post()
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: FILE_MAX_BYTES, files: 1 } }))
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: FILE_MAX_BYTES, files: 1 } }),
+  )
   upload(
     @Req() req: AuthenticatedRequest,
     @Param('receiptId') receiptId: string,
@@ -57,7 +62,12 @@ export class ZapingFilesController {
       fileId,
     );
     res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', 'attachment; filename="document"; filename*=UTF-8' + "''" + encodeURIComponent(result.name));
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="document"; filename*=UTF-8' +
+        "''" +
+        encodeURIComponent(result.name),
+    );
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'private, no-store');
     return res.send(result.bytes);
@@ -69,6 +79,11 @@ export class ZapingFilesController {
     @Param('receiptId') receiptId: string,
     @Param('fileId') fileId: string,
   ) {
-    return this.files.remove(req.user.companyId, req.user.id, receiptId, fileId);
+    return this.files.remove(
+      req.user.companyId,
+      req.user.id,
+      receiptId,
+      fileId,
+    );
   }
 }
