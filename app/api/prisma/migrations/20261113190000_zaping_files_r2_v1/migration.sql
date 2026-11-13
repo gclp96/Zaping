@@ -18,48 +18,8 @@ CREATE TABLE "ZapingFile" (
   CONSTRAINT "ZapingFile_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "ZapingFile_positive_size" CHECK ("sizeBytes" > 0 AND "sizeBytes" <= 10485760),
   CONSTRAINT "ZapingFile_supported_mime" CHECK ("contentType" IN ('application/pdf', 'image/jpeg')),
-  CONSTRAINT "ZapingFile_sha256_hex" CHECK ("sha256" ~ '^[0-9a-f]{64}
-
-CREATE TABLE "ZapingFileReceiptLink" (
-  "id" TEXT NOT NULL,
-  "companyId" TEXT NOT NULL,
-  "receiptId" TEXT NOT NULL,
-  "fileId" TEXT NOT NULL,
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "ZapingFileReceiptLink_pkey" PRIMARY KEY ("id")
-);
-
-CREATE TABLE "ZapingFileEvent" (
-  "id" TEXT NOT NULL,
-  "companyId" TEXT NOT NULL,
-  "fileId" TEXT NOT NULL,
-  "actorId" TEXT NOT NULL,
-  "type" "ZapingFileEventType" NOT NULL,
-  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT "ZapingFileEvent_pkey" PRIMARY KEY ("id")
-);
-
-CREATE UNIQUE INDEX "ZapingFile_id_companyId_key" ON "ZapingFile"("id", "companyId");
-CREATE UNIQUE INDEX "ZapingFile_companyId_objectKey_key" ON "ZapingFile"("companyId", "objectKey");
-CREATE INDEX "ZapingFile_companyId_deletedAt_createdAt_idx" ON "ZapingFile"("companyId", "deletedAt", "createdAt");
-CREATE UNIQUE INDEX "ZapingFileReceiptLink_companyId_fileId_key" ON "ZapingFileReceiptLink"("companyId", "fileId");
-CREATE INDEX "ZapingFileReceiptLink_companyId_receiptId_createdAt_idx" ON "ZapingFileReceiptLink"("companyId", "receiptId", "createdAt");
-CREATE INDEX "ZapingFileEvent_companyId_fileId_createdAt_idx" ON "ZapingFileEvent"("companyId", "fileId", "createdAt");
-
-ALTER TABLE "ZapingFile" ADD CONSTRAINT "ZapingFile_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE RESTRICT;
-ALTER TABLE "ZapingFile" ADD CONSTRAINT "ZapingFile_uploadedById_companyId_fkey" FOREIGN KEY ("uploadedById", "companyId") REFERENCES "User"("id", "companyId") ON DELETE RESTRICT ON UPDATE RESTRICT;
-ALTER TABLE "ZapingFile" ADD CONSTRAINT "ZapingFile_deletedById_companyId_fkey" FOREIGN KEY ("deletedById", "companyId") REFERENCES "User"("id", "companyId") ON DELETE RESTRICT ON UPDATE RESTRICT;
-
-ALTER TABLE "ZapingFileReceiptLink" ADD CONSTRAINT "ZapingFileReceiptLink_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE RESTRICT;
-ALTER TABLE "ZapingFileReceiptLink" ADD CONSTRAINT "ZapingFileReceiptLink_receiptId_companyId_fkey" FOREIGN KEY ("receiptId", "companyId") REFERENCES "PurchaseReceipt"("id", "companyId") ON DELETE RESTRICT ON UPDATE RESTRICT;
-ALTER TABLE "ZapingFileReceiptLink" ADD CONSTRAINT "ZapingFileReceiptLink_fileId_companyId_fkey" FOREIGN KEY ("fileId", "companyId") REFERENCES "ZapingFile"("id", "companyId") ON DELETE RESTRICT ON UPDATE RESTRICT;
-
-ALTER TABLE "ZapingFileEvent" ADD CONSTRAINT "ZapingFileEvent_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE RESTRICT ON UPDATE RESTRICT;
-ALTER TABLE "ZapingFileEvent" ADD CONSTRAINT "ZapingFileEvent_fileId_companyId_fkey" FOREIGN KEY ("fileId", "companyId") REFERENCES "ZapingFile"("id", "companyId") ON DELETE RESTRICT ON UPDATE RESTRICT;
-ALTER TABLE "ZapingFileEvent" ADD CONSTRAINT "ZapingFileEvent_actorId_companyId_fkey" FOREIGN KEY ("actorId", "companyId") REFERENCES "User"("id", "companyId") ON DELETE RESTRICT ON UPDATE RESTRICT;
-),
+  CONSTRAINT "ZapingFile_sha256_hex" CHECK ("sha256" ~ '^[0-9a-f]{64}$'),
   CONSTRAINT "ZapingFile_tenant_key" CHECK ("objectKey" LIKE ('tenants/' || "companyId" || '/purchase-receipts/%')),
-  -- No scanner in V1: do not allow a privileged application call to forge CLEAN.
   CONSTRAINT "ZapingFile_scanner_deferred" CHECK ("scanStatus" = 'NOT_SCANNED'::"ZapingFileScanStatus"),
   CONSTRAINT "ZapingFile_deletion_actor" CHECK (
     ("deletedAt" IS NULL AND "deletedById" IS NULL) OR
@@ -105,9 +65,7 @@ ALTER TABLE "ZapingFileEvent" ADD CONSTRAINT "ZapingFileEvent_companyId_fkey" FO
 ALTER TABLE "ZapingFileEvent" ADD CONSTRAINT "ZapingFileEvent_fileId_companyId_fkey" FOREIGN KEY ("fileId", "companyId") REFERENCES "ZapingFile"("id", "companyId") ON DELETE RESTRICT ON UPDATE RESTRICT;
 ALTER TABLE "ZapingFileEvent" ADD CONSTRAINT "ZapingFileEvent_actorId_companyId_fkey" FOREIGN KEY ("actorId", "companyId") REFERENCES "User"("id", "companyId") ON DELETE RESTRICT ON UPDATE RESTRICT;
 
--- Do not permit rewriting accepted object metadata, replacing keys or
--- resurrecting a logically deleted file. A later reviewed migration can
--- revise scan-status policy when the scanning worker is implemented.
+-- Accepted objects are immutable except for one-way soft deletion.
 CREATE FUNCTION "zaping_file_protect_metadata"() RETURNS trigger AS $$
 BEGIN
   IF NEW."companyId" IS DISTINCT FROM OLD."companyId"
