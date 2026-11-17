@@ -49,6 +49,10 @@ export class PurchasesService {
         throw new NotFoundException('Proveedor no encontrado');
       }
 
+      if (!supplier.isActive) {
+        throw new BadRequestException('El proveedor está inactivo');
+      }
+
       const products = await tx.product.findMany({
         where: {
           companyId,
@@ -70,6 +74,10 @@ export class PurchasesService {
         throw new NotFoundException(
           `Producto ${missingProductId} no encontrado`,
         );
+      }
+
+      if (products.some((product) => !product.isActive)) {
+        throw new BadRequestException('Uno o más productos están inactivos');
       }
 
       const purchaseItems: Array<{
@@ -301,11 +309,16 @@ export class PurchasesService {
         },
         select: {
           id: true,
+          isActive: true,
         },
       });
 
       if (!supplier) {
         throw new NotFoundException('Proveedor no encontrado');
+      }
+
+      if (!supplier.isActive) {
+        throw new BadRequestException('El proveedor está inactivo');
       }
 
       const products = await tx.product.findMany({
@@ -329,6 +342,10 @@ export class PurchasesService {
         throw new NotFoundException(
           `Producto ${missingProductId} no encontrado`,
         );
+      }
+
+      if (products.some((product) => !product.isActive)) {
+        throw new BadRequestException('Uno o más productos están inactivos');
       }
 
       const purchaseItems: Array<{

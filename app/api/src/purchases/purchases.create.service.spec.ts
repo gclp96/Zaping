@@ -1,7 +1,11 @@
 import { PurchasesService } from './purchases.service';
 import { PurchasesFolioService } from './purchases-folio.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { ExecutionContext } from '@nestjs/common';
+import {
+  BadRequestException,
+  ExecutionContext,
+  NotFoundException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { UserRole } from '@prisma/client';
 import { RolesGuard } from '../auth/guards/roles.guards';
@@ -28,8 +32,13 @@ describe('PurchasesService — annual folio creation', () => {
     prisma.$transaction.mockImplementation(
       (work: (client: typeof tx) => Promise<unknown>) => work(tx),
     );
-    tx.supplier.findFirst.mockResolvedValue({ id: 'supplier-a' });
-    tx.product.findMany.mockResolvedValue([{ id: 'product-a', cost: 100 }]);
+    tx.supplier.findFirst.mockResolvedValue({
+      id: 'supplier-a',
+      isActive: true,
+    });
+    tx.product.findMany.mockResolvedValue([
+      { id: 'product-a', cost: 100, isActive: true },
+    ]);
     folios.allocateNextAvailableFolio.mockResolvedValue('OC-26-00001');
     tx.purchase.create.mockResolvedValue({
       id: 'purchase-a',
@@ -98,6 +107,68 @@ describe('PurchasesService — annual folio creation', () => {
     expect(folios.allocateNextAvailableFolio).toHaveBeenCalledTimes(1);
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
+
+  it('rejects an inactive supplier before allocating a folio or writing', async () => {
+    tx.supplier.findFirst.mockResolvedValue({
+      id: 'supplier-a',
+      isActive: false,
+    });
+    await expect(service.create('company-a', dto)).rejects.toThrow(
+      new BadRequestException('El proveedor está inactivo'),
+    );
+    expect(tx.product.findMany).not.toHaveBeenCalled();
+    expect(folios.allocateNextAvailableFolio).not.toHaveBeenCalled();
+    expect(tx.purchase.create).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])(
+    'rejects inactive products atomically (mixed=%s)',
+    async (mixed) => {
+      const inactive = { id: 'product-inactive', cost: 50, isActive: false };
+      const active = { id: 'product-a', cost: 100, isActive: true };
+      const products = mixed ? [active, inactive] : [inactive];
+      tx.product.findMany.mockResolvedValue(products);
+      await expect(
+        service.create('company-a', {
+          ...dto,
+          items: products.map((product) => ({
+            productId: product.id,
+            quantity: 1,
+          })),
+        }),
+      ).rejects.toThrow(
+        new BadRequestException('Uno o más productos están inactivos'),
+      );
+      expect(folios.allocateNextAvailableFolio).not.toHaveBeenCalled();
+      expect(tx.purchase.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['supplier', 'product'])(
+    'keeps foreign or missing %s indistinguishable and performs no writes',
+    async (resource) => {
+      if (resource === 'supplier')
+        tx.supplier.findFirst.mockResolvedValue(null);
+      else tx.product.findMany.mockResolvedValue([]);
+      await expect(service.create('company-a', dto)).rejects.toThrow(
+        new NotFoundException(
+          resource === 'supplier'
+            ? 'Proveedor no encontrado'
+            : 'Producto product-a no encontrado',
+        ),
+      );
+      expect(tx.supplier.findFirst).toHaveBeenCalledWith({
+        where: { id: dto.supplierId, companyId: 'company-a' },
+      });
+      if (resource === 'product') {
+        expect(tx.product.findMany).toHaveBeenCalledWith({
+          where: { companyId: 'company-a', id: { in: ['product-a'] } },
+        });
+      }
+      expect(folios.allocateNextAvailableFolio).not.toHaveBeenCalled();
+      expect(tx.purchase.create).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('Purchase creation authorization contract', () => {

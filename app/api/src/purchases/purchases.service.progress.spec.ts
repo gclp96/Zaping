@@ -68,6 +68,46 @@ describe('PurchasesService — receipt progress', () => {
     );
   });
 
+  it.each(['findAll', 'findOne'] as const)(
+    'preserves historical purchases with inactive catalogs through %s',
+    async (method) => {
+      const base = createPurchase('historical', [
+        { id: 'historical-item', productId: 'product-1', quantity: 5 },
+      ]);
+      const purchase = {
+        ...base,
+        supplier: { ...base.supplier, isActive: false },
+        items: base.items.map((item) => ({
+          ...item,
+          product: { ...item.product, isActive: false },
+        })),
+      };
+      prismaMock.purchase.findMany.mockResolvedValue([purchase]);
+      prismaMock.purchase.findFirst.mockResolvedValue(purchase);
+      prismaMock.purchaseReceiptItem.findMany.mockResolvedValue([]);
+
+      const result =
+        method === 'findAll'
+          ? (await service.findAll('company-1'))[0]
+          : await service.findOne('company-1', purchase.id);
+
+      expect(result).toMatchObject(purchase);
+      expect(result.receiptProgress.pendingUnits).toBe(5);
+      const query =
+        method === 'findAll'
+          ? prismaMock.purchase.findMany
+          : prismaMock.purchase.findFirst;
+      expect(query).toHaveBeenCalledWith({
+        where:
+          method === 'findAll'
+            ? { companyId: 'company-1' }
+            : { id: purchase.id, companyId: 'company-1' },
+        include: { supplier: true, items: { include: { product: true } } },
+        ...(method === 'findAll' ? { orderBy: { createdAt: 'desc' } } : {}),
+      });
+    },
+  );
+
   it('returns zero progress for a purchase without receipts', async () => {
     const purchase = createPurchase('no-receipts', [
       { id: 'item-1', productId: 'product-1', quantity: 5 },

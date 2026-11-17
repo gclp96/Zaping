@@ -769,33 +769,17 @@ Company A Purchase
 
 ---
 
-# 25. Supplier active gap
+# 25. Supplier active validation — PUR-ACTIVE-01
 
-Actualmente `PurchasesService.create()` y `update()` no exigen todavía de forma
-completa:
+`PurchasesService.create()` y `update()` exigen un Supplier de la Company
+autenticada con `isActive = true`. Primero se valida su existencia dentro de la
+Company: recursos inexistentes o de otra empresa conservan `NotFoundException`.
+Un proveedor de la empresa inactivo produce `BadRequestException` antes de
+escribir o asignar un folio.
 
-```text
-Supplier.isActive = true
-```
-
-aunque la UI utilice catálogos activos.
-
-Por tanto:
-
-```text
-Supplier same-tenant validation
-→ IMPLEMENTED
-```
-
-mientras:
-
-```text
-Supplier active backend enforcement
-→ TECHNICAL DEBT
-```
-
-Esta validación debe cerrarse antes de considerar definitivo el contrato de nuevas
-Purchases.
+**Estado:** IMPLEMENTED — deuda de validación activa cerrada por PUR-ACTIVE-01.
+Las consultas históricas no filtran por el estado activo del proveedor. No se
+modifican aprobación, recepción ni reglas de folios.
 
 ---
 
@@ -818,25 +802,17 @@ Company A Purchase
 
 ---
 
-# 27. Product active gap
+# 27. Product active validation — PUR-ACTIVE-01
 
-Actualmente el backend de Purchase create/update no exige todavía de forma
-completa:
+`PurchasesService.create()` y `update()` validan primero que todos los Products
+pertenezcan a la Company autenticada. Una referencia inexistente o de otra
+empresa conserva `NotFoundException`. Si alguno de los productos encontrados
+está inactivo, se rechaza toda la operación con `BadRequestException`, antes de
+escribir o asignar un folio; no se aceptan parcialmente las partidas activas.
 
-```text
-Product.isActive = true
-```
-
-aunque la UI utilice Products activos.
-
-Por tanto:
-
-```text
-Product active backend enforcement in Purchase
-→ TECHNICAL DEBT
-```
-
-Debe resolverse en backend.
+**Estado:** IMPLEMENTED — deuda de validación activa cerrada por PUR-ACTIVE-01.
+Las compras históricas continúan consultándose aunque sus productos se hayan
+desactivado. Los costos, importes y movimientos de inventario no cambian.
 
 ---
 
@@ -2739,17 +2715,10 @@ CHANGELOG.md
 
 # 102. TECHNICAL DEBT — Purchase
 
+PUR-ACTIVE-01 cierra la validación de Supplier/Product activos en create/update;
+contrato y alcance en las secciones 25 y 27.
+
 Permanece pendiente:
-
-```text
-Supplier.isActive backend enforcement
-for Purchase create/update
-```
-
-```text
-Product.isActive backend enforcement
-for Purchase create/update
-```
 
 ```text
 Purchase creation idempotency

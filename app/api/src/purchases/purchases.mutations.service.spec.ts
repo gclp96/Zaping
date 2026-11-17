@@ -14,6 +14,7 @@ describe('PurchasesService — tenant-safe mutations', () => {
   const productId = '44444444-4444-4444-8444-444444444444';
 
   let service: PurchasesService;
+  const folios = { allocateNextAvailableFolio: jest.fn() };
   let prisma: {
     $transaction: jest.Mock;
   };
@@ -35,19 +36,23 @@ describe('PurchasesService — tenant-safe mutations', () => {
   };
 
   beforeEach(() => {
+    folios.allocateNextAvailableFolio.mockReset();
     transactionClient = {
       purchase: {
         findFirst: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       supplier: {
-        findFirst: jest.fn().mockResolvedValue({ id: supplierId }),
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ id: supplierId, isActive: true }),
       },
       product: {
         findMany: jest.fn().mockResolvedValue([
           {
             id: productId,
             cost: 100,
+            isActive: true,
           },
         ]),
       },
@@ -66,7 +71,7 @@ describe('PurchasesService — tenant-safe mutations', () => {
 
     service = new PurchasesService(
       prisma as unknown as PrismaService,
-      {} as PurchasesFolioService,
+      folios as unknown as PurchasesFolioService,
     );
   });
 
@@ -172,6 +177,7 @@ describe('PurchasesService — tenant-safe mutations', () => {
       },
       select: {
         id: true,
+        isActive: true,
       },
     });
   });
@@ -212,5 +218,62 @@ describe('PurchasesService — tenant-safe mutations', () => {
 
     expect(transactionClient.purchaseItem.deleteMany).not.toHaveBeenCalled();
     expect(transactionClient.purchaseItem.createMany).not.toHaveBeenCalled();
+  });
+
+  it.each(['supplier', 'product', 'mixed'])(
+    'rechaza %s inactivo sin escribir ni asignar folio',
+    async (inactive) => {
+      transactionClient.purchase.findFirst.mockResolvedValue({
+        id: purchaseId,
+        status: PurchaseStatus.DRAFT,
+      });
+      const request = { ...updateDto, items: [...updateDto.items] };
+      if (inactive === 'supplier') {
+        transactionClient.supplier.findFirst.mockResolvedValue({
+          id: supplierId,
+          isActive: false,
+        });
+      } else {
+        const products = [{ id: productId, cost: 100, isActive: false }];
+        if (inactive === 'mixed') {
+          products.push({ id: 'active-product', cost: 50, isActive: true });
+          request.items.push({ productId: 'active-product', quantity: 1 });
+        }
+        transactionClient.product.findMany.mockResolvedValue(products);
+      }
+      await expect(
+        service.update(companyId, purchaseId, request),
+      ).rejects.toThrow(
+        new BadRequestException(
+          inactive === 'supplier'
+            ? 'El proveedor está inactivo'
+            : 'Uno o más productos están inactivos',
+        ),
+      );
+      expect(transactionClient.purchase.updateMany).not.toHaveBeenCalled();
+      expect(transactionClient.purchaseItem.deleteMany).not.toHaveBeenCalled();
+      expect(transactionClient.purchaseItem.createMany).not.toHaveBeenCalled();
+      expect(folios.allocateNextAvailableFolio).not.toHaveBeenCalled();
+    },
+  );
+
+  it('rechaza productos de otro tenant antes de mutar el borrador', async () => {
+    transactionClient.purchase.findFirst.mockResolvedValue({
+      id: purchaseId,
+      status: PurchaseStatus.DRAFT,
+    });
+    transactionClient.product.findMany.mockResolvedValue([]);
+    await expect(
+      service.update(companyId, purchaseId, updateDto),
+    ).rejects.toThrow(
+      new NotFoundException(`Producto ${productId} no encontrado`),
+    );
+    expect(transactionClient.product.findMany).toHaveBeenCalledWith({
+      where: { companyId, id: { in: [productId] } },
+    });
+    expect(transactionClient.purchase.updateMany).not.toHaveBeenCalled();
+    expect(transactionClient.purchaseItem.deleteMany).not.toHaveBeenCalled();
+    expect(transactionClient.purchaseItem.createMany).not.toHaveBeenCalled();
+    expect(folios.allocateNextAvailableFolio).not.toHaveBeenCalled();
   });
 });
