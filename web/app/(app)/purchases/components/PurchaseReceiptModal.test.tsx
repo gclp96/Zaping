@@ -476,7 +476,7 @@ describe('OX-PUR-05 — editor por autoridad en ambos layouts', () => {
 });
 
 
-describe('RR-005 — preview de adjuntos sin persistencia', () => {
+describe('ZF-001-UX — documentos después del registro', () => {
   const props = {
     isOpen: true,
     receiptAuthority: 'PHYSICAL' as const,
@@ -501,25 +501,18 @@ describe('RR-005 — preview de adjuntos sin persistencia', () => {
     onViewInventory: vi.fn(),
   };
 
-  it('coloca adjuntos a la izquierda del resumen en workspace', () => {
-    vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'true');
-    render(<PurchaseReceiptModal {...props} attachmentPreview={<div data-testid="rr005-files">Archivos locales</div>} />);
-    const lowerArea = screen.getByTestId('receipt-lower-area');
-    const children = Array.from(lowerArea.children);
-    expect(children).toHaveLength(2);
-    expect(children[0].contains(screen.getByTestId('rr005-files'))).toBe(true);
-    expect(children[1].contains(screen.getByTestId('receipt-capture-summary'))).toBe(true);
-  });
-
-  it('bloquea registro con selección local; no invoca callback de negocio', () => {
-    vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'true');
+  it.each(['true', 'false'])('permite registrar sin selector local en workspace=%s', (workspace) => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', workspace);
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI', 'true');
     const onSubmit = vi.fn();
-    render(<PurchaseReceiptModal {...props} pendingAttachmentCount={2} onSubmit={onSubmit} />);
+    const { container } = render(<PurchaseReceiptModal {...props} onSubmit={onSubmit} />);
+    expect(screen.getByText('Los documentos se adjuntan después de registrar la recepción, desde su página de detalle.')).toBeTruthy();
+    expect(container.querySelector('input[type="file"]')).toBeNull();
+    expect(screen.queryByText(/No se guardarán/)).toBeNull();
     const submit = screen.getByRole('button', { name: 'Registrar recepción' }) as HTMLButtonElement;
-    expect(submit.disabled).toBe(true);
+    expect(submit.disabled).toBe(false);
     fireEvent.click(submit);
-    expect(onSubmit).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert').textContent).toContain('No se guardarán');
+    expect(onSubmit).toHaveBeenCalledOnce();
   });
 
   it('no altera la vista clásica al apagar el workspace', () => {
@@ -577,16 +570,13 @@ describe('RR-006 — confirmación de descarte', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it('archivos locales se consideran cambios; durante guardado no permite salir', () => {
+  it('durante guardado no permite salir', () => {
     vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'true');
     const onClose = vi.fn();
-    const { rerender } = render(<PurchaseReceiptModal {...base} pendingAttachmentCount={1} onClose={onClose} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Cerrar modal' }));
-    expect(screen.getByRole('dialog', { name: 'Descartar cambios de la recepción' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Continuar captura' }));
-    rerender(<PurchaseReceiptModal {...base} pendingAttachmentCount={1} saving onClose={onClose} />);
+    render(<PurchaseReceiptModal {...base} saving onClose={onClose} />);
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar modal' }));
     expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: 'Descartar cambios de la recepción' })).toBeNull();
   });
 
   it('Escape solicita descarte de notas no guardadas sin perder el contenido', () => {

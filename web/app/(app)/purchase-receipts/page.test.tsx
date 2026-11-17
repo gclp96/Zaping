@@ -230,6 +230,8 @@ async function openCapture(user: ReturnType<typeof userEvent.setup>) {
 
 async function submitCapture(user: ReturnType<typeof userEvent.setup>) {
   await openCapture(user);
+  expect(screen.getByText('Los documentos se adjuntan después de registrar la recepción, desde su página de detalle.')).toBeTruthy();
+  expect(document.querySelector('input[type="file"]')).toBeNull();
   const input = within(screen.getByTestId('receipt-desktop-items'))
     .getByRole('spinbutton', { name: 'Cantidad recibida de Material B3' });
   await user.type(input, '2');
@@ -242,7 +244,10 @@ describe('OX-PUR-06B3 — creación mediante el flujo existente', () => {
     sessionMock.mockReturnValue({ status: 'success', user: { role: 'ADMIN' } });
     creationApi();
   });
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllEnvs();
+  });
 
   it.each(['ADMIN', 'MANAGER', 'WAREHOUSE'])('permite iniciar a %s aun sin historial', async (role) => {
     sessionMock.mockReturnValue({ status: 'success', user: { role } });
@@ -419,6 +424,7 @@ describe('OX-PUR-06B3 — creación mediante el flujo existente', () => {
   });
 
   it.each(['detail', 'inventory'])('reutiliza éxito y navegación a %s tras refrescar historial', async (target) => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI', 'true');
     const user = userEvent.setup(); render(<PurchaseReceiptsPage />); await submitCapture(user);
     await screen.findByRole('dialog', { name: 'Recepción registrada correctamente' });
     expect(screen.getByText('RC-CREATED')).toBeTruthy();

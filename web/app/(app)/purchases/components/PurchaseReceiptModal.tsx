@@ -1,6 +1,6 @@
 import DateInput from '@/app/components/business/DateInput';
 import { CircleCheck } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 
 import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
@@ -42,8 +42,6 @@ type PurchaseReceiptModalProps = {
   error: string;
   fieldErrors?: PurchaseReceiptFieldErrors;
   createdReceipt: CreatedPurchaseReceipt | null;
-  attachmentPreview?: ReactNode;
-  pendingAttachmentCount?: number;
 
   onClose: () => void;
 
@@ -85,8 +83,6 @@ export default function PurchaseReceiptModal({
   error,
   fieldErrors = {},
   createdReceipt,
-  attachmentPreview,
-  pendingAttachmentCount = 0,
   onClose,
   onItemChange,
   onNotesChange,
@@ -103,8 +99,7 @@ export default function PurchaseReceiptModal({
     ) ||
     notes.trim() !== '' ||
     supplierDocumentType !== '' ||
-    supplierDocumentNumber.trim() !== '' ||
-    pendingAttachmentCount > 0;
+    supplierDocumentNumber.trim() !== '';
 
   function requestClose() {
     if (saving) return;
@@ -156,8 +151,8 @@ export default function PurchaseReceiptModal({
         className="w-full sm:w-auto"
         loading={saving}
         loadingText="Registrando..."
-        disabled={saving || !receiptAuthority || items.length === 0 || pendingAttachmentCount > 0}
-        onClick={() => { if (pendingAttachmentCount === 0) onSubmit(); }}
+        disabled={saving || !receiptAuthority || items.length === 0}
+        onClick={onSubmit}
       >
         Registrar recepción
       </Button>
@@ -829,19 +824,18 @@ export default function PurchaseReceiptModal({
               data-testid="receipt-lower-area"
               className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,11fr)_minmax(0,9fr)]"
             >
-              {attachmentPreview ? (
-                <div className="min-w-0 lg:col-start-1">{attachmentPreview}</div>
-              ) : null}
+              <p className="min-w-0 text-sm text-text-muted lg:col-start-1">
+                Los documentos se adjuntan después de registrar la recepción, desde su página de detalle.
+              </p>
               <div className="min-w-0 lg:col-start-2">
                 <ReceiptCaptureSummary items={items} />
               </div>
             </div>
           ) : null}
 
-          {!workspaceEnabled ? attachmentPreview : null}
-          {pendingAttachmentCount > 0 ? (
-            <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-              Hay {pendingAttachmentCount} archivo(s) seleccionados solo para vista previa. No se guardarán con la recepción. Limpia la selección para registrar sin adjuntos.
+          {!workspaceEnabled ? (
+            <p className="text-sm text-text-muted">
+              Los documentos se adjuntan después de registrar la recepción, desde su página de detalle.
             </p>
           ) : null}
           {error ? (
@@ -860,7 +854,7 @@ export default function PurchaseReceiptModal({
     <ConfirmDialog
       isOpen={isOpen && confirmDiscard && !saving && !createdReceipt}
       title="Descartar cambios de la recepción"
-      message="Hay información capturada que todavía no se ha registrado. Si sales, se perderán las cantidades, la trazabilidad, las notas y los archivos seleccionados en vista previa."
+      message="Hay información capturada que todavía no se ha registrado. Si sales, se perderán las cantidades, la trazabilidad, las notas y los documentos del proveedor."
       confirmText="Descartar cambios"
       cancelText="Continuar captura"
       confirmVariant="danger"

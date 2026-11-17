@@ -170,6 +170,33 @@ describe('environment configuration validation', () => {
     },
   );
 
+  it('allows R2 to remain unconfigured during local ERP development', () => {
+    const result = validateEnvironment({
+      ...productionConfig,
+      NODE_ENV: 'development',
+    });
+    expect(result.R2_ACCOUNT_ID).toBeUndefined();
+  });
+
+  it('rejects incomplete R2 configuration without leaking secrets', () => {
+    const error = validationError({
+      ...productionConfig,
+      R2_ACCOUNT_ID: 'a'.repeat(32),
+    });
+    expect(error?.message).toContain('R2_BUCKET');
+  });
+
+  it('accepts bucket-scoped R2 credentials when fully supplied', () => {
+    const result = validateEnvironment({
+      ...productionConfig,
+      R2_ACCOUNT_ID: 'a'.repeat(32),
+      R2_BUCKET: 'zaping-files-local',
+      R2_ACCESS_KEY_ID: 'example-key',
+      R2_SECRET_ACCESS_KEY: 'example-secret',
+    });
+    expect(result.R2_BUCKET).toBe('zaping-files-local');
+  });
+
   it('requires email settings in production', () => {
     const missingApiKey = { ...productionConfig };
     delete missingApiKey.RESEND_API_KEY;

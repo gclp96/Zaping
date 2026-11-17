@@ -34,7 +34,6 @@ import {
 } from './purchase-date';
 
 import StatusBadge from '@/app/components/business/StatusBadge';
-import ReceiptFilesPreview from '@/app/components/files/ReceiptFilesPreview';
 import PurchaseReceiptModal from './components/PurchaseReceiptModal';
 import PurchaseQuickDetailPanel from './components/PurchaseQuickDetailPanel';
 import PurchaseFormModal from './components/PurchaseFormModal';
@@ -263,7 +262,6 @@ const [quickDetailOpen, setQuickDetailOpen] = useState(false);
 const [quickDetailGeneration, setQuickDetailGeneration] = useState(0);
 const [directReceiveState, setDirectReceiveState] =
   useState<DirectReceiveState>(null);
-const [localAttachmentCount, setLocalAttachmentCount] = useState(0);
 const directReceiveRequestId = useRef(0);
 const directReceiveInFlight = useRef(false);
 const authenticatedCompanyTimezone =
@@ -566,14 +564,13 @@ const {
     }
   }
 
-function closeReceiptWithPreview() {
+function closeReceipt() {
   if (receiptSaving) return;
-  setLocalAttachmentCount(0);
   closeReceiptModal();
 }
 
 function handleViewCreatedReceipt(receiptId: string) {
-  closeReceiptWithPreview();
+  closeReceipt();
   router.push(`/purchase-receipts/${encodeURIComponent(receiptId)}`);
 }
 
@@ -581,7 +578,7 @@ function handleViewCreatedReceiptInventory(
   receiptId: string,
   receiptFolio: string,
 ) {
-  closeReceiptWithPreview();
+  closeReceipt();
   router.push(getPurchaseReceiptInventoryHref(receiptId, receiptFolio));
 }
 
@@ -1314,14 +1311,10 @@ async function loadPageData() {
         error={receiptFormError}
         fieldErrors={receiptFieldErrors}
         createdReceipt={createdReceipt}
-        onClose={closeReceiptWithPreview}
-        pendingAttachmentCount={localAttachmentCount}
-        attachmentPreview={process.env.NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI === 'true' && purchaseToReceive && !createdReceipt ? (
-          <ReceiptFilesPreview key={purchaseToReceive.id} mode="registration" receiptFolio={purchaseToReceive.folio} onSelectionCountChange={setLocalAttachmentCount} />
-        ) : null}
+        onClose={closeReceipt}
         onItemChange={handleReceiptItemChange}
         onNotesChange={handleReceiptNotesChange}
-        onSubmit={() => { if (localAttachmentCount === 0) void handleCreateReceipt(); }}
+        onSubmit={() => { void handleCreateReceipt(); }}
         onViewReceipt={handleViewCreatedReceipt}
         onViewInventory={handleViewCreatedReceiptInventory}
       />

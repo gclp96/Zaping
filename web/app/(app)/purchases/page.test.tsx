@@ -429,6 +429,8 @@ beforeEach(() => {
   routerMock.search = '';
 });
 
+afterEach(() => vi.unstubAllEnvs());
+
 describe('PurchasesPage — compatibilidad de navegación legacy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -1951,6 +1953,7 @@ it('rechaza una fecha de caducidad sin número de lote', async () => {
 });
 
 it('envía correctamente la recepción al backend', async () => {
+  vi.stubEnv('NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI', 'true');
   const user = userEvent.setup();
 
   vi.mocked(api.post).mockResolvedValue({
@@ -1973,6 +1976,9 @@ it('envía correctamente la recepción al backend', async () => {
   await screen.findByRole('heading', {
     name: /registrar recepci[oó]n.*OC-0001/i,
   });
+
+  expect(screen.getByText('Los documentos se adjuntan después de registrar la recepción, desde su página de detalle.')).toBeTruthy();
+  expect(document.querySelector('input[type="file"]')).toBeNull();
 
   const receiptDesktop = screen.getByTestId('receipt-desktop-items');
   const quantityInput = within(receiptDesktop).getByRole(
