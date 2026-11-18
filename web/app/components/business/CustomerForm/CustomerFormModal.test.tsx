@@ -38,7 +38,10 @@ async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
     screen.getByRole('textbox', { name: 'Nombre' }),
     '  Clínica del Centro  ',
   );
-  await user.type(screen.getByRole('textbox', { name: 'Tipo' }), '  Clínica  ');
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: 'Tipo' }),
+    'CLINIC',
+  );
   await user.type(
     screen.getByRole('textbox', { name: 'Email' }),
     '  centro@clinica.test  ',
@@ -75,13 +78,17 @@ describe('CustomerFormModal', () => {
       within(dialog).getByRole('heading', { name: /Información adicional/ }),
     ).toBeTruthy();
 
-    for (const label of ['Nombre', 'Tipo', 'Email', 'Teléfono']) {
+    for (const label of ['Nombre', 'Email', 'Teléfono']) {
       expect(
         (screen.getByRole('textbox', { name: label }) as HTMLInputElement)
           .required,
       ).toBe(true);
     }
-    for (const label of ['Contacto', 'Dirección']) {
+    expect(
+      (screen.getByRole('combobox', { name: 'Tipo' }) as HTMLSelectElement)
+        .required,
+    ).toBe(true);
+    for (const label of ['Contacto', 'Dirección', 'Ciudad', 'Estado / provincia', 'País (código ISO)']) {
       expect(
         (screen.getByRole('textbox', { name: label }) as HTMLInputElement)
           .required,
@@ -151,7 +158,10 @@ describe('CustomerFormModal', () => {
     );
 
     await user.type(screen.getByRole('textbox', { name: 'Nombre' }), 'Cliente QA');
-    await user.type(screen.getByRole('textbox', { name: 'Tipo' }), 'Hospital');
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Tipo' }),
+      'HOSPITAL',
+    );
     await user.type(screen.getByRole('textbox', { name: 'Email' }), 'invalido');
     await user.type(screen.getByRole('textbox', { name: 'Teléfono' }), '6621231234');
     await user.click(screen.getByRole('button', { name: 'Registrar cliente' }));
@@ -182,11 +192,14 @@ describe('CustomerFormModal', () => {
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith('/customers', {
         name: 'Clínica del Centro',
-        type: 'Clínica',
+        type: 'CLINIC',
         email: 'centro@clinica.test',
         phone: '6621112233',
         contactName: 'Ana',
         address: 'Norte',
+        city: null,
+        state: null,
+        countryCode: 'MX',
         notes: 'Verificar datos',
       });
       expect(onSaved).toHaveBeenCalledWith(customer);
@@ -223,15 +236,58 @@ describe('CustomerFormModal', () => {
     await waitFor(() =>
       expect(api.patch).toHaveBeenCalledWith('/customers/customer-a', {
         name: 'Hospital Actualizado',
-        type: customer.type,
+        type: undefined,
         email: customer.email,
         phone: customer.phone,
         contactName: customer.contactName,
         address: customer.address,
+        city: null,
+        state: null,
+        countryCode: null,
         notes: customer.notes,
       }),
     );
     expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('saves explicit classification and structured location on legacy edits', async () => {
+    const user = userEvent.setup();
+    render(
+      <CustomerFormModal
+        isOpen
+        customer={{ ...customer, type: 'Licitación histórica' }}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/Clasificación anterior/)).toBeTruthy();
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Tipo' }),
+      'PUBLIC_INSTITUTION',
+    );
+    await user.type(screen.getByRole('textbox', { name: 'Ciudad' }), 'Hermosillo');
+    await user.type(
+      screen.getByRole('textbox', { name: 'Estado / provincia' }),
+      'Sonora',
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'País (código ISO)' }),
+      'mx',
+    );
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledWith(
+        '/customers/customer-a',
+        expect.objectContaining({
+          type: 'PUBLIC_INSTITUTION',
+          city: 'Hermosillo',
+          state: 'Sonora',
+          countryCode: 'MX',
+        }),
+      ),
+    );
   });
 
   it('keeps the form open after an API failure and allows resubmission', async () => {
