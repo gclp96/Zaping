@@ -22,7 +22,6 @@ type FormErrors = {
   name?: string;
   type?: string;
   email?: string;
-  phone?: string;
 };
 
 type CustomerFormContentProps = {
@@ -76,7 +75,7 @@ function CustomerFormContent({
   const editing = Boolean(customer);
 
   useEffect(() => {
-    if (!/^\\d{5}$/.test(postalCode) || countryCode.toUpperCase() !== 'MX') {
+    if (!/^\d{5}$/.test(postalCode) || countryCode.toUpperCase() !== 'MX') {
       return;
     }
     let cancelled = false;
@@ -134,9 +133,7 @@ function CustomerFormContent({
     if (!trimmedType) {
       nextErrors.type = 'El tipo de cliente es obligatorio.';
     }
-    if (!trimmedEmail) {
-      nextErrors.email = 'El correo electrónico es obligatorio.';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       nextErrors.email = 'Ingresa un correo electrónico válido.';
     }
 
@@ -367,10 +364,10 @@ function CustomerFormContent({
             value={postalCode}
             disabled={saving}
             onChange={(event) => {
-              setPostalCode(event.target.value.replace(/\\D/g, '').slice(0, 5));
+              setPostalCode(event.target.value.replace(/\D/g, '').slice(0, 5));
               setPostalMatches([]);
               setPostalStatus('');
-              setPostalLoading(true);
+              setPostalLoading(/^\d{5}$/.test(event.target.value.replace(/\D/g, '')));
               setNeighborhood('');
             }}
           />
@@ -384,25 +381,26 @@ function CustomerFormContent({
                 name="neighborhood"
                 value={neighborhood}
                 disabled={saving}
-                onChange={(event) => setNeighborhood(event.target.value)}
+                onChange={(event) => {
+                  setNeighborhood(event.target.value);
+                }}
                 className="w-full rounded-lg border border-gray-300 bg-white p-3 text-sm"
               >
                 <option value="">Selecciona una colonia</option>
                 {postalMatches.map((item) => <option key={item} value={item}>{item}</option>)}
-                <option value="__OTHER__">Otra (captura manual)</option>
               </select>
             ) : null}
-            {!postalMatches.length || neighborhood === '__OTHER__' ? (
+            {!postalMatches.length ? (
               <Input
                 name="neighborhoodManual"
                 label="Colonia (captura manual)"
-                value={neighborhood === '__OTHER__' ? '' : neighborhood}
+                value={neighborhood}
                 disabled={saving}
                 onChange={(event) => setNeighborhood(event.target.value)}
               />
             ) : null}
             {postalStatus ? <p role="status" className="text-xs text-text-muted">{postalStatus}</p> : null}
-            {postalLoading && /^\\d{5}$/.test(postalCode) ? <p className="text-xs text-text-muted">Buscando código postal...</p> : null}
+            {postalLoading && /^\d{5}$/.test(postalCode) ? <p className="text-xs text-text-muted">Buscando código postal...</p> : null}
           </div>
           <Input
             name="city"
