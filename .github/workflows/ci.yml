@@ -39,6 +39,16 @@ jobs:
           node --check scripts/qa/audit-zaping-files-r2-history.cjs
           node --test scripts/qa/audit-zaping-files-r2-history.test.cjs
 
+      - name: Validate isolated history rehearsal Compose syntax
+        run: |
+          test ! -e .qa/api.env
+          test ! -e .qa/postgres.env
+          mkdir -p .qa
+          trap 'rm -f .qa/api.env .qa/postgres.env' EXIT
+          printf 'DATABASE_URL=postgresql://zaping_qa:synthetic-only@zaping-qa-postgres:5432/zaping_qa\n' > .qa/api.env
+          printf 'POSTGRES_USER=zaping_qa\nPOSTGRES_PASSWORD=synthetic-only\nPOSTGRES_DB=zaping_qa\n' > .qa/postgres.env
+          docker compose -f docker-compose.qa-history-rehearsal.yml config --quiet
+
   historical-upgrade:
     name: Historical upgrade pre-S1
     runs-on: ubuntu-latest
