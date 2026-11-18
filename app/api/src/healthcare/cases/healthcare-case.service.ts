@@ -223,8 +223,7 @@ export class HealthcareCaseService {
               folio: healthcareCase.folio,
               title: healthcareCase.title,
               scheduledStart: healthcareCase.scheduledStart.toISOString(),
-              scheduledEnd:
-                healthcareCase.scheduledEnd?.toISOString() ?? null,
+              scheduledEnd: healthcareCase.scheduledEnd?.toISOString() ?? null,
               hospitalName: healthcareCase.healthcareHospital?.name ?? null,
             },
           ]
