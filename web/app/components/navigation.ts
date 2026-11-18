@@ -37,7 +37,7 @@ export type NavigationGroup = {
 
 export const navigationGroups: NavigationGroup[] = [
   {
-    label: "INICIO",
+    label: "GENERAL",
     items: [
       {
         label: "Inicio",
@@ -52,7 +52,7 @@ export const navigationGroups: NavigationGroup[] = [
     ],
   },
   {
-    label: "COMERCIAL",
+    label: "VENTAS",
     items: [
       {
         label: "Clientes",
@@ -84,7 +84,7 @@ export const navigationGroups: NavigationGroup[] = [
         visibleForRoles: WAREHOUSE_ROLES,
       },
       {
-        label: "Compras",
+        label: "Órdenes de compra",
         href: "/purchases",
         icon: ClipboardList,
         visibleForRoles: WAREHOUSE_ROLES,
@@ -110,6 +110,11 @@ export const navigationGroups: NavigationGroup[] = [
         label: "Productos",
         href: "/products",
         icon: Package,
+      },
+      {
+        label: "Categorías",
+        href: "/categories",
+        icon: Tags,
       },
       {
         label: "Inventario",
@@ -152,11 +157,6 @@ export const navigationGroups: NavigationGroup[] = [
         href: "/users",
         icon: UsersRound,
         visibleForRoles: ["ADMIN"],
-      },
-      {
-        label: "Categorías",
-        href: "/categories",
-        icon: Tags,
       },
     ],
   },
