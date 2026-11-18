@@ -75,9 +75,9 @@ describe('RecentActivitySection', () => {
     expect(links).toHaveLength(4);
     expect(links.map((link) => link.getAttribute('href'))).toEqual([
       '/purchase-receipts/receipt-1',
-      '/sales',
+      '/sales?saleId=sale-1',
       '/quotes',
-      '/purchases',
+      '/purchases/purchase-1',
     ]);
     expect(container.querySelectorAll('time')).toHaveLength(4);
   });
@@ -92,7 +92,9 @@ describe('RecentActivitySection', () => {
 
   it('preserves the receipt identifier as part of its route', () => {
     expect(getRecentActivityHref(records[0])).toBe('/purchase-receipts/receipt-1');
-    expect(getRecentActivityHref(records[1])).toBe('/sales');
+    expect(getRecentActivityHref(records[1])).toBe('/sales?saleId=sale-1');
+    expect(getRecentActivityHref(records[2])).toBe('/quotes');
+    expect(getRecentActivityHref(records[3])).toBe('/purchases/purchase-1');
   });
 
   it('shows a useful empty state when no documents exist', async () => {
