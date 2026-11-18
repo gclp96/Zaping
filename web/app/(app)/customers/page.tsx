@@ -362,14 +362,6 @@ export default function CustomersPage() {
           </Section>
         ) : (
           <Section>
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-              <h2 className="text-base font-semibold text-text">
-                Clientes activos
-              </h2>
-              <span className="rounded-full bg-primary-subtle px-2.5 py-0.5 text-xs font-semibold tabular-nums text-primary">
-                {customers.length}
-              </span>
-            </div>
             <DataTable
               caption="Catálogo de clientes"
               rows={paginatedCustomers}
@@ -380,47 +372,59 @@ export default function CustomersPage() {
                 onChange: setSorting,
               }}
               toolbar={
-                customers.length > 0 ? (
-                  <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 sm:flex-row sm:items-end sm:justify-between">
-                    <div className="w-full min-w-0 sm:max-w-lg">
-                      <Input
-                        type="search"
-                        label="Buscar clientes"
-                        value={search}
-                        placeholder="Nombre, tipo, correo, teléfono o contacto"
-                        startAdornment={<Search aria-hidden="true" size={17} />}
-                        onChange={(event) => {
-                          setSearch(event.target.value);
-                          setPageIndex(0);
-                        }}
-                      />
-                    </div>
-                    <div className="flex shrink-0 items-center gap-3">
-                      <span
-                        role="status"
-                        aria-live="polite"
-                        className="rounded-full bg-surface-subtle px-3 py-1.5 text-xs font-medium tabular-nums text-text-secondary"
-                      >
-                        {isFiltered
-                          ? `${sortedCustomers.length} de ${customers.length} clientes`
-                          : `${customers.length} ${customers.length === 1 ? 'cliente' : 'clientes'}`}
-                      </span>
-                      {isFiltered ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSearch('');
+                <div
+                  role="group"
+                  aria-label="Herramientas de clientes"
+                  className="flex flex-col gap-3 rounded-xl border border-border bg-surface px-4 py-3 lg:flex-row lg:items-end lg:justify-between"
+                >
+                  <div className="flex min-h-10 shrink-0 items-center gap-2 lg:self-center">
+                    <h2 className="text-base font-semibold text-text">
+                      Clientes activos
+                    </h2>
+                    <span className="rounded-full bg-primary-subtle px-2.5 py-0.5 text-xs font-semibold tabular-nums text-primary">
+                      {customers.length}
+                    </span>
+                  </div>
+                  {customers.length > 0 ? (
+                    <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end lg:justify-end">
+                      <div className="w-full min-w-0 sm:w-80 xl:w-[28rem]">
+                        <Input
+                          type="search"
+                          label="Buscar clientes"
+                          value={search}
+                          placeholder="Nombre, tipo, correo, teléfono o contacto"
+                          startAdornment={<Search aria-hidden="true" size={17} />}
+                          onChange={(event) => {
+                            setSearch(event.target.value);
                             setPageIndex(0);
                           }}
-                        >
-                          Limpiar búsqueda
-                        </Button>
+                        />
+                      </div>
+                      {isFiltered ? (
+                        <div className="flex shrink-0 flex-wrap items-center gap-2">
+                          <span
+                            role="status"
+                            aria-live="polite"
+                            className="text-xs font-medium tabular-nums text-text-secondary"
+                          >
+                            {sortedCustomers.length} coincidencias
+                          </span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSearch('');
+                              setPageIndex(0);
+                            }}
+                          >
+                            Limpiar búsqueda
+                          </Button>
+                        </div>
                       ) : null}
                     </div>
-                  </div>
-                ) : undefined
+                  ) : null}
+                </div>
               }
               pagination={
                 customers.length > 0
