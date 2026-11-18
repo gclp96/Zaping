@@ -328,14 +328,18 @@ enum EquipmentRetirementReason {
 model Customer {
   id          String   @id @default(uuid())
   companyId   String
-  name        String
-  type        String?
-  email       String?
-  phone       String?
-  address     String?
-  city        String?
-  state       String?
-  countryCode String?
+  name         String
+  legalName    String?
+  type         String?
+  email        String?
+  phone        String?
+  address      String?
+  postalCode   String?
+  neighborhood String?
+  municipality String?
+  city         String?
+  state        String?
+  countryCode  String?
   contactName String?
   creditLimit Decimal?
   notes       String?
