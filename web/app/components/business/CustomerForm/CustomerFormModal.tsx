@@ -479,7 +479,7 @@ function CustomerFormContent({
           {stateOptions.length ? (
             <Select
               name="state"
-              label="Estado"
+              label="Estado / provincia"
               value={state}
               options={[
                 ...(!stateOptions.some((option) => option.name === state) && state
@@ -524,7 +524,7 @@ function CustomerFormContent({
           <div>
             <Input
               name="municipality"
-              label="Municipio / alcaldía"
+              label="Municipio"
               placeholder="Selecciona o escribe el municipio"
               list="customer-municipalities"
               value={municipality}
@@ -541,7 +541,7 @@ function CustomerFormContent({
           <div className="sm:col-span-2">
             <Input
               name="city"
-              label="Ciudad / localidad"
+              label="Ciudad"
               placeholder="Selecciona o escribe la ciudad"
               list="customer-cities"
               value={city}
