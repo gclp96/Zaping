@@ -39,7 +39,7 @@ export class CustomersController {
    */
   @Get('postal-lookup/:code')
   async lookupPostalCode(@Param('code') code: string) {
-    if (!/^\\d{5}$/.test(code)) {
+    if (!/^\d{5}$/.test(code)) {
       throw new BadRequestException('Código postal inválido');
     }
     const key = process.env.POSTALKIT_API_KEY;
@@ -56,7 +56,9 @@ export class CustomersController {
       );
       if (response.status === 404) return { code, settlements: [] };
       if (!response.ok) {
-        throw new ServiceUnavailableException('Consulta postal temporalmente no disponible');
+        throw new ServiceUnavailableException(
+          'Consulta postal temporalmente no disponible',
+        );
       }
       const body: unknown = await response.json();
       return this.customersService.normalizePostalLookup(code, body);
