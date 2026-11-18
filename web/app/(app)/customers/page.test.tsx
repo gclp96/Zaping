@@ -461,11 +461,15 @@ describe('CustomersPage', () => {
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith('/customers', {
         name: newCustomer.name,
+        legalName: null,
         type: 'CLINIC',
         email: newCustomer.email,
         phone: newCustomer.phone,
         contactName: undefined,
         address: undefined,
+        postalCode: null,
+        neighborhood: null,
+        municipality: null,
         city: null,
         state: null,
         countryCode: 'MX',
