@@ -81,6 +81,25 @@ describe('CustomersService', () => {
     });
   });
 
+  it('normalizes state, municipality, and city options safely', () => {
+    expect(
+      service.normalizeGeographyOptions({
+        data: [
+          { id: 26, name: 'Sonora', code: '26' },
+          { id: 0, name: 'Invalid' },
+          { id: 12, name: 'Hermosillo' },
+          { id: 3, name: '' },
+          null,
+        ],
+      }),
+    ).toEqual([
+      { id: 26, name: 'Sonora', code: '26' },
+      { id: 12, name: 'Hermosillo' },
+    ]);
+    expect(service.normalizeGeographyOptions({ data: {} })).toEqual([]);
+    expect(service.normalizeGeographyOptions(null)).toEqual([]);
+  });
+
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
