@@ -169,6 +169,63 @@ describe('CustomerFormModal', () => {
     expect(api.get).toHaveBeenCalledWith('/customers/postal-lookup/83000');
   });
 
+  it('allows manual address entry when postal lookup is unavailable', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.get).mockRejectedValue(new Error('Postal service offline'));
+    render(<CustomerFormModal isOpen onClose={vi.fn()} onSaved={vi.fn()} />);
+    await user.type(screen.getByRole('textbox', { name: 'Código postal' }), '83000');
+    expect(
+      await screen.findByText(/Consulta no disponible/),
+    ).toBeTruthy();
+    await user.type(
+      screen.getByRole('textbox', { name: 'Colonia (captura manual)' }),
+      'Las Palmas',
+    );
+    await user.type(screen.getByRole('textbox', { name: 'Ciudad' }), 'Hermosillo');
+    await user.type(screen.getByRole('textbox', { name: 'Estado / provincia' }), 'Sonora');
+    await user.type(screen.getByRole('textbox', { name: 'Nombre' }), 'Cliente manual');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Tipo' }), 'BUSINESS');
+    await user.click(screen.getByRole('button', { name: 'Registrar cliente' }));
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/customers',
+        expect.objectContaining({
+          postalCode: '83000',
+          neighborhood: 'Las Palmas',
+          city: 'Hermosillo',
+          state: 'Sonora',
+        }),
+      ),
+    );
+  });
+
+  it('keeps an unclassified historical type when editing another field', async () => {
+    const user = userEvent.setup();
+    render(
+      <CustomerFormModal
+        isOpen
+        customer={{ ...customer, type: 'Tipo histórico desconocido' }}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Razón social' }),
+      'Hospital del Norte SA de CV',
+    );
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledWith(
+        '/customers/customer-a',
+        expect.objectContaining({
+          name: customer.name,
+          legalName: 'Hospital del Norte SA de CV',
+          type: undefined,
+        }),
+      ),
+    );
+  });
+
   it('creates a customer with only name and type', async () => {
     const user = userEvent.setup();
     render(<CustomerFormModal isOpen onClose={vi.fn()} onSaved={vi.fn()} />);
