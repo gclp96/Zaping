@@ -210,7 +210,7 @@ describe('CustomersPage', () => {
 
     const search = screen.getByRole('searchbox', { name: 'Buscar clientes' });
     await user.type(search, 'clinica');
-    expect(screen.getByText('1 coincidencias')).toBeTruthy();
+    expect(screen.getByText('1 coincidencia')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Limpiar búsqueda' })).toBeTruthy();
     expect(screen.getByText(clinicCustomer.name)).toBeTruthy();
     expect(screen.queryByText(hospitalCustomer.name)).toBeNull();
