@@ -773,6 +773,13 @@ function CustomerFormContent({
               hasMore={cityHasMore}
               onLoadMore={loadMoreCities}
               loadMoreLabel="Ver más ciudades"
+              emptyMessage={
+                !selectedMunicipalityId
+                  ? 'Selecciona un municipio o escribe la ciudad manualmente.'
+                  : cityOptions.length === 0
+                    ? 'No hay ciudades registradas para este municipio. Puedes escribirla manualmente.'
+                    : 'No hay coincidencias para esta ciudad. Puedes escribirla manualmente.'
+              }
               onChange={(value) => {
                 setCity(value);
                 setFormError('');
