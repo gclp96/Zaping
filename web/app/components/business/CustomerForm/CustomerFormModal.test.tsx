@@ -88,12 +88,26 @@ describe('CustomerFormModal', () => {
       (screen.getByRole('combobox', { name: 'Tipo' }) as HTMLSelectElement)
         .required,
     ).toBe(true);
-    for (const label of ['Email', 'Teléfono', 'Razón social', 'Código postal', 'Municipio', 'Contacto', 'Dirección', 'Ciudad', 'Estado / provincia', 'País (código ISO)']) {
+    for (const label of ['Email', 'Teléfono', 'Razón social', 'Código postal', 'Municipio', 'Contacto', 'Dirección', 'Ciudad', 'Estado / provincia']) {
       expect(
         (screen.getByRole('textbox', { name: label }) as HTMLInputElement)
           .required,
       ).toBe(false);
     }
+  });
+
+  it('does not display the technical ISO country field', () => {
+    render(<CustomerFormModal isOpen onClose={vi.fn()} onSaved={vi.fn()} />);
+    expect(screen.queryByRole('textbox', { name: 'País (código ISO)' })).toBeNull();
+  });
+
+  it('explains when the postal service needs configuration', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.get).mockRejectedValue(new Error('Consulta postal no configurada'));
+    render(<CustomerFormModal isOpen onClose={vi.fn()} onSaved={vi.fn()} />);
+    await user.type(screen.getByRole('textbox', { name: 'Código postal' }), '83140');
+    expect(await screen.findByText(/Autocompletado postal no configurado/)).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: 'Colonia / asentamiento' })).toBeTruthy();
   });
 
   it('keeps save and cancel actions outside the scrollable form content', async () => {
@@ -349,7 +363,7 @@ describe('CustomerFormModal', () => {
     render(
       <CustomerFormModal
         isOpen
-        customer={{ ...customer, type: 'Licitación histórica' }}
+        customer={{ ...customer, type: 'Licitación histórica', countryCode: 'MX' }}
         onClose={vi.fn()}
         onSaved={vi.fn()}
       />,
@@ -365,10 +379,7 @@ describe('CustomerFormModal', () => {
       screen.getByRole('textbox', { name: 'Estado / provincia' }),
       'Sonora',
     );
-    await user.type(
-      screen.getByRole('textbox', { name: 'País (código ISO)' }),
-      'mx',
-    );
+
     await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
 
     await waitFor(() =>
