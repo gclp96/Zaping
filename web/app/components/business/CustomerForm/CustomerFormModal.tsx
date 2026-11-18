@@ -102,10 +102,14 @@ function CustomerFormContent({
             setMunicipality(data.municipality ?? '');
           }
         })
-        .catch(() => {
-          if (!cancelled) {
-            setPostalStatus('Consulta no disponible. Puedes capturar el domicilio manualmente.');
-          }
+        .catch((error: unknown) => {
+          if (cancelled) return;
+          const message = getApiErrorMessage(error, '');
+          setPostalStatus(
+            message.includes('Consulta postal no configurada')
+              ? 'Autocompletado postal no configurado. Puedes capturar el domicilio manualmente.'
+              : 'Consulta no disponible. Puedes capturar el domicilio manualmente.',
+          );
         })
         .finally(() => {
           if (!cancelled) setPostalLoading(false);
@@ -366,6 +370,7 @@ function CustomerFormContent({
             onChange={(event) => {
               setPostalCode(event.target.value.replace(/\D/g, '').slice(0, 5));
               setPostalLookupRequested(true);
+              setCountryCode('MX');
               setPostalMatches([]);
               setPostalStatus('');
               setPostalLoading(/^\d{5}$/.test(event.target.value.replace(/\D/g, '')));
@@ -373,10 +378,11 @@ function CustomerFormContent({
             }}
           />
           <div className="space-y-1">
-            <label htmlFor="customer-neighborhood" className="block font-medium text-gray-700">
-              Colonia / asentamiento
-            </label>
             {postalMatches.length ? (
+              <>
+                <label htmlFor="customer-neighborhood" className="block font-medium text-gray-700">
+                  Colonia / asentamiento
+                </label>
               <select
                 id="customer-neighborhood"
                 name="neighborhood"
@@ -390,16 +396,16 @@ function CustomerFormContent({
                 <option value="">Selecciona una colonia</option>
                 {postalMatches.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
-            ) : null}
-            {!postalMatches.length ? (
+              </>
+            ) : (
               <Input
                 name="neighborhoodManual"
-                label="Colonia (captura manual)"
+                label="Colonia / asentamiento"
                 value={neighborhood}
                 disabled={saving}
                 onChange={(event) => setNeighborhood(event.target.value)}
               />
-            ) : null}
+            )}
             {postalStatus ? <p role="status" className="text-xs text-text-muted">{postalStatus}</p> : null}
             {postalLoading && countryCode.toUpperCase() === 'MX' && /^\d{5}$/.test(postalCode) ? <p className="text-xs text-text-muted">Buscando código postal...</p> : null}
           </div>
@@ -437,21 +443,6 @@ function CustomerFormContent({
           disabled={saving}
           onChange={(event) => setMunicipality(event.target.value)}
         />
-        <div className="sm:max-w-xs">
-          <Input
-            name="countryCode"
-            label="País (código ISO)"
-            placeholder="MX"
-            helperText="Dos letras, por ejemplo MX o US."
-            value={countryCode}
-            maxLength={2}
-            disabled={saving}
-            onChange={(event) => {
-              setCountryCode(event.target.value.toUpperCase());
-              setFormError('');
-            }}
-          />
-        </div>
         <Input
           name="address"
           label="Dirección"
