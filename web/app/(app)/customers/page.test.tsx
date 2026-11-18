@@ -249,6 +249,43 @@ describe('CustomersPage', () => {
     expect((search as HTMLInputElement).value).toBe('');
   });
 
+  it('muestra municipio y estado sin ciudad y permite filtrar esa ubicación', async () => {
+    const user = userEvent.setup();
+    const customerFromMunicipality = {
+      ...clinicCustomer,
+      id: 'qa-ux005d-address',
+      name: 'QA-UX005D-Domicilio',
+      type: 'INDIVIDUAL',
+      municipality: 'Acateno',
+      city: null,
+      state: 'Puebla',
+      countryCode: 'MX',
+    };
+    configureApiMocks([clinicCustomer, customerFromMunicipality]);
+    render(<CustomersPage />);
+    const row = (await screen.findByText(customerFromMunicipality.name)).closest('tr');
+    expect(row).not.toBeNull();
+    expect(
+      within(row as HTMLElement).getByText('Acateno, Puebla'),
+    ).toBeTruthy();
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Ubicación' }),
+      'ACATENO|PUEBLA|MX',
+    );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Tipo' }),
+      'INDIVIDUAL',
+    );
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Nombre' }),
+      'domicilio',
+    );
+    expect(screen.getByText(customerFromMunicipality.name)).toBeTruthy();
+    expect(screen.queryByText(clinicCustomer.name)).toBeNull();
+    expect(screen.getByText('1 coincidencia')).toBeTruthy();
+  });
+
   it('muestra datos vacíos con indicadores discretos y simplifica la paginación', async () => {
     const customerWithoutDetails = {
       ...clinicCustomer,
