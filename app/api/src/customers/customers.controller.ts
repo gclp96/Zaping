@@ -31,6 +31,12 @@ export class CustomersController {
     return this.customersService.findAll(req.user.companyId);
   }
 
+  @Get(':id/overview')
+  getOverview(@Request() req: any, @Param('id') id: string) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+    return this.customersService.getOverview(req.user.companyId, id);
+  }
+
   @Get(':id')
   findOne(@Request() req: any, @Param('id') id: string) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
