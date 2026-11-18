@@ -41,7 +41,7 @@ export default function Sidebar({
   return (
     <aside
       id={id}
-      className={`min-h-0 flex-col overflow-y-auto overscroll-contain bg-slate-950 py-4 text-white ${
+      className={`zaping-sidebar-scroll min-h-0 flex-col overflow-y-auto overscroll-contain bg-slate-950 py-4 text-white ${
         collapsed ? "w-20 px-2" : "w-64 px-4"
       } ${
         transitionEnabled
@@ -105,7 +105,14 @@ export default function Sidebar({
         aria-label="Navegación principal"
       >
         {navigationGroups.map((group) => (
-          <div key={group.label}>
+          <div
+            key={group.label}
+            className={
+              collapsed
+                ? "border-b border-white/10 pb-3 last:border-b-0 last:pb-0"
+                : undefined
+            }
+          >
             <p
               className={
                 collapsed
