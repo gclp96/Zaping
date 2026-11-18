@@ -56,6 +56,7 @@ export type DataTablePaginationState = {
   pageIndex: number;
   pageSize: number;
   totalRows: number;
+  compact?: boolean;
   onPageChange: (pageIndex: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   pageSizeOptions?: readonly number[];
