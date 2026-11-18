@@ -34,6 +34,11 @@ jobs:
       - name: Run agent tests
         run: node --test scripts/agents/*.test.mjs
 
+      - name: Verify read-only migration audit helpers (issue 284)
+        run: |
+          node --check scripts/qa/audit-zaping-files-r2-history.cjs
+          node --test scripts/qa/audit-zaping-files-r2-history.test.cjs
+
   historical-upgrade:
     name: Historical upgrade pre-S1
     runs-on: ubuntu-latest
