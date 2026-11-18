@@ -21,6 +21,7 @@ type Props = {
   value: string;
   options: LocationOption[];
   placeholder: string;
+  emptyMessage?: string;
   disabled?: boolean;
   loading?: boolean;
   hasMore?: boolean;
@@ -49,6 +50,7 @@ export default function CustomerLocationCombobox({
   value,
   options,
   placeholder,
+  emptyMessage = 'No hay coincidencias en las opciones cargadas. Puedes escribir el valor manualmente.',
   disabled = false,
   loading = false,
   hasMore = false,
@@ -183,8 +185,7 @@ export default function CustomerLocationCombobox({
             ) : null}
             {!loading && visible.length === 0 ? (
               <p className="px-3 py-2 text-xs text-gray-500">
-                No hay coincidencias en las opciones cargadas. Puedes escribir
-                el valor manualmente.
+                {emptyMessage}
               </p>
             ) : null}
             {filtered.length > visible.length ? (
