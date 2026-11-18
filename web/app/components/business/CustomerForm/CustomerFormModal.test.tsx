@@ -51,7 +51,8 @@ async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
 
 describe('CustomerFormModal', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    vi.mocked(api.get).mockResolvedValue({ data: [] } as never);
     vi.mocked(api.post).mockResolvedValue({ data: customer } as never);
     vi.mocked(api.patch).mockResolvedValue({ data: customer } as never);
   });
@@ -88,9 +89,15 @@ describe('CustomerFormModal', () => {
       (screen.getByRole('combobox', { name: 'Tipo' }) as HTMLSelectElement)
         .required,
     ).toBe(true);
-    for (const label of ['Email', 'Teléfono', 'Razón social', 'Código postal', 'Municipio', 'Contacto', 'Dirección', 'Ciudad', 'Estado / provincia']) {
+    for (const label of ['Email', 'Teléfono', 'Razón social', 'Código postal', 'Contacto', 'Dirección', 'Estado / provincia']) {
       expect(
         (screen.getByRole('textbox', { name: label }) as HTMLInputElement)
+          .required,
+      ).toBe(false);
+    }
+    for (const label of ['Municipio', 'Ciudad']) {
+      expect(
+        (screen.getByRole('combobox', { name: label }) as HTMLInputElement)
           .required,
       ).toBe(false);
     }
@@ -194,8 +201,8 @@ describe('CustomerFormModal', () => {
         document.querySelector('#customer-cities option[value="Hermosillo"]'),
       ).not.toBeNull();
     });
-    await user.type(screen.getByRole('textbox', { name: 'Municipio' }), 'Hermosillo');
-    await user.type(screen.getByRole('textbox', { name: 'Ciudad' }), 'Hermosillo');
+    await user.type(screen.getByRole('combobox', { name: 'Municipio' }), 'Hermosillo');
+    await user.type(screen.getByRole('combobox', { name: 'Ciudad' }), 'Hermosillo');
     await user.type(screen.getByRole('textbox', { name: 'Dirección' }), 'Calle 12 #30');
     expect(
       (screen.getByRole('textbox', { name: 'Dirección' }) as HTMLInputElement).value,
@@ -225,7 +232,7 @@ describe('CustomerFormModal', () => {
       screen.getByRole('combobox', { name: 'Colonia / asentamiento' }),
       'Centro',
     );
-    expect((screen.getByRole('textbox', { name: 'Ciudad' }) as HTMLInputElement).value).toBe('Hermosillo');
+    expect((screen.getByRole('combobox', { name: 'Ciudad' }) as HTMLInputElement).value).toBe('Hermosillo');
     expect((screen.getByRole('textbox', { name: 'Estado / provincia' }) as HTMLInputElement).value).toBe('Sonora');
     expect(api.get).toHaveBeenCalledWith('/customers/postal-lookup/83000');
   });
@@ -265,10 +272,10 @@ describe('CustomerFormModal', () => {
       await screen.findByText(/Consulta no disponible/),
     ).toBeTruthy();
     await user.type(
-      screen.getByRole('textbox', { name: 'Colonia (captura manual)' }),
+      screen.getByRole('textbox', { name: 'Colonia / asentamiento' }),
       'Las Palmas',
     );
-    await user.type(screen.getByRole('textbox', { name: 'Ciudad' }), 'Hermosillo');
+    await user.type(screen.getByRole('combobox', { name: 'Ciudad' }), 'Hermosillo');
     await user.type(screen.getByRole('textbox', { name: 'Estado / provincia' }), 'Sonora');
     await user.type(screen.getByRole('textbox', { name: 'Nombre' }), 'Cliente manual');
     await user.selectOptions(screen.getByRole('combobox', { name: 'Tipo' }), 'BUSINESS');
@@ -447,7 +454,7 @@ describe('CustomerFormModal', () => {
       screen.getByRole('combobox', { name: 'Tipo' }),
       'PUBLIC_INSTITUTION',
     );
-    await user.type(screen.getByRole('textbox', { name: 'Ciudad' }), 'Hermosillo');
+    await user.type(screen.getByRole('combobox', { name: 'Ciudad' }), 'Hermosillo');
     await user.type(
       screen.getByRole('textbox', { name: 'Estado / provincia' }),
       'Sonora',
