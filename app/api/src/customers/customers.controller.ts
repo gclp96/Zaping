@@ -6,6 +6,7 @@ import {
   Delete,
   Get,
   Param,
+  Query,
   Patch,
   Post,
   Request,
@@ -135,6 +136,75 @@ export class CustomersController {
       throw new BadRequestException('Estado inválido');
     }
     return this.getGeography('states/' + id + '/cities');
+  }
+
+  private readonly settlementCache = new Map<
+    string,
+    {
+      expiresAt: number;
+      data: {
+        items: Array<{ id: number; name: string; postalCode: string | null }>;
+        hasMore: boolean;
+      };
+    }
+  >();
+
+  @Get('geography/states/:stateId/municipalities/:municipalityId/settlements')
+  async listMunicipalitySettlements(
+    @Param('stateId') stateId: string,
+    @Param('municipalityId') municipalityId: string,
+    @Query('page') pageInput = '1',
+  ) {
+    if (
+      !/^\d{1,3}$/.test(stateId) ||
+      !/^\d{1,8}$/.test(municipalityId) ||
+      !/^\d{1,4}$/.test(pageInput)
+    ) {
+      throw new BadRequestException('Parámetros geográficos inválidos');
+    }
+    const page = Number(pageInput);
+    if (!Number.isSafeInteger(page) || page < 1 || page > 1000) {
+      throw new BadRequestException('Página inválida');
+    }
+    const path =
+      'states/' +
+      stateId +
+      '/municipalities/' +
+      municipalityId +
+      '/settlements?page=' +
+      page;
+    const cached = this.settlementCache.get(path);
+    if (cached && cached.expiresAt > Date.now()) return cached.data;
+
+    const key = process.env.POSTALKIT_API_KEY;
+    if (!key) {
+      throw new ServiceUnavailableException('Consulta postal no configurada');
+    }
+    try {
+      const response = await fetch('https://api.postalkit.mx/v1/' + path, {
+        headers: { Authorization: 'Bearer ' + key },
+        signal: AbortSignal.timeout(4500),
+      });
+      if (!response.ok) {
+        throw new ServiceUnavailableException(
+          'Colonias temporalmente no disponibles',
+        );
+      }
+      const payload: unknown = await response.json();
+      const data = this.customersService.normalizeMunicipalitySettlements(
+        payload,
+        page,
+      );
+      this.settlementCache.set(path, {
+        data,
+        expiresAt: Date.now() + 60 * 60 * 1000,
+      });
+      return data;
+    } catch {
+      throw new ServiceUnavailableException(
+        'Colonias temporalmente no disponibles',
+      );
+    }
   }
 
   @Get(':id/overview')
