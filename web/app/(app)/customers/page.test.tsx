@@ -81,7 +81,21 @@ function buildCustomer(index: number) {
   };
 }
 
-function configureApiMocks(customerData = customers) {
+type TestCustomer = {
+  id: string;
+  name: string;
+  type: string;
+  email: string;
+  phone: string;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  countryCode: string | null;
+  contactName: string | null;
+  notes: string | null;
+};
+
+function configureApiMocks(customerData: TestCustomer[] = customers) {
   vi.mocked(api.get).mockImplementation(async (url) =>
     String(url) === '/auth/me'
       ? ({
@@ -148,7 +162,7 @@ async function completeCustomerForm(
 ) {
   await user.type(screen.getByRole('textbox', { name: 'Nombre' }), name);
   await user.selectOptions(
-    screen.getByRole('combobox', { name: 'Tipo' }),
+    within(screen.getByRole('dialog')).getByRole('combobox', { name: 'Tipo' }),
     'CLINIC',
   );
   await user.type(
@@ -269,6 +283,35 @@ describe('CustomersPage', () => {
     expect(screen.getByText('Mostrando 1-1 de 1')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Página siguiente' })).toBeNull();
     expect(screen.queryByRole('combobox', { name: 'Filas por página' })).toBeNull();
+  });
+
+  it('permite filtrar por clientes sin clasificación o ubicación', async () => {
+    const user = userEvent.setup();
+    const unclassified = {
+      ...clinicCustomer,
+      id: 'unknown',
+      name: 'Cliente heredado',
+      type: 'LICITACION',
+      city: null,
+      state: null,
+      countryCode: null,
+    };
+    configureApiMocks([clinicCustomer, unclassified]);
+    render(<CustomersPage />);
+    await screen.findByText('Cliente heredado');
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Tipo' }),
+      '__UNCLASSIFIED__',
+    );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Ubicación' }),
+      '__UNLOCATED__',
+    );
+    expect(screen.getByText('Cliente heredado')).toBeTruthy();
+    expect(screen.queryByText(clinicCustomer.name)).toBeNull();
+    const row = screen.getByText('Cliente heredado').closest('tr');
+    expect(within(row as HTMLElement).getByText('Por clasificar')).toBeTruthy();
   });
 
   it('destaca el nombre y muestra el contacto sin duplicar columnas', async () => {
