@@ -168,20 +168,15 @@ function CustomerFormContent({
       postalCode +
       ':' +
       String(postalMatches.length);
-    setSettlementOptions([]);
-    setSettlementPage(0);
-    setSettlementHasMore(false);
     if (
       !selectedStateId ||
       !selectedMunicipalityId ||
       postalMatches.length > 0 ||
       postalCode.length > 0
     ) {
-      setSettlementLoading(false);
       return;
     }
     let cancelled = false;
-    setSettlementLoading(true);
     void api
       .get<{ items: SettlementOption[]; hasMore: boolean }>(
         '/customers/geography/states/' +
@@ -210,6 +205,13 @@ function CustomerFormContent({
       cancelled = true;
     };
   }, [selectedStateId, selectedMunicipalityId, postalCode, postalMatches.length]);
+
+  function clearSettlementResults() {
+    setSettlementOptions([]);
+    setSettlementPage(0);
+    setSettlementHasMore(false);
+    setSettlementLoading(false);
+  }
 
   function loadMoreSettlements() {
     if (
@@ -562,6 +564,7 @@ function CustomerFormContent({
               setPostalCode(event.target.value.replace(/\D/g, '').slice(0, 5));
               setPostalLookupRequested(true);
               setCountryCode('MX');
+              clearSettlementResults();
               setPostalMatches([]);
               setPostalStatus('');
               setPostalLoading(/^\d{5}$/.test(event.target.value.replace(/\D/g, '')));
@@ -583,6 +586,7 @@ function CustomerFormContent({
               onSelect={(option) => {
                 setNeighborhood(option.value);
                 if (option.postalCode) {
+                  clearSettlementResults();
                   setPostalCode(option.postalCode);
                   setPostalLookupRequested(false);
                   setPostalStatus('');
@@ -622,6 +626,7 @@ function CustomerFormContent({
                 setCity('');
                 setMunicipalityOptions([]);
                 setCityOptions([]);
+                clearSettlementResults();
                 setPostalCode('');
                 setNeighborhood('');
                 setPostalMatches([]);
@@ -658,6 +663,7 @@ function CustomerFormContent({
             disabled={saving}
             onChange={(value) => {
               setMunicipality(value);
+              clearSettlementResults();
               setCity('');
               setNeighborhood('');
               setPostalCode('');
