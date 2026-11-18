@@ -208,6 +208,15 @@ describe("Sidebar", () => {
     expect(
       productsLink.querySelector("span")?.classList.contains("sr-only"),
     ).toBe(true);
+
+    const navigation = screen.getByRole("navigation", {
+      name: "Navegación principal",
+    });
+    const groups = Array.from(navigation.children);
+    expect(groups.length).toBeGreaterThan(1);
+    expect(groups[0].classList.contains("border-b")).toBe(true);
+    expect(groups[groups.length - 1].classList.contains("last:border-b-0")).toBe(true);
+    expect(screen.getByRole("complementary").classList.contains("zaping-sidebar-scroll")).toBe(true);
   });
 
   it("shows Users navigation for ADMIN users", () => {
