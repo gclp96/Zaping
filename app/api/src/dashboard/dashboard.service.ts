@@ -3,6 +3,12 @@ import { UserRole } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
+type RecentDocument = {
+  id: string;
+  folio: string;
+  createdAt: Date;
+};
+
 @Injectable()
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
@@ -28,16 +34,20 @@ export class DashboardService {
       take: 6,
     };
 
-    const [quotes, sales, purchases, receipts] = await Promise.all([
-      canReadCommercial ? this.prisma.quote.findMany(query) : Promise.resolve([]),
-      canReadCommercial ? this.prisma.sale.findMany(query) : Promise.resolve([]),
+    const [quotes, sales, purchases, receipts] = (await Promise.all([
+      canReadCommercial
+        ? this.prisma.quote.findMany(query)
+        : Promise.resolve([]),
+      canReadCommercial
+        ? this.prisma.sale.findMany(query)
+        : Promise.resolve([]),
       canReadPurchases
         ? this.prisma.purchase.findMany(query)
         : Promise.resolve([]),
       canReadPurchases
         ? this.prisma.purchaseReceipt.findMany(query)
         : Promise.resolve([]),
-    ]);
+    ])) as [RecentDocument[], RecentDocument[], RecentDocument[], RecentDocument[]];
 
     const activities = [
       ...quotes.map((document) => ({ type: 'QUOTE' as const, ...document })),
