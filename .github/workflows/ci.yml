@@ -37,7 +37,8 @@ jobs:
       - name: Verify read-only migration audit helpers (issue 284)
         run: |
           node --check scripts/qa/audit-zaping-files-r2-history.cjs
-          node --test scripts/qa/audit-zaping-files-r2-history.test.cjs
+          node --check scripts/qa/rehearse-issue284-official-data.cjs
+          node --test scripts/qa/*.test.cjs
 
       - name: Validate isolated history rehearsal Compose syntax
         run: |
