@@ -130,7 +130,7 @@ function CustomerFormContent({
     if (!trimmedName) {
       nextErrors.name = 'El nombre del cliente es obligatorio.';
     }
-    if (!trimmedType) {
+    if (!trimmedType && (!customer || typeTouched)) {
       nextErrors.type = 'El tipo de cliente es obligatorio.';
     }
     if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
