@@ -383,19 +383,23 @@ function CustomerFormContent({
                 <label htmlFor="customer-neighborhood" className="block font-medium text-gray-700">
                   Colonia / asentamiento
                 </label>
-              <select
-                id="customer-neighborhood"
-                name="neighborhood"
-                value={neighborhood}
-                disabled={saving}
-                onChange={(event) => {
-                  setNeighborhood(event.target.value);
-                }}
-                className="w-full rounded-lg border border-gray-300 bg-white p-3 text-sm"
-              >
-                <option value="">Selecciona una colonia</option>
-                {postalMatches.map((item) => <option key={item} value={item}>{item}</option>)}
-              </select>
+                <select
+                  id="customer-neighborhood"
+                  name="neighborhood"
+                  value={neighborhood}
+                  disabled={saving}
+                  onChange={(event) => {
+                    setNeighborhood(event.target.value);
+                  }}
+                  className="w-full rounded-lg border border-gray-300 bg-white p-3 text-sm"
+                >
+                  <option value="">Selecciona una colonia</option>
+                  {postalMatches.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
               </>
             ) : (
               <Input
