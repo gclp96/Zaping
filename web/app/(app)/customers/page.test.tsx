@@ -132,7 +132,7 @@ async function chooseCustomerAction(
 function renderedCustomerNames() {
   return screen.getAllByRole('row').slice(1).map((row) => {
     const firstCell = within(row).getAllByRole('cell')[0];
-    return firstCell.textContent?.trim();
+    return firstCell.querySelector('p')?.textContent?.trim();
   });
 }
 
@@ -202,6 +202,62 @@ describe('CustomersPage', () => {
     ).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Limpiar búsqueda' }));
     expect(screen.getByText(clinicCustomer.name)).toBeTruthy();
+  });
+
+  it('busca también por tipo y contacto, sin exigir acentos', async () => {
+    const user = userEvent.setup();
+    await renderCustomersPage();
+
+    const search = screen.getByRole('searchbox', { name: 'Buscar clientes' });
+    await user.type(search, 'clinica');
+    expect(screen.getByText(clinicCustomer.name)).toBeTruthy();
+    expect(screen.queryByText(hospitalCustomer.name)).toBeNull();
+
+    await user.clear(search);
+    await user.type(search, 'luis perez');
+    expect(screen.getByText(hospitalCustomer.name)).toBeTruthy();
+    expect(screen.queryByText(clinicCustomer.name)).toBeNull();
+
+    await user.clear(search);
+    await user.type(search, 'obregon');
+    expect(screen.getByText(hospitalCustomer.name)).toBeTruthy();
+  });
+
+  it('muestra datos vacíos con indicadores discretos y simplifica la paginación', async () => {
+    const customerWithoutDetails = {
+      ...clinicCustomer,
+      id: 'empty-customer',
+      name: 'Cliente sin datos',
+      type: '',
+      email: '',
+      phone: '',
+      address: '',
+      contactName: null,
+    };
+    configureApiMocks([customerWithoutDetails]);
+
+    render(<CustomersPage />);
+    await screen.findByText('Cliente sin datos');
+
+    expect(screen.getByText('Clientes activos')).toBeTruthy();
+    expect(screen.getByText('1 cliente')).toBeTruthy();
+    expect(screen.getByLabelText('Tipo sin registrar').textContent).toBe('—');
+    expect(screen.getByLabelText('Correo sin registrar').textContent).toBe('—');
+    expect(screen.getByLabelText('Teléfono sin registrar').textContent).toBe('—');
+    expect(screen.getByLabelText('Dirección sin registrar').textContent).toBe('—');
+    expect(screen.getByText('Mostrando 1-1 de 1')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Página siguiente' })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Filas por página' })).toBeNull();
+  });
+
+  it('destaca el nombre y muestra el contacto sin duplicar columnas', async () => {
+    await renderCustomersPage();
+    const row = screen.getByText(clinicCustomer.name).closest('tr');
+
+    expect(row).not.toBeNull();
+    expect(within(row as HTMLElement).getByText('Contacto: Ana López')).toBeTruthy();
+    expect(within(row as HTMLElement).getByText('Clínica')).toBeTruthy();
+    expect(within(row as HTMLElement).getByText(clinicCustomer.email)).toBeTruthy();
   });
 
   it('ordena columnas claras con el ciclo ascendente, descendente y neutral', async () => {
