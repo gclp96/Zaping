@@ -143,10 +143,10 @@ describe('CustomersController', () => {
     } as Response);
     normalizeGeographyOptions.mockReturnValue([]);
 
-    await expect(controller.listMunicipalities('invalid')).rejects.toBeInstanceOf(
+    expect(() => controller.listMunicipalities('invalid')).toThrow(
       BadRequestException,
     );
-    await expect(controller.listCities('../other')).rejects.toBeInstanceOf(
+    expect(() => controller.listCities('../other')).toThrow(
       BadRequestException,
     );
     await expect(controller.listMunicipalities('26')).resolves.toEqual([]);
