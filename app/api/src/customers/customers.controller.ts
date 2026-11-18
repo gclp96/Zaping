@@ -1,5 +1,7 @@
 import {
   Body,
+  BadRequestException,
+  ServiceUnavailableException,
   Controller,
   Delete,
   Get,
@@ -29,6 +31,38 @@ export class CustomersController {
   findAll(@Request() req: any) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
     return this.customersService.findAll(req.user.companyId);
+  }
+
+  /**
+   * Authenticated postal assistance. The provider token never reaches the browser.
+   * Manual entry remains available when POSTALKIT_API_KEY is not configured.
+   */
+  @Get('postal-lookup/:code')
+  async lookupPostalCode(@Param('code') code: string) {
+    if (!/^\\d{5}$/.test(code)) {
+      throw new BadRequestException('Código postal inválido');
+    }
+    const key = process.env.POSTALKIT_API_KEY;
+    if (!key) {
+      throw new ServiceUnavailableException('Consulta postal no configurada');
+    }
+    try {
+      const response = await fetch(
+        'https://api.postalkit.mx/v1/postal-codes/' + code,
+        {
+          headers: { Authorization: 'Bearer ' + key },
+          signal: AbortSignal.timeout(4500),
+        },
+      );
+      if (response.status === 404) return { code, settlements: [] };
+      if (!response.ok) {
+        throw new ServiceUnavailableException('Consulta postal temporalmente no disponible');
+      }
+      const body: unknown = await response.json();
+      return this.customersService.normalizePostalLookup(code, body);
+    } catch {
+      throw new ServiceUnavailableException('Consulta postal temporalmente no disponible');
+    }
   }
 
   @Get(':id/overview')
