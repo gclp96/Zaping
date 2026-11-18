@@ -183,6 +183,32 @@ describe('CustomerFormModal', () => {
     expect(api.get).toHaveBeenCalledWith('/customers/postal-lookup/83000');
   });
 
+  it('looks up a Mexican postal code when editing a legacy customer without countryCode', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        state: 'Sonora',
+        municipality: 'Hermosillo',
+        city: 'Hermosillo',
+        settlements: ['Colonia de prueba'],
+      },
+    } as never);
+    render(
+      <CustomerFormModal
+        isOpen
+        customer={customer}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    );
+    await user.type(screen.getByRole('textbox', { name: 'Código postal' }), '83140');
+    expect(
+      await screen.findByRole('combobox', { name: 'Colonia / asentamiento' }),
+    ).toBeTruthy();
+    expect(api.get).toHaveBeenCalledWith('/customers/postal-lookup/83140');
+    expect(screen.queryByRole('textbox', { name: 'País (código ISO)' })).toBeNull();
+  });
+
   it('allows manual address entry when postal lookup is unavailable', async () => {
     const user = userEvent.setup();
     vi.mocked(api.get).mockRejectedValue(new Error('Postal service offline'));
