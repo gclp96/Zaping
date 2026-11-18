@@ -354,6 +354,7 @@ model Customer {
 
   @@index([companyId])
   @@index([companyId, state, city])
+  @@index([companyId, postalCode])
 }
 
 enum DocumentStatus {
