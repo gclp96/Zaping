@@ -297,6 +297,11 @@ describe('CustomerFormModal', () => {
     );
     expect(api.get).not.toHaveBeenCalledWith('/customers/geography/states/21/cities');
     await user.click(screen.getByRole('button', { name: 'Mostrar opciones de Ciudad' }));
+    expect(
+      await screen.findByText(
+        'No hay ciudades registradas para este municipio. Puedes escribirla manualmente.',
+      ),
+    ).toBeTruthy();
     expect(screen.queryByRole('option', { name: 'Amozoc' })).toBeNull();
     const cityField = screen.getByRole('combobox', { name: 'Ciudad' });
     await user.type(cityField, 'Localidad de captura manual');
