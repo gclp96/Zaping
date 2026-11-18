@@ -23,6 +23,70 @@ export class CustomersService {
     return customer;
   }
 
+  /**
+   * Bounded customer overview: counts include all document statuses, while
+   * recent lists show five documents per type. This is not a full audit log.
+   */
+  async getOverview(companyId: string, customerId: string) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: customerId, companyId },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        email: true,
+        phone: true,
+        contactName: true,
+        address: true,
+        notes: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+
+    if (!customer) {
+      throw new NotFoundException('Cliente no encontrado');
+    }
+
+    const where = { companyId, customerId };
+    const [quoteCount, saleCount, recentQuotes, recentSales] =
+      await Promise.all([
+        this.prisma.quote.count({ where }),
+        this.prisma.sale.count({ where }),
+        this.prisma.quote.findMany({
+          where,
+          select: {
+            id: true,
+            folio: true,
+            status: true,
+            total: true,
+            createdAt: true,
+          },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 5,
+        }),
+        this.prisma.sale.findMany({
+          where,
+          select: {
+            id: true,
+            folio: true,
+            status: true,
+            total: true,
+            createdAt: true,
+          },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 5,
+        }),
+      ]);
+
+    return {
+      customer,
+      counts: { quotes: quoteCount, sales: saleCount },
+      recentQuotes,
+      recentSales,
+    };
+  }
+
   findAll(companyId: string) {
     return this.prisma.customer.findMany({
       where: {
