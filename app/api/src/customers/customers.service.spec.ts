@@ -100,6 +100,43 @@ describe('CustomersService', () => {
     expect(service.normalizeGeographyOptions(null)).toEqual([]);
   });
 
+  it('normalizes municipality settlements with distinct IDs and postal codes', () => {
+    expect(
+      service.normalizeMunicipalitySettlements(
+        {
+          data: [
+            { id: 53, name: 'Centro', postal_code: { code: '83140' } },
+            { id: 54, name: 'Centro', postal_code: { code: '83141' } },
+            { id: -1, name: 'Invalid' },
+            { id: 55, name: 'Ejido', postal_code: null },
+          ],
+          meta: { total: 55, per_page: 20 },
+        },
+        1,
+      ),
+    ).toEqual({
+      items: [
+        { id: 53, name: 'Centro', postalCode: '83140' },
+        { id: 54, name: 'Centro', postalCode: '83141' },
+        { id: 55, name: 'Ejido', postalCode: null },
+      ],
+      hasMore: true,
+    });
+    expect(
+      service.normalizeMunicipalitySettlements(
+        { data: [{ id: 1, name: 'Centro' }], meta: { total: 25 } },
+        2,
+      ),
+    ).toEqual({
+      items: [{ id: 1, name: 'Centro', postalCode: null }],
+      hasMore: false,
+    });
+    expect(service.normalizeMunicipalitySettlements(null, 1)).toEqual({
+      items: [],
+      hasMore: false,
+    });
+  });
+
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
