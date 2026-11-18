@@ -92,6 +92,7 @@ function CustomerFormContent({
   const [formError, setFormError] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const submittingRef = useRef(false);
+  const settlementContextRef = useRef('');
   const editing = Boolean(customer);
 
   // Fetch catalog data only while the form is mounted. Historical values
@@ -159,6 +160,7 @@ function CustomerFormContent({
   )?.id;
 
   useEffect(() => {
+    settlementContextRef.current = String(selectedStateId) + ':' + String(selectedMunicipalityId);
     setSettlementOptions([]);
     setSettlementPage(0);
     setSettlementHasMore(false);
@@ -166,7 +168,7 @@ function CustomerFormContent({
       !selectedStateId ||
       !selectedMunicipalityId ||
       postalMatches.length > 0 ||
-      /^\\d{5}$/.test(postalCode)
+      postalCode.length > 0
     ) {
       setSettlementLoading(false);
       return;
@@ -213,6 +215,7 @@ function CustomerFormContent({
     }
     setSettlementLoading(true);
     const page = settlementPage + 1;
+    const context = settlementContextRef.current;
     void api
       .get<{ items: SettlementOption[]; hasMore: boolean }>(
         '/customers/geography/states/' +
@@ -223,6 +226,7 @@ function CustomerFormContent({
           page,
       )
       .then(({ data }) => {
+        if (context !== settlementContextRef.current) return;
         setSettlementOptions((current) => [
           ...current,
           ...(Array.isArray(data.items) ? data.items : []),
@@ -231,9 +235,13 @@ function CustomerFormContent({
         setSettlementPage(page);
       })
       .catch(() => {
-        setGeographyStatus('No fue posible cargar más colonias.');
+        if (context === settlementContextRef.current) {
+          setGeographyStatus('No fue posible cargar más colonias.');
+        }
       })
-      .finally(() => setSettlementLoading(false));
+      .finally(() => {
+        if (context === settlementContextRef.current) setSettlementLoading(false);
+      });
   }
 
   const neighborhoodSuggestions: LocationOption[] = postalMatches.length
