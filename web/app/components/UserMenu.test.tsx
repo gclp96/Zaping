@@ -11,6 +11,18 @@ const account = {
 afterEach(cleanup);
 
 describe("UserMenu account disclosure", () => {
+  it("shows a blue circular avatar without changing account accessibility", () => {
+    render(<UserMenu user={account} onLogout={vi.fn()} />);
+    const trigger = screen.getByRole("button", { name: "Cuenta de Ana Pérez" });
+    const avatar = trigger.querySelector('div[aria-hidden="true"]');
+
+    expect(avatar).not.toBeNull();
+    expect(avatar?.classList.contains("rounded-full")).toBe(true);
+    expect(avatar?.classList.contains("bg-primary")).toBe(true);
+    expect(avatar?.classList.contains("text-primary-foreground")).toBe(true);
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+  });
+
   it("exposes only the existing account actions through a native disclosure", async () => {
     const user = userEvent.setup();
     render(<UserMenu user={account} onLogout={vi.fn()} />);
