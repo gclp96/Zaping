@@ -31,7 +31,9 @@ describe('CreateCustomerDto', () => {
   });
 
   it.each(CUSTOMER_TYPES)('accepts controlled type %s', async (type) => {
-    await expect(transformDto({ ...validPayload, type })).resolves.toMatchObject({
+    await expect(
+      transformDto({ ...validPayload, type }),
+    ).resolves.toMatchObject({
       ...validPayload,
       type,
     });
@@ -68,10 +70,13 @@ describe('CreateCustomerDto', () => {
 
   it('allows partial updates without rewriting historical types', async () => {
     await expect(
-      validationPipe.transform({ city: 'Nogales' }, {
-        type: 'body',
-        metatype: UpdateCustomerDto,
-      }),
+      validationPipe.transform(
+        { city: 'Nogales' },
+        {
+          type: 'body',
+          metatype: UpdateCustomerDto,
+        },
+      ),
     ).resolves.toMatchObject({ city: 'Nogales' });
   });
 
