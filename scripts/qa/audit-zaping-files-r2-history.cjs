@@ -24,7 +24,7 @@ const EXPECTED_API_DB = 'zaping-qa-postgres:5432/zaping_qa';
 function run(command, args, binary = false) {
   return execFileSync(command, args, {
     cwd: ROOT,
-    encoding: binary ? 'buffer' : 'utf8',
+    encoding: binary ? null : 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
     timeout: 30000,
     maxBuffer: 1024 * 1024 * 4,
