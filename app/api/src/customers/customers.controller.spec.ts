@@ -171,9 +171,7 @@ describe('CustomersController', () => {
   it('returns municipality colonias with CP and supports bounded pagination', async () => {
     process.env.POSTALKIT_API_KEY = 'test-key';
     const payload = {
-      data: [
-        { id: 50, name: 'Centro', postal_code: { code: '83140' } },
-      ],
+      data: [{ id: 50, name: 'Centro', postal_code: { code: '83140' } }],
       meta: { total: 21 },
     };
     const result = {
