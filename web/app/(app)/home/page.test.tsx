@@ -115,6 +115,10 @@ function mockHomeSuccess({
       } as never;
     }
 
+    if (endpoint === '/dashboard/recent-activity') {
+      return { data: [] } as never;
+    }
+
     if (endpoint === '/dashboard') {
       return { data: dashboard } as never;
     }
@@ -170,7 +174,10 @@ describe('HomePage', () => {
     expect(api.get).toHaveBeenCalledWith('/dashboard');
     expect(api.get).toHaveBeenCalledWith('/equipment');
     expect(api.get).toHaveBeenCalledWith('/purchases');
-    expect(api.get).toHaveBeenCalledTimes(4);
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/dashboard/recent-activity');
+      expect(api.get).toHaveBeenCalledTimes(5);
+    });
     const operationalSummary = screen
       .getByRole('heading', { level: 2, name: 'Resumen operativo' })
       .closest('section') as HTMLElement;
@@ -364,6 +371,10 @@ describe('HomePage', () => {
         },
       } as never;
     }
+
+      if (endpoint === '/dashboard/recent-activity') {
+        return { data: [] } as never;
+      }
 
       if (endpoint === '/dashboard') {
         dashboardAttempts += 1;
