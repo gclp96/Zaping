@@ -1,4 +1,7 @@
-import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { CustomersController } from './customers.controller';
@@ -76,11 +79,9 @@ describe('CustomersController', () => {
     const provider = jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => providerPayload,
+      json: () => Promise.resolve(providerPayload),
     } as Response);
-    await expect(controller.lookupPostalCode('83000')).resolves.toEqual(
-      result,
-    );
+    await expect(controller.lookupPostalCode('83000')).resolves.toEqual(result);
     expect(provider).toHaveBeenCalledWith(
       'https://api.postalkit.mx/v1/postal-codes/83000',
       expect.objectContaining({
