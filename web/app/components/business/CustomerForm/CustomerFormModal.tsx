@@ -62,6 +62,7 @@ function CustomerFormContent({
   const [postalMatches, setPostalMatches] = useState<string[]>([]);
   const [postalStatus, setPostalStatus] = useState('');
   const [postalLoading, setPostalLoading] = useState(false);
+  const [postalLookupRequested, setPostalLookupRequested] = useState(false);
   const [city, setCity] = useState(customer?.city ?? '');
   const [state, setState] = useState(customer?.state ?? '');
   const [countryCode, setCountryCode] = useState(
@@ -75,7 +76,7 @@ function CustomerFormContent({
   const editing = Boolean(customer);
 
   useEffect(() => {
-    if (!/^\d{5}$/.test(postalCode) || countryCode.toUpperCase() !== 'MX') {
+    if (!postalLookupRequested || !/^\d{5}$/.test(postalCode) || countryCode.toUpperCase() !== 'MX') {
       return;
     }
     let cancelled = false;
@@ -114,7 +115,7 @@ function CustomerFormContent({
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [postalCode, countryCode]);
+  }, [postalCode, countryCode, postalLookupRequested]);
 
   function clearFieldError(field: keyof FormErrors) {
     setErrors((current) => ({ ...current, [field]: undefined }));
@@ -365,6 +366,7 @@ function CustomerFormContent({
             disabled={saving}
             onChange={(event) => {
               setPostalCode(event.target.value.replace(/\D/g, '').slice(0, 5));
+              setPostalLookupRequested(true);
               setPostalMatches([]);
               setPostalStatus('');
               setPostalLoading(/^\d{5}$/.test(event.target.value.replace(/\D/g, '')));
@@ -400,7 +402,7 @@ function CustomerFormContent({
               />
             ) : null}
             {postalStatus ? <p role="status" className="text-xs text-text-muted">{postalStatus}</p> : null}
-            {postalLoading && /^\d{5}$/.test(postalCode) ? <p className="text-xs text-text-muted">Buscando código postal...</p> : null}
+            {postalLoading && countryCode.toUpperCase() === 'MX' && /^\d{5}$/.test(postalCode) ? <p className="text-xs text-text-muted">Buscando código postal...</p> : null}
           </div>
           <Input
             name="city"
