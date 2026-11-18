@@ -25,9 +25,9 @@ import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 type Customer = {
   id: string;
   name: string;
-  type: string | null;
-  email: string | null;
-  phone: string | null;
+  type: string;
+  email: string;
+  phone: string;
   address?: string | null;
   contactName?: string | null;
   notes?: string | null;
