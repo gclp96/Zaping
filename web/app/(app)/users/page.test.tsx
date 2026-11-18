@@ -33,7 +33,7 @@ const adminSession: AuthenticatedSession = {
   firstName: "Ana",
   lastName: "Admin",
   role: "ADMIN",
-  companyTimezone: "America/Hermosillo",
+  companyTimezone: "America/Hermosillo", companyName: 'QA Company',
 };
 
 const users: User[] = [
