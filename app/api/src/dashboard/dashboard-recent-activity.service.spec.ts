@@ -55,11 +55,36 @@ describe('DashboardService recent activity', () => {
     const result = await service.getRecentActivity(companyId, UserRole.ADMIN);
 
     expect(result).toEqual([
-      { type: 'RECEIPT', id: 'r1', folio: 'FOL-r1', createdAt: '2026-11-18T20:00:00.000Z' },
-      { type: 'PURCHASE', id: 'p1', folio: 'FOL-p1', createdAt: '2026-11-18T19:00:00.000Z' },
-      { type: 'SALE', id: 's1', folio: 'FOL-s1', createdAt: '2026-11-18T18:00:00.000Z' },
-      { type: 'QUOTE', id: 'q1', folio: 'FOL-q1', createdAt: '2026-11-18T17:00:00.000Z' },
-      { type: 'QUOTE', id: 'q2', folio: 'FOL-q2', createdAt: '2026-11-17T17:00:00.000Z' },
+      {
+        type: 'RECEIPT',
+        id: 'r1',
+        folio: 'FOL-r1',
+        createdAt: '2026-11-18T20:00:00.000Z',
+      },
+      {
+        type: 'PURCHASE',
+        id: 'p1',
+        folio: 'FOL-p1',
+        createdAt: '2026-11-18T19:00:00.000Z',
+      },
+      {
+        type: 'SALE',
+        id: 's1',
+        folio: 'FOL-s1',
+        createdAt: '2026-11-18T18:00:00.000Z',
+      },
+      {
+        type: 'QUOTE',
+        id: 'q1',
+        folio: 'FOL-q1',
+        createdAt: '2026-11-18T17:00:00.000Z',
+      },
+      {
+        type: 'QUOTE',
+        id: 'q2',
+        folio: 'FOL-q2',
+        createdAt: '2026-11-17T17:00:00.000Z',
+      },
     ]);
 
     for (const query of [
@@ -83,7 +108,10 @@ describe('DashboardService recent activity', () => {
       document('p1', '2026-11-18T12:00:00.000Z'),
     ]);
 
-    const result = await service.getRecentActivity(companyId, UserRole.WAREHOUSE);
+    const result = await service.getRecentActivity(
+      companyId,
+      UserRole.WAREHOUSE,
+    );
 
     expect(result).toHaveLength(1);
     expect(result[0].type).toBe('PURCHASE');
@@ -112,10 +140,9 @@ describe('DashboardService recent activity', () => {
 
   it('keeps at most six records and breaks timestamp ties deterministically', async () => {
     prisma.quote.findMany.mockResolvedValue([
-      ...Array.from({ length: 6 }, (_, i) => document(
-        'q' + String(i),
-        '2026-11-18T12:00:00.000Z',
-      )),
+      ...Array.from({ length: 6 }, (_, i) =>
+        document('q' + String(i), '2026-11-18T12:00:00.000Z'),
+      ),
     ]);
     prisma.sale.findMany.mockResolvedValue([
       document('s1', '2026-11-18T12:00:00.000Z'),
@@ -125,7 +152,12 @@ describe('DashboardService recent activity', () => {
 
     expect(result).toHaveLength(6);
     expect(result.map((item) => item.id)).toEqual([
-      'q0', 'q1', 'q2', 'q3', 'q4', 'q5',
+      'q0',
+      'q1',
+      'q2',
+      'q3',
+      'q4',
+      'q5',
     ]);
   });
 
