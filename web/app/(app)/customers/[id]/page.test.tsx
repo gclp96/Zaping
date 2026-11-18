@@ -157,7 +157,7 @@ describe('CustomerDetailPage', () => {
     render(<CustomerDetailPage />);
     await screen.findByRole('heading', { name: 'Hospital QA' });
     expect(screen.getByText('Inactivo')).toBeTruthy();
-    expect(screen.getAllByText('Sin registrar')).toHaveLength(4);
+    expect(screen.getAllByText('Sin registrar')).toHaveLength(8);
     expect(
       screen.getByText('No hay cotizaciones registradas para este cliente.'),
     ).toBeTruthy();
