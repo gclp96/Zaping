@@ -47,7 +47,7 @@ export class DashboardService {
       canReadPurchases
         ? this.prisma.purchaseReceipt.findMany(query)
         : Promise.resolve([]),
-    ])) as [RecentDocument[], RecentDocument[], RecentDocument[], RecentDocument[]];
+    ])) as RecentDocument[][];
 
     const activities = [
       ...quotes.map((document) => ({ type: 'QUOTE' as const, ...document })),
