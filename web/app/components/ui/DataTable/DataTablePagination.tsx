@@ -42,53 +42,53 @@ export default function DataTablePagination({
 
       {!compact ? (
         <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-sm text-text-secondary">
-          Filas por página
-          <select
-            aria-label="Filas por página"
-            value={pageSize}
-            className="rounded-lg border border-border bg-surface px-2 py-1.5 text-text focus:outline-none focus:ring-2 focus:ring-focus-ring"
-            onChange={(event) => onPageSizeChange(Number(event.target.value))}
-          >
-            {availablePageSizes.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="flex items-center gap-2 text-sm text-text-secondary">
+            Filas por página
+            <select
+              aria-label="Filas por página"
+              value={pageSize}
+              className="rounded-lg border border-border bg-surface px-2 py-1.5 text-text focus:outline-none focus:ring-2 focus:ring-focus-ring"
+              onChange={(event) => onPageSizeChange(Number(event.target.value))}
+            >
+              {availablePageSizes.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <span className="min-w-24 text-center text-sm text-text-secondary">
-          Página {pageCount === 0 ? 0 : pageIndex + 1} de {pageCount}
-        </span>
+          <span className="min-w-24 text-center text-sm text-text-secondary">
+            Página {pageCount === 0 ? 0 : pageIndex + 1} de {pageCount}
+          </span>
 
-        <div className="flex gap-1">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="size-9 p-0"
-            aria-label="Página anterior"
-            title="Página anterior"
-            disabled={previousDisabled}
-            onClick={() => onPageChange(pageIndex - 1)}
-          >
-            <ChevronLeft aria-hidden="true" size={17} />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="size-9 p-0"
-            aria-label="Página siguiente"
-            title="Página siguiente"
-            disabled={nextDisabled}
-            onClick={() => onPageChange(pageIndex + 1)}
-          >
-            <ChevronRight aria-hidden="true" size={17} />
-          </Button>
+          <div className="flex gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="size-9 p-0"
+              aria-label="Página anterior"
+              title="Página anterior"
+              disabled={previousDisabled}
+              onClick={() => onPageChange(pageIndex - 1)}
+            >
+              <ChevronLeft aria-hidden="true" size={17} />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="size-9 p-0"
+              aria-label="Página siguiente"
+              title="Página siguiente"
+              disabled={nextDisabled}
+              onClick={() => onPageChange(pageIndex + 1)}
+            >
+              <ChevronRight aria-hidden="true" size={17} />
+            </Button>
+          </div>
         </div>
-      </div>
       ) : null}
     </nav>
   );
