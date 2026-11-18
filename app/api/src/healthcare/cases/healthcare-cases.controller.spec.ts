@@ -31,6 +31,7 @@ describe('HealthcareCasesController', () => {
       [string, string, string, string]
     >(),
     findAll: jest.fn<Promise<HealthcareCaseResponse[]>, [string]>(),
+    findUpcoming: jest.fn(),
     findOne: jest.fn<Promise<HealthcareCaseResponse>, [string, string]>(),
   };
 
@@ -86,7 +87,7 @@ describe('HealthcareCasesController', () => {
   });
 
   const getRolesMetadata = (
-    methodName: 'create' | 'update' | 'cancel' | 'findAll' | 'findOne',
+    methodName: 'create' | 'update' | 'cancel' | 'findAll' | 'findUpcoming' | 'findOne',
   ): UserRole[] | undefined => {
     const descriptor = Object.getOwnPropertyDescriptor(
       HealthcareCasesController.prototype,
@@ -241,6 +242,23 @@ describe('HealthcareCasesController', () => {
     const result = await controller.findAll(request);
 
     expect(result).toBe(cases);
+  });
+
+  it('reads the upcoming agenda only for the authenticated company', async () => {
+    healthcareCaseServiceMock.findUpcoming.mockResolvedValue([]);
+
+    const response = await controller.findUpcoming(request);
+
+    expect(response).toEqual([]);
+    expect(healthcareCaseServiceMock.findUpcoming).toHaveBeenCalledWith(
+      companyId,
+    );
+    expect(getRolesMetadata('findUpcoming')).toEqual([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.SALES,
+      UserRole.WAREHOUSE,
+    ]);
   });
 
   it('should findOne using companyId and caseId', async () => {
