@@ -5,6 +5,9 @@ export type CustomerFormCustomer = {
   email: string;
   phone: string;
   address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  countryCode?: string | null;
   contactName?: string | null;
   notes?: string | null;
   isActive?: boolean;
@@ -16,6 +19,9 @@ export type CustomerFormValues = {
   email: string;
   phone: string;
   address: string;
+  city: string;
+  state: string;
+  countryCode: string;
   contactName: string;
   notes: string;
 };
