@@ -78,6 +78,12 @@ export class HealthcareCasesController {
     );
   }
 
+  @Get('agenda')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES, UserRole.WAREHOUSE)
+  findUpcoming(@Req() request: AuthenticatedRequest) {
+    return this.healthcareCaseService.findUpcoming(request.user.companyId);
+  }
+
   @Get(':caseId')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES, UserRole.WAREHOUSE)
   findOne(

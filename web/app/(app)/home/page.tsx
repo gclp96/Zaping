@@ -23,6 +23,7 @@ import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
 
 import HomeAttentionSection from './HomeAttentionSection';
+import OperationalAgendaSection from './OperationalAgendaSection';
 import RecentActivitySection from './RecentActivitySection';
 import { useHomeData } from './useHomeData';
 
@@ -356,11 +357,18 @@ export default function HomePage() {
             </Section>
           </div>
           {currentCompanyId ? (
-            <RecentActivitySection
-              key={currentCompanyId}
-              companyId={currentCompanyId}
-              timezone={currentCompanyTimezone}
-            />
+            <div className="grid items-start gap-8 2xl:grid-cols-2">
+              <OperationalAgendaSection
+                key={currentCompanyId + '-agenda'}
+                companyId={currentCompanyId}
+                timezone={currentCompanyTimezone}
+              />
+              <RecentActivitySection
+                key={currentCompanyId + '-recent'}
+                companyId={currentCompanyId}
+                timezone={currentCompanyTimezone}
+              />
+            </div>
           ) : null}
         </>
       )}

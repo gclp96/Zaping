@@ -119,6 +119,10 @@ function mockHomeSuccess({
       return { data: [] } as never;
     }
 
+    if (endpoint === '/healthcare/cases/agenda') {
+      return { data: [] } as never;
+    }
+
     if (endpoint === '/dashboard') {
       return { data: dashboard } as never;
     }
@@ -176,8 +180,13 @@ describe('HomePage', () => {
     expect(api.get).toHaveBeenCalledWith('/purchases');
     await waitFor(() => {
       expect(api.get).toHaveBeenCalledWith('/dashboard/recent-activity');
-      expect(api.get).toHaveBeenCalledTimes(5);
+      expect(api.get).toHaveBeenCalledWith('/healthcare/cases/agenda');
+      expect(api.get).toHaveBeenCalledTimes(6);
     });
+    expect(screen.getByRole('heading', { level: 2, name: 'Agenda operativa' })).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: 'Ver casos de salud' }).getAttribute('href'),
+    ).toBe('/healthcare-cases');
     const operationalSummary = screen
       .getByRole('heading', { level: 2, name: 'Resumen operativo' })
       .closest('section') as HTMLElement;
@@ -373,6 +382,10 @@ describe('HomePage', () => {
     }
 
       if (endpoint === '/dashboard/recent-activity') {
+        return { data: [] } as never;
+      }
+
+      if (endpoint === '/healthcare/cases/agenda') {
         return { data: [] } as never;
       }
 
