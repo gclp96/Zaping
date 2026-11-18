@@ -195,6 +195,16 @@ describe('CustomerFormModal', () => {
               { id: 10, name: 'Centro', postalCode: '83140' },
               { id: 11, name: 'Centro', postalCode: '83141' },
             ],
+            hasMore: true,
+          },
+        } as never);
+      }
+      if (
+        url === '/customers/geography/states/26/municipalities/1/settlements?page=2'
+      ) {
+        return Promise.resolve({
+          data: {
+            items: [{ id: 12, name: 'Las Palmas', postalCode: '83142' }],
             hasMore: false,
           },
         } as never);
@@ -227,13 +237,19 @@ describe('CustomerFormModal', () => {
     await user.click(
       screen.getByRole('button', { name: 'Mostrar opciones de Colonia / asentamiento' }),
     );
-    await user.click(await screen.findByRole('option', { name: 'Centro · CP 83140' }));
+    expect(await screen.findByRole('option', { name: 'Centro · CP 83140' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Centro · CP 83141' })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Ver más colonias' }));
+    expect(
+      await screen.findByRole('option', { name: 'Las Palmas · CP 83142' }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole('option', { name: 'Las Palmas · CP 83142' }));
     expect(
       (screen.getByRole('textbox', { name: 'Código postal' }) as HTMLInputElement).value,
-    ).toBe('83140');
+    ).toBe('83142');
     expect(
       (screen.getByRole('combobox', { name: 'Colonia / asentamiento' }) as HTMLInputElement).value,
-    ).toBe('Centro');
+    ).toBe('Las Palmas');
 
     await user.type(screen.getByRole('textbox', { name: 'Dirección' }), 'Calle 12 #30');
     expect(
