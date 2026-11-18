@@ -191,6 +191,47 @@ export class HealthcareCaseService {
     }
   }
 
+  /**
+   * Upcoming scheduled cases only. This is a bounded operational agenda,
+   * not a full case history or a calendar of all company events.
+   */
+  async findUpcoming(companyId: string, now = new Date()) {
+    const horizon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const cases = await this.prisma.healthcareCase.findMany({
+      where: {
+        companyId,
+        status: HealthcareCaseStatus.SCHEDULED,
+        scheduledStart: { gte: now, lt: horizon },
+      },
+      select: {
+        id: true,
+        folio: true,
+        title: true,
+        scheduledStart: true,
+        scheduledEnd: true,
+        healthcareHospital: { select: { name: true } },
+      },
+      orderBy: [{ scheduledStart: 'asc' }, { id: 'asc' }],
+      take: 5,
+    });
+
+    return cases.flatMap((healthcareCase) =>
+      healthcareCase.scheduledStart
+        ? [
+            {
+              id: healthcareCase.id,
+              folio: healthcareCase.folio,
+              title: healthcareCase.title,
+              scheduledStart: healthcareCase.scheduledStart.toISOString(),
+              scheduledEnd:
+                healthcareCase.scheduledEnd?.toISOString() ?? null,
+              hospitalName: healthcareCase.healthcareHospital?.name ?? null,
+            },
+          ]
+        : [],
+    );
+  }
+
   async findAll(companyId: string): Promise<HealthcareCaseResponse[]> {
     const healthcareCases = await this.prisma.healthcareCase.findMany({
       where: {
