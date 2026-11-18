@@ -333,6 +333,9 @@ model Customer {
   email       String?
   phone       String?
   address     String?
+  city        String?
+  state       String?
+  countryCode String?
   contactName String?
   creditLimit Decimal?
   notes       String?
@@ -346,6 +349,7 @@ model Customer {
   isActive Boolean @default(true)
 
   @@index([companyId])
+  @@index([companyId, state, city])
 }
 
 enum DocumentStatus {
