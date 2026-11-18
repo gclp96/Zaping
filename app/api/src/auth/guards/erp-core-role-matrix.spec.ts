@@ -219,6 +219,7 @@ const roleMatrix: RoleMatrix[] = [
     methods: {
       create: [UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES],
       findAll: allRoles,
+      findUpcoming: allRoles,
       update: [UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES],
       cancel: [UserRole.ADMIN, UserRole.MANAGER],
       findOne: allRoles,
