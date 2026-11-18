@@ -26,7 +26,7 @@ export class CustomersService {
       code,
       state: postal.state?.name ?? '',
       municipality: postal.municipality?.name ?? '',
-      city: postal.city?.name ?? postal.municipality?.name ?? '',
+      city: postal.city?.name ?? '',
       settlements: Array.isArray(postal.settlements)
         ? postal.settlements
             .map((settlement) => settlement.name)
@@ -112,6 +112,48 @@ export class CustomersService {
     return {
       items,
       hasMore: total !== null ? page * 20 < total : items.length === 20,
+    };
+  }
+
+  normalizeMunicipalityCities(payload: unknown, page: number) {
+    const empty = { items: [], hasMore: false };
+    if (!payload || typeof payload !== 'object' || !('data' in payload)) {
+      return empty;
+    }
+    if (!Array.isArray(payload.data)) return empty;
+
+    const seen = new Set<number>();
+    const items = payload.data.flatMap((entry: unknown) => {
+      if (!entry || typeof entry !== 'object' || !('city' in entry)) return [];
+      const city = entry.city;
+      if (!city || typeof city !== 'object') return [];
+      const item = city as { id?: unknown; name?: unknown };
+      if (
+        typeof item.id !== 'number' ||
+        !Number.isSafeInteger(item.id) ||
+        item.id < 1 ||
+        typeof item.name !== 'string' ||
+        !item.name.trim() ||
+        seen.has(item.id)
+      ) {
+        return [];
+      }
+      seen.add(item.id);
+      return [{ id: item.id, name: item.name.trim() }];
+    });
+
+    const meta = 'meta' in payload ? payload.meta : null;
+    const total =
+      meta &&
+      typeof meta === 'object' &&
+      'total' in meta &&
+      typeof meta.total === 'number' &&
+      Number.isFinite(meta.total)
+        ? meta.total
+        : null;
+    return {
+      items,
+      hasMore: total !== null ? page * 20 < total : payload.data.length === 20,
     };
   }
 
