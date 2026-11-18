@@ -13,6 +13,7 @@ describe('CustomersController', () => {
   const normalizePostalLookup = jest.fn();
   const normalizeGeographyOptions = jest.fn();
   const normalizeMunicipalitySettlements = jest.fn();
+  const normalizeMunicipalityCities = jest.fn();
   const originalKey = process.env.POSTALKIT_API_KEY;
 
   afterEach(() => {
@@ -35,6 +36,7 @@ describe('CustomersController', () => {
             normalizePostalLookup,
             normalizeGeographyOptions,
             normalizeMunicipalitySettlements,
+            normalizeMunicipalityCities,
           },
         },
       ],
@@ -209,6 +211,50 @@ describe('CustomersController', () => {
     await expect(
       controller.listMunicipalitySettlements('26', '30', '1001'),
     ).rejects.toBeInstanceOf(BadRequestException);
+    expect(provider).not.toHaveBeenCalled();
+  });
+
+  it('returns municipality-scoped cities rather than all cities of the state', async () => {
+    process.env.POSTALKIT_API_KEY = 'test-key';
+    const payload = {
+      data: [
+        { code: '73590', city: null },
+        { code: '73591', city: { id: 42, name: 'Ciudad verificada' } },
+      ],
+      meta: { total: 22 },
+    };
+    const normalized = {
+      items: [{ id: 42, name: 'Ciudad verificada' }],
+      hasMore: true,
+    };
+    normalizeMunicipalityCities.mockReturnValue(normalized);
+    const provider = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(payload),
+    } as Response);
+
+    await expect(controller.listMunicipalityCities('21', '123', '1')).resolves.toEqual(
+      normalized,
+    );
+    expect(provider).toHaveBeenCalledWith(
+      'https://api.postalkit.mx/v1/municipalities/123/postal-codes?page=1',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer test-key' },
+      }),
+    );
+    expect(normalizeMunicipalityCities).toHaveBeenCalledWith(payload, 1);
+    await controller.listMunicipalityCities('21', '123', '1');
+    expect(provider).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects invalid municipality city query parameters', async () => {
+    const provider = jest.spyOn(global, 'fetch');
+    await expect(controller.listMunicipalityCities('21', '../', '1')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    await expect(controller.listMunicipalityCities('21', '123', '1001')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
     expect(provider).not.toHaveBeenCalled();
   });
 
