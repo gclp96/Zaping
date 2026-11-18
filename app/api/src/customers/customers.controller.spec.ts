@@ -12,6 +12,7 @@ describe('CustomersController', () => {
   const getOverview = jest.fn();
   const normalizePostalLookup = jest.fn();
   const normalizeGeographyOptions = jest.fn();
+  const normalizeMunicipalitySettlements = jest.fn();
   const originalKey = process.env.POSTALKIT_API_KEY;
 
   afterEach(() => {
@@ -29,7 +30,12 @@ describe('CustomersController', () => {
       providers: [
         {
           provide: CustomersService,
-          useValue: { getOverview, normalizePostalLookup, normalizeGeographyOptions },
+          useValue: {
+            getOverview,
+            normalizePostalLookup,
+            normalizeGeographyOptions,
+            normalizeMunicipalitySettlements,
+          },
         },
       ],
     }).compile();
@@ -160,6 +166,52 @@ describe('CustomersController', () => {
       'https://api.postalkit.mx/v1/states/26/cities',
       expect.anything(),
     );
+  });
+
+  it('returns municipality colonias with CP and supports bounded pagination', async () => {
+    process.env.POSTALKIT_API_KEY = 'test-key';
+    const payload = {
+      data: [
+        { id: 50, name: 'Centro', postal_code: { code: '83140' } },
+      ],
+      meta: { total: 21 },
+    };
+    const result = {
+      items: [{ id: 50, name: 'Centro', postalCode: '83140' }],
+      hasMore: true,
+    };
+    normalizeMunicipalitySettlements.mockReturnValue(result);
+    const provider = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(payload),
+    } as Response);
+    await expect(
+      controller.listMunicipalitySettlements('26', '30', '1'),
+    ).resolves.toEqual(result);
+    expect(provider).toHaveBeenCalledWith(
+      'https://api.postalkit.mx/v1/states/26/municipalities/30/settlements?page=1',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer test-key' },
+      }),
+    );
+    expect(normalizeMunicipalitySettlements).toHaveBeenCalledWith(payload, 1);
+    await controller.listMunicipalitySettlements('26', '30', '1');
+    expect(provider).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects unsafe geography identifiers and unbounded settlement pages', async () => {
+    process.env.POSTALKIT_API_KEY = 'test-key';
+    const provider = jest.spyOn(global, 'fetch');
+    await expect(
+      controller.listMunicipalitySettlements('../', '30', '1'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      controller.listMunicipalitySettlements('26', '../', '1'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      controller.listMunicipalitySettlements('26', '30', '1001'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(provider).not.toHaveBeenCalled();
   });
 
   it('should be defined', () => {
