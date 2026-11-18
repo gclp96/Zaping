@@ -15,6 +15,14 @@ import DataTable, {
 } from '@/app/components/ui/DataTable';
 import Loading from '@/app/components/ui/Loading';
 import Input from '@/app/components/ui/Input';
+import Select from '@/app/components/ui/Select';
+import {
+  CUSTOMER_TYPE_OPTIONS,
+  customerLocationKey,
+  customerLocationLabel,
+  customerTypeLabel,
+  resolveCustomerType,
+} from './customer-classification';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
@@ -30,6 +38,9 @@ type Customer = {
   email: string;
   phone: string;
   address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  countryCode?: string | null;
   contactName?: string | null;
   notes?: string | null;
 };
@@ -50,23 +61,24 @@ function normalizeCustomerSearch(value: string): string {
     .trim();
 }
 
-function customerMatchesSearch(customer: Customer, search: string): boolean {
-  const normalizedSearch = normalizeCustomerSearch(search);
-
-  if (!normalizedSearch) {
-    return true;
-  }
-
-  return [
-    customer.name,
-    customer.type,
-    customer.email,
-    customer.phone,
-    customer.address,
-    customer.contactName,
-  ].some((value) =>
-    value ? normalizeCustomerSearch(value).includes(normalizedSearch) : false,
+function customerMatchesFilters(
+  customer: Customer,
+  search: string,
+  typeFilter: string,
+  locationFilter: string,
+): boolean {
+  const matchesName = normalizeCustomerSearch(customer.name).includes(
+    normalizeCustomerSearch(search),
   );
+  const matchesType =
+    !typeFilter ||
+    (typeFilter === '__UNCLASSIFIED__'
+      ? !resolveCustomerType(customer.type)
+      : resolveCustomerType(customer.type) === typeFilter);
+  const matchesLocation =
+    !locationFilter || customerLocationKey(customer) === locationFilter;
+
+  return matchesName && matchesType && matchesLocation;
 }
 
 function compareCustomers(
@@ -78,27 +90,18 @@ function compareCustomers(
     columnId === 'name'
       ? first.name
       : columnId === 'type'
-        ? first.type ?? ''
-        : columnId === 'email'
-          ? first.email ?? ''
-          : columnId === 'phone'
-            ? first.phone ?? ''
-            : columnId === 'address'
-              ? first.address || ''
-              : '';
+        ? customerTypeLabel(first.type)
+        : columnId === 'location'
+          ? customerLocationLabel(first)
+          : '';
   const secondValue =
     columnId === 'name'
       ? second.name
       : columnId === 'type'
-        ? second.type ?? ''
-        : columnId === 'email'
-          ? second.email ?? ''
-          : columnId === 'phone'
-            ? second.phone ?? ''
-            : columnId === 'address'
-              ? second.address || ''
-              : '';
-
+        ? customerTypeLabel(second.type)
+        : columnId === 'location'
+          ? customerLocationLabel(second)
+          : '';
   return customerCollator.compare(firstValue, secondValue);
 }
 
@@ -119,6 +122,8 @@ export default function CustomersPage() {
   const [pageError, setPageError] = useState('');
   const [forbidden, setForbidden] = useState(false);
   const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [customerToDeactivate, setCustomerToDeactivate] =
@@ -129,9 +134,22 @@ export default function CustomersPage() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
+  const locationOptions = useMemo(() => {
+    const options = new Map<string, string>();
+    for (const customer of customers) {
+      options.set(customerLocationKey(customer), customerLocationLabel(customer));
+    }
+    return [...options.entries()]
+      .sort((left, right) => customerCollator.compare(left[1], right[1]))
+      .map(([value, label]) => ({ value, label }));
+  }, [customers]);
+
   const filteredCustomers = useMemo(
-    () => customers.filter((customer) => customerMatchesSearch(customer, search)),
-    [customers, search],
+    () =>
+      customers.filter((customer) =>
+        customerMatchesFilters(customer, search, typeFilter, locationFilter),
+      ),
+    [customers, search, typeFilter, locationFilter],
   );
 
   async function loadCustomers() {
@@ -224,7 +242,7 @@ export default function CustomersPage() {
     }
   }
 
-  const isFiltered = Boolean(search.trim());
+  const isFiltered = Boolean(search.trim() || typeFilter || locationFilter);
 
   const sortedCustomers = useMemo(() => {
     if (!sorting) {
@@ -277,59 +295,43 @@ export default function CustomersPage() {
     {
       id: 'type',
       header: 'Tipo',
-      cell: (customer) =>
-        customer.type?.trim() ? (
-          <span className="inline-flex max-w-full items-center rounded-full border border-border bg-surface-subtle px-2.5 py-1 text-xs font-medium text-text-secondary">
-            <span className="truncate">{customer.type}</span>
-          </span>
-        ) : (
-          <span className="text-text-muted" aria-label="Tipo sin registrar">
-            —
-          </span>
-        ),
+      cell: (customer) => (
+        <span
+          className="inline-flex max-w-full items-center rounded-full border border-border bg-surface-subtle px-2.5 py-1 text-xs font-medium text-text-secondary"
+          aria-label={
+            resolveCustomerType(customer.type)
+              ? undefined
+              : 'Tipo sin clasificar'
+          }
+        >
+          <span className="truncate">{customerTypeLabel(customer.type)}</span>
+        </span>
+      ),
       sortable: true,
       priority: 'secondary',
-      minWidth: 130,
+      minWidth: 160,
     },
     {
-      id: 'email',
-      header: 'Correo',
-      cell: (customer) =>
-        customer.email?.trim() ? (
-          <span className="break-all">{customer.email}</span>
-        ) : (
-          <span className="text-text-muted" aria-label="Correo sin registrar">
-            —
-          </span>
-        ),
+      id: 'location',
+      header: 'Ubicación',
+      cell: (customer) => (
+        <span
+          className={
+            customerLocationKey(customer) === '__UNLOCATED__'
+              ? 'text-text-muted'
+              : 'text-text'
+          }
+          aria-label={
+            customerLocationKey(customer) === '__UNLOCATED__'
+              ? 'Ubicación sin registrar'
+              : undefined
+          }
+        >
+          {customerLocationLabel(customer)}
+        </span>
+      ),
       sortable: true,
       priority: 'secondary',
-      minWidth: 200,
-    },
-    {
-      id: 'phone',
-      header: 'Teléfono',
-      cell: (customer) =>
-        customer.phone?.trim() || (
-          <span className="text-text-muted" aria-label="Teléfono sin registrar">
-            —
-          </span>
-        ),
-      sortable: true,
-      priority: 'tertiary',
-      minWidth: 140,
-    },
-    {
-      id: 'address',
-      header: 'Dirección',
-      cell: (customer) =>
-        customer.address?.trim() || (
-          <span className="text-text-muted" aria-label="Dirección sin registrar">
-            —
-          </span>
-        ),
-      sortable: true,
-      priority: 'tertiary',
       minWidth: 200,
     },
   ];
