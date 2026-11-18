@@ -235,7 +235,8 @@ export class CustomersController {
     if (!Number.isSafeInteger(page) || page < 1 || page > 1000) {
       throw new BadRequestException('Página inválida');
     }
-    const path = 'municipalities/' + municipalityId + '/postal-codes?page=' + page;
+    const path =
+      'municipalities/' + municipalityId + '/postal-codes?page=' + page;
     const cacheKey = stateId + ':' + path;
     const cached = this.municipalityCityCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) return cached.data;
