@@ -3263,3 +3263,30 @@ Returns evolution, FEFO, Expiration, Audit, Permission-Based RBAC, Data Import,
 Advanced Inventory y Billing / CFDI continúan como evoluciones futuras; no
 mantienen ERP Core V1 artificialmente abierto. No se afirma despliegue de
 staging o producción.
+
+---
+
+## Addendum estratégico — CRM-DASH — Evolución de Clientes a centro de inteligencia comercial (2026-11-18)
+
+**Estado:** PRODUCT DECISION APPROVED / PENDIENTE / NO IMPLEMENTADO  
+**Prioridad:** P1 estratégica, subordinada a ERP Pilot Readiness P0  
+**Sprint / fechas / SP / Target / Forecast / Commitment / Actual:** no definidos.
+
+**Objetivo:** evolucionar la página Clientes a un CRM ligero de visibilidad ejecutiva y seguimiento comercial, con tres vistas objetivo: `Resumen comercial | Directorio | Oportunidades`. INSAP usa Microsoft Dynamics en prospección, oportunidades y seguimiento de vendedores; no se pretende clonar Dynamics ni retirarlo sin análisis y autorización.
+
+La iniciativa **no bloquea el piloto ERP** y no altera los gates de seguridad, integridad, QA, migraciones o despliegue. Durante el congelamiento, solo se registra esta dirección de producto; no se autorizan nuevas funcionalidades ni migraciones.
+
+| Orden | Iniciativa | Resultado previsto | Estado |
+|---|---|---|---|
+| 0 | ERP Pilot Readiness P0 | Estabilización y aceptación del ERP actual | PRIORIDAD ACTUAL |
+| 1 | CRM-DASH-01 | Resumen con KPIs de Clientes, Quotes y Sales reales y verificables | BACKLOG / PENDIENTE |
+| 2 | CRM-001 | Responsables, carteras y autorización comercial transversal (ID ya reservado) | DEPENDENCIA / PENDIENTE |
+| 3 | CRM-DASH-02 | Oportunidades y etapas comerciales | BACKLOG / PENDIENTE |
+| 4 | CRM-DASH-03 | Actividades, llamadas, visitas y seguimientos | BACKLOG / PENDIENTE |
+| 5 | CRM-DASH-04 | Embudo, conversión y desempeño de vendedores con atribución validada | BACKLOG / PENDIENTE |
+| 6 | CRM-DASH-05 | Consultas ejecutivas ChatGPT/MCP de solo lectura | FUTURE / PENDIENTE |
+
+**Reglas:** cada KPI debe tener definición de fuente, fórmula, período, estado, autorización y pruebas. No calcular rankings por vendedor hasta formalizar CRM-001; no inventar oportunidades a partir de cotizaciones. Programar refinement únicamente cuando se levanten los bloqueos P0 y se autorice el trabajo.
+
+**Especificación:** [CRM-DASH](../modules/erp/CRM_DASHBOARD_PROPOSAL_2026-11-18.md).  
+**Backlog operativo:** [PROJECT_BOARD](PROJECT_BOARD.md) — CRM-DASH.
