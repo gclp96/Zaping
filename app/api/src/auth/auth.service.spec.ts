@@ -147,6 +147,8 @@ describe('AuthService', () => {
 
   it('adds companyTimezone from the authenticated user company', async () => {
     prismaMock.company.findUnique.mockResolvedValue({
+      name: 'Insumos de Salud Profesional',
+      tradeName: 'INSAP',
       timezone: 'America/Mazatlan',
     });
 
@@ -155,6 +157,7 @@ describe('AuthService', () => {
     ).resolves.toEqual({
       ...authenticatedUser,
       companyTimezone: 'America/Mazatlan',
+      companyName: 'INSAP',
     });
 
     expect(prismaMock.company.findUnique).toHaveBeenCalledWith({
@@ -162,6 +165,8 @@ describe('AuthService', () => {
         id: 'company-1',
       },
       select: {
+        name: true,
+        tradeName: true,
         timezone: true,
       },
     });
@@ -169,6 +174,8 @@ describe('AuthService', () => {
 
   it('returns non-default company timezones without hardcoding', async () => {
     prismaMock.company.findUnique.mockResolvedValue({
+      name: 'Insumos de Salud Profesional',
+      tradeName: 'INSAP',
       timezone: 'America/Tijuana',
     });
 
@@ -179,8 +186,25 @@ describe('AuthService', () => {
     expect(context.companyTimezone).toBe('America/Tijuana');
   });
 
+  it('uses the legal name when no trade name is available', async () => {
+    prismaMock.company.findUnique.mockResolvedValue({
+      name: 'Empresa Demo SA de CV',
+      tradeName: '   ',
+      timezone: 'America/Hermosillo',
+    });
+
+    const context = await service.getAuthenticatedUserContext(
+      authenticatedUser as never,
+    );
+
+    expect(context.companyName).toBe('Empresa Demo SA de CV');
+    expect(context.companyId).toBe(authenticatedUser.companyId);
+  });
+
   it('preserves existing authenticated user fields', async () => {
     prismaMock.company.findUnique.mockResolvedValue({
+      name: 'Insumos de Salud Profesional',
+      tradeName: 'INSAP',
       timezone: 'America/Hermosillo',
     });
 
@@ -201,6 +225,8 @@ describe('AuthService', () => {
 
   it('does not add timezone to JWT operations while building /auth/me context', async () => {
     prismaMock.company.findUnique.mockResolvedValue({
+      name: 'Insumos de Salud Profesional',
+      tradeName: 'INSAP',
       timezone: 'America/Mazatlan',
     });
 
