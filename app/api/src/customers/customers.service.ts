@@ -35,6 +35,35 @@ export class CustomersService {
     };
   }
 
+  normalizeGeographyOptions(payload: unknown) {
+    if (!payload || typeof payload !== 'object' || !('data' in payload)) {
+      return [];
+    }
+    const records = payload.data;
+    if (!Array.isArray(records)) return [];
+
+    return records.flatMap((entry: unknown) => {
+      if (!entry || typeof entry !== 'object') return [];
+      const item = entry as { id?: unknown; name?: unknown; code?: unknown };
+      if (
+        typeof item.id !== 'number' ||
+        !Number.isSafeInteger(item.id) ||
+        item.id < 1 ||
+        typeof item.name !== 'string' ||
+        !item.name.trim()
+      ) {
+        return [];
+      }
+      return [
+        {
+          id: item.id,
+          name: item.name,
+          ...(typeof item.code === 'string' ? { code: item.code } : {}),
+        },
+      ];
+    });
+  }
+
   async findOne(companyId: string, customerId: string) {
     const customer = await this.prisma.customer.findFirst({
       where: {
