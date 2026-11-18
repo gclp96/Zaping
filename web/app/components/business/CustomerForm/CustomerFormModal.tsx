@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type FormEvent } from 'react';
 import { Building2, ContactRound, MapPin } from 'lucide-react';
 
 import { api } from '@/services/api';
@@ -22,6 +22,9 @@ type FormErrors = {
 
 type CustomerFormContentProps = {
   customer: CustomerFormCustomer | null;
+  formId: string;
+  saving: boolean;
+  setSaving: (value: boolean) => void;
   onClose: () => void;
   onSaved: (customer: CustomerFormCustomer) => void | Promise<void>;
 };
@@ -33,6 +36,9 @@ function normalizeOptionalValue(value: string): string | undefined {
 
 function CustomerFormContent({
   customer,
+  formId,
+  saving,
+  setSaving,
   onClose,
   onSaved,
 }: CustomerFormContentProps) {
@@ -45,7 +51,6 @@ function CustomerFormContent({
   const [notes, setNotes] = useState(customer?.notes ?? '');
   const [errors, setErrors] = useState<FormErrors>({});
   const [formError, setFormError] = useState('');
-  const [saving, setSaving] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const submittingRef = useRef(false);
   const editing = Boolean(customer);
@@ -88,10 +93,6 @@ function CustomerFormContent({
     }
 
     return true;
-  }
-
-  function handleClose() {
-    if (!submittingRef.current) onClose();
   }
 
   async function handleSave() {
@@ -143,7 +144,13 @@ function CustomerFormContent({
   }
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} noValidate className="space-y-6">
+    <form
+      id={formId}
+      ref={formRef}
+      onSubmit={handleSubmit}
+      noValidate
+      className="space-y-5"
+    >
       <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700">
           <Building2 aria-hidden="true" size={20} />
@@ -199,7 +206,7 @@ function CustomerFormContent({
 
       <section
         aria-labelledby="customer-contact-heading"
-        className="space-y-4 border-t border-border pt-5"
+        className="space-y-4 border-t border-border pt-4"
       >
         <div className="flex items-center gap-2">
           <ContactRound aria-hidden="true" size={18} className="text-text-muted" />
@@ -307,26 +314,6 @@ function CustomerFormContent({
         </div>
       ) : null}
 
-      <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full sm:w-auto"
-          disabled={saving}
-          onClick={handleClose}
-        >
-          Cancelar
-        </Button>
-        <Button
-          type="submit"
-          className="w-full sm:w-auto"
-          loading={saving}
-          loadingText={editing ? 'Actualizando...' : 'Registrando...'}
-          disabled={saving}
-        >
-          {editing ? 'Guardar cambios' : 'Registrar cliente'}
-        </Button>
-      </div>
     </form>
   );
 }
@@ -337,17 +324,52 @@ export default function CustomerFormModal({
   onClose,
   onSaved,
 }: CustomerFormModalProps) {
+  const formId = useId();
+  const [saving, setSaving] = useState(false);
+  const editing = Boolean(customer);
+
+  function handleClose() {
+    if (!saving) onClose();
+  }
+
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
-      title={customer ? 'Editar cliente' : 'Nuevo cliente'}
+      onClose={handleClose}
+      dismissible={!saving}
+      title={editing ? 'Editar cliente' : 'Nuevo cliente'}
       description="Formulario de datos generales y contacto del cliente."
+      footer={
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full sm:w-auto"
+            disabled={saving}
+            onClick={handleClose}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            form={formId}
+            className="w-full sm:w-auto"
+            loading={saving}
+            loadingText={editing ? 'Actualizando...' : 'Registrando...'}
+            disabled={saving}
+          >
+            {editing ? 'Guardar cambios' : 'Registrar cliente'}
+          </Button>
+        </div>
+      }
     >
       {isOpen ? (
         <CustomerFormContent
           key={customer?.id ?? 'new'}
           customer={customer}
+          formId={formId}
+          saving={saving}
+          setSaving={setSaving}
           onClose={onClose}
           onSaved={onSaved}
         />
