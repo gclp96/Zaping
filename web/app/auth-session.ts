@@ -17,6 +17,7 @@ export type AuthenticatedSession = {
   lastName: string;
   role: UserRole;
   companyTimezone: string;
+  companyName: string;
 };
 
 export type AuthenticatedSessionState =

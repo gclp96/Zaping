@@ -31,6 +31,7 @@ function setRole(role: UserRole) {
       firstName: 'QA',
       lastName: 'Pruebas',
       companyTimezone: 'America/Hermosillo',
+      companyName: 'QA Company',
     },
   });
 }

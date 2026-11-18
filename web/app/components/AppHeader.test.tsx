@@ -8,6 +8,8 @@ const account = {
   firstName: 'Ana',
   lastName: 'Pérez',
   email: 'ana@example.test',
+  companyName: 'INSAP',
+  companyTimezone: 'America/Hermosillo',
 };
 
 afterEach(() => {
@@ -31,6 +33,11 @@ describe('AppHeader', () => {
     const header = screen.getByRole('banner');
 
     expect(within(header).getByText('Productos')).toBeTruthy();
+    const company = within(header).getByText('INSAP');
+    expect(company).toBeTruthy();
+    expect(company.classList.contains('truncate')).toBe(false);
+    expect(within(header).getByText('Empresa')).toBeTruthy();
+    expect(within(header).getByLabelText('Fecha y hora de la empresa')).toBeTruthy();
     expect(within(header).queryByRole('heading', { level: 1 })).toBeNull();
     expect(header.classList.contains('sticky')).toBe(true);
     expect(header.classList.contains('xl:hidden')).toBe(false);
@@ -38,9 +45,54 @@ describe('AppHeader', () => {
       screen.getByRole('button', { name: 'Cuenta de Ana Pérez' }),
     ).toBeTruthy();
     expect(header.classList.contains('lg:hidden')).toBe(false);
+    expect(within(header).queryByText('Notificaciones')).toBeNull();
     expect(
       within(header).getByText('Productos').classList.contains('lg:sr-only'),
     ).toBe(false);
+  });
+
+  it('offers the desktop sidebar toggle in the header when configured', async () => {
+    const user = userEvent.setup();
+    const onToggleDesktopSidebar = vi.fn();
+
+    const { rerender } = render(
+      <AppHeader
+        pathname="/home"
+        user={account}
+        onLogout={vi.fn()}
+        title="Inicio"
+        mobileNavigationId="mobile-navigation"
+        mobileNavigationOpen={false}
+        onMenuClick={vi.fn()}
+        desktopNavigationId="desktop-navigation"
+        desktopSidebarCollapsed={false}
+        onToggleDesktopSidebar={onToggleDesktopSidebar}
+      />,
+    );
+
+    const toggle = screen.getByRole('button', { name: 'Colapsar navegación' });
+    expect(toggle.getAttribute('aria-controls')).toBe('desktop-navigation');
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    await user.click(toggle);
+    expect(onToggleDesktopSidebar).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <AppHeader
+        pathname="/home"
+        user={account}
+        onLogout={vi.fn()}
+        title="Inicio"
+        mobileNavigationId="mobile-navigation"
+        mobileNavigationOpen={false}
+        onMenuClick={vi.fn()}
+        desktopNavigationId="desktop-navigation"
+        desktopSidebarCollapsed
+        onToggleDesktopSidebar={onToggleDesktopSidebar}
+      />,
+    );
+    expect(
+      screen.getByRole('button', { name: 'Expandir navegación' }).getAttribute('aria-expanded'),
+    ).toBe('false');
   });
 
   it('exposes the drawer relationship and current expanded state', () => {

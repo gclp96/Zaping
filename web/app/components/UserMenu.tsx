@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, KeyRound, LogOut, UserCircle } from "lucide-react";
+import { ChevronDown, KeyRound, LogOut, UserRound } from "lucide-react";
 import type { AuthenticatedSession } from "@/app/auth-session";
 
 type UserMenuProps = {
@@ -61,7 +61,12 @@ export default function UserMenu({ user, onLogout }: UserMenuProps) {
         className="inline-flex min-h-10 items-center gap-2 rounded-ui-md border border-border bg-surface px-3 text-sm font-medium text-text transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
         onClick={() => setOpen((current) => !current)}
       >
-        <UserCircle aria-hidden="true" size={20} className="shrink-0" />
+        <div
+          aria-hidden="true"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
+        >
+          <UserRound size={18} strokeWidth={2} />
+        </div>
         <span className="hidden max-w-40 truncate sm:block">{label}</span>
         <ChevronDown aria-hidden="true" size={16} className="shrink-0" />
       </button>

@@ -192,9 +192,7 @@ export default function AppShell({ children }: AppShellProps) {
         id="desktop-navigation"
         pathname={pathname}
         collapsed={sidebarCollapsed}
-        collapsible
         className="sticky top-0 hidden h-screen xl:flex"
-        onToggleCollapsed={toggleSidebarCollapsed}
         transitionEnabled={sidebarPreferenceReady}
         currentUserRole={currentUserRole}
       />
@@ -240,6 +238,9 @@ export default function AppShell({ children }: AppShellProps) {
           mobileNavigationOpen={mobileNavigationOpen}
           menuButtonRef={menuButtonRef}
           onMenuClick={() => setMobileNavigationOpen(true)}
+          desktopNavigationId="desktop-navigation"
+          desktopSidebarCollapsed={sidebarCollapsed}
+          onToggleDesktopSidebar={toggleSidebarCollapsed}
         />
         <main ref={mainRef} tabIndex={-1} className="min-w-0 flex-1">
           {children}
