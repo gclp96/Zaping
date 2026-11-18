@@ -217,7 +217,7 @@ function DocumentList<Status extends QuoteStatus | SaleStatus>({
         )}
         {count > items.length ? (
           <p className="mt-3 border-t border-border pt-3 text-xs text-text-muted">
-            Mostrando los {items.length} registros más recientes.
+            Mostrando {items.length} de {count} registros.
           </p>
         ) : null}
       </div>
