@@ -1,0 +1,52 @@
+# Issue #284 — ISOLATED clean-history rehearsal, NOT the operational QA Compose project.
+# Distinct Compose project, network and named volumes. No published host ports.
+# No service can connect to zaping-local-qa by its Docker service name.
+name: zaping-issue284-rehearsal
+
+services:
+  zaping-qa-postgres:
+    image: postgres:16
+    env_file: .qa/postgres.env
+    volumes:
+      - rehearsal-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zaping_qa -d zaping_qa"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Dependencies are installed without access to API or PostgreSQL secrets.
+  deps:
+    image: node:24.20.0-bookworm-slim
+    working_dir: /work
+    volumes:
+      - ./app/api:/source:ro
+      - rehearsal-api:/work
+    entrypoint: ["sh", "-ec"]
+    command:
+      - |
+        cp /source/package.json /source/package-lock.json /source/prisma.config.ts /work/
+        cp -R /source/prisma /work/prisma
+        npm ci --no-audit --no-fund
+
+  # This service never exposes a listening port or runs the Zaping application.
+  schema-check:
+    image: node:24.20.0-bookworm-slim
+    working_dir: /work
+    env_file: .qa/api.env
+    depends_on:
+      zaping-qa-postgres:
+        condition: service_healthy
+    volumes:
+      - rehearsal-api:/work
+    entrypoint: ["sh", "-ec"]
+    command:
+      - |
+        node -e 'const u = new URL(process.env.DATABASE_URL || ""); if (u.host !== "zaping-qa-postgres:5432" || u.pathname !== "/zaping_qa") { console.error("ABORT: Unexpected rehearsal target"); process.exit(42); }'
+        npx prisma migrate deploy
+        npx prisma migrate status
+        npx prisma validate
+
+volumes:
+  rehearsal-postgres:
+  rehearsal-api:
