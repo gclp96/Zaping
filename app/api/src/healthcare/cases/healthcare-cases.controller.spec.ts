@@ -87,13 +87,7 @@ describe('HealthcareCasesController', () => {
   });
 
   const getRolesMetadata = (
-    methodName:
-      | 'create'
-      | 'update'
-      | 'cancel'
-      | 'findAll'
-      | 'findUpcoming'
-      | 'findOne',
+    methodName: keyof HealthcareCasesController,
   ): UserRole[] | undefined => {
     const descriptor = Object.getOwnPropertyDescriptor(
       HealthcareCasesController.prototype,
