@@ -320,10 +320,9 @@ function CustomerFormContent({
             placeholder="Teléfono de contacto"
             value={phone}
             disabled={saving}
-            error={errors.phone}
             onChange={(event) => {
               setPhone(event.target.value);
-              clearFieldError('phone');
+              setFormError('');
             }}
           />
           <div className="sm:col-span-2">
