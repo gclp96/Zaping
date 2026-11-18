@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Building2, ContactRound, MapPin } from 'lucide-react';
 
 import { api } from '@/services/api';
@@ -48,6 +48,7 @@ function CustomerFormContent({
   onSaved,
 }: CustomerFormContentProps) {
   const [name, setName] = useState(customer?.name ?? '');
+  const [legalName, setLegalName] = useState(customer?.legalName ?? '');
   const [customerType, setCustomerType] = useState(
     resolveCustomerType(customer?.type) ?? '',
   );
@@ -56,6 +57,12 @@ function CustomerFormContent({
   const [phone, setPhone] = useState(customer?.phone ?? '');
   const [contactName, setContactName] = useState(customer?.contactName ?? '');
   const [address, setAddress] = useState(customer?.address ?? '');
+  const [postalCode, setPostalCode] = useState(customer?.postalCode ?? '');
+  const [neighborhood, setNeighborhood] = useState(customer?.neighborhood ?? '');
+  const [municipality, setMunicipality] = useState(customer?.municipality ?? '');
+  const [postalMatches, setPostalMatches] = useState<string[]>([]);
+  const [postalStatus, setPostalStatus] = useState('');
+  const [postalLoading, setPostalLoading] = useState(false);
   const [city, setCity] = useState(customer?.city ?? '');
   const [state, setState] = useState(customer?.state ?? '');
   const [countryCode, setCountryCode] = useState(
@@ -68,6 +75,48 @@ function CustomerFormContent({
   const submittingRef = useRef(false);
   const editing = Boolean(customer);
 
+  useEffect(() => {
+    if (!/^\\d{5}$/.test(postalCode) || countryCode.toUpperCase() !== 'MX') {
+      return;
+    }
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      void api
+        .get<{
+          state?: string;
+          municipality?: string;
+          city?: string;
+          settlements: string[];
+        }>('/customers/postal-lookup/' + postalCode)
+        .then(({ data }) => {
+          if (cancelled) return;
+          setPostalMatches(data.settlements);
+          setPostalStatus(
+            data.settlements.length
+              ? 'Selecciona una colonia de la lista.'
+              : 'Código postal sin resultados. Puedes escribir el domicilio manualmente.',
+          );
+          if (data.settlements.length) {
+            setState(data.state ?? '');
+            setCity(data.city ?? '');
+            setMunicipality(data.municipality ?? '');
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setPostalStatus('Consulta no disponible. Puedes capturar el domicilio manualmente.');
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setPostalLoading(false);
+        });
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [postalCode, countryCode]);
+
   function clearFieldError(field: keyof FormErrors) {
     setErrors((current) => ({ ...current, [field]: undefined }));
     setFormError('');
@@ -78,7 +127,6 @@ function CustomerFormContent({
     const trimmedName = name.trim();
     const trimmedType = customerType.trim();
     const trimmedEmail = email.trim();
-    const trimmedPhone = phone.trim();
 
     if (!trimmedName) {
       nextErrors.name = 'El nombre del cliente es obligatorio.';
@@ -90,9 +138,6 @@ function CustomerFormContent({
       nextErrors.email = 'El correo electrónico es obligatorio.';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       nextErrors.email = 'Ingresa un correo electrónico válido.';
-    }
-    if (!trimmedPhone) {
-      nextErrors.phone = 'El teléfono es obligatorio.';
     }
 
     setErrors(nextErrors);
@@ -118,11 +163,15 @@ function CustomerFormContent({
 
     const payload = {
       name: name.trim(),
+      legalName: normalizeOptionalValue(legalName) ?? null,
       type: customer && !typeTouched ? undefined : customerType.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
+      email: normalizeOptionalValue(email) ?? null,
+      phone: normalizeOptionalValue(phone) ?? null,
       contactName: normalizeOptionalValue(contactName),
       address: normalizeOptionalValue(address),
+      postalCode: normalizeOptionalValue(postalCode) ?? null,
+      neighborhood: normalizeOptionalValue(neighborhood) ?? null,
+      municipality: normalizeOptionalValue(municipality) ?? null,
       city: normalizeOptionalValue(city) ?? null,
       state: normalizeOptionalValue(state) ?? null,
       countryCode: normalizeOptionalValue(countryCode)?.toUpperCase() ?? null,
@@ -195,7 +244,7 @@ function CustomerFormContent({
           <Input
             name="name"
             label="Nombre"
-            placeholder="Nombre comercial o razón social"
+            placeholder="Nombre comercial o identificador del cliente"
             value={name}
             required
             disabled={saving}
@@ -229,6 +278,15 @@ function CustomerFormContent({
             ) : null}
           </div>
         </div>
+        <Input
+          name="legalName"
+          label="Razón social"
+          placeholder="Nombre o denominación fiscal (opcional)"
+          value={legalName}
+          maxLength={255}
+          disabled={saving}
+          onChange={(event) => setLegalName(event.target.value)}
+        />
       </section>
 
       <section
@@ -249,7 +307,6 @@ function CustomerFormContent({
             autoComplete="email"
             placeholder="correo@empresa.com"
             value={email}
-            required
             disabled={saving}
             error={errors.email}
             onChange={(event) => {
@@ -264,7 +321,6 @@ function CustomerFormContent({
             autoComplete="tel"
             placeholder="Teléfono de contacto"
             value={phone}
-            required
             disabled={saving}
             error={errors.phone}
             onChange={(event) => {
@@ -303,6 +359,52 @@ function CustomerFormContent({
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
+            name="postalCode"
+            label="Código postal"
+            placeholder="Código postal de 5 dígitos"
+            inputMode="numeric"
+            maxLength={5}
+            value={postalCode}
+            disabled={saving}
+            onChange={(event) => {
+              setPostalCode(event.target.value.replace(/\\D/g, '').slice(0, 5));
+              setPostalMatches([]);
+              setPostalStatus('');
+              setPostalLoading(true);
+              setNeighborhood('');
+            }}
+          />
+          <div className="space-y-1">
+            <label htmlFor="customer-neighborhood" className="block font-medium text-gray-700">
+              Colonia / asentamiento
+            </label>
+            {postalMatches.length ? (
+              <select
+                id="customer-neighborhood"
+                name="neighborhood"
+                value={neighborhood}
+                disabled={saving}
+                onChange={(event) => setNeighborhood(event.target.value)}
+                className="w-full rounded-lg border border-gray-300 bg-white p-3 text-sm"
+              >
+                <option value="">Selecciona una colonia</option>
+                {postalMatches.map((item) => <option key={item} value={item}>{item}</option>)}
+                <option value="__OTHER__">Otra (captura manual)</option>
+              </select>
+            ) : null}
+            {!postalMatches.length || neighborhood === '__OTHER__' ? (
+              <Input
+                name="neighborhoodManual"
+                label="Colonia (captura manual)"
+                value={neighborhood === '__OTHER__' ? '' : neighborhood}
+                disabled={saving}
+                onChange={(event) => setNeighborhood(event.target.value)}
+              />
+            ) : null}
+            {postalStatus ? <p role="status" className="text-xs text-text-muted">{postalStatus}</p> : null}
+            {postalLoading && /^\\d{5}$/.test(postalCode) ? <p className="text-xs text-text-muted">Buscando código postal...</p> : null}
+          </div>
+          <Input
             name="city"
             label="Ciudad"
             placeholder="Ej. Hermosillo"
@@ -327,6 +429,15 @@ function CustomerFormContent({
             }}
           />
         </div>
+        <Input
+          name="municipality"
+          label="Municipio"
+          placeholder="Ej. Hermosillo"
+          value={municipality}
+          maxLength={120}
+          disabled={saving}
+          onChange={(event) => setMunicipality(event.target.value)}
+        />
         <div className="sm:max-w-xs">
           <Input
             name="countryCode"
