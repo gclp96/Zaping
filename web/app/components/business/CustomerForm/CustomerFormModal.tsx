@@ -82,6 +82,9 @@ function CustomerFormContent({
     GeographyOption[]
   >([]);
   const [cityOptions, setCityOptions] = useState<GeographyOption[]>([]);
+  const [cityPage, setCityPage] = useState(0);
+  const [cityHasMore, setCityHasMore] = useState(false);
+  const [cityLoading, setCityLoading] = useState(false);
   const [settlementOptions, setSettlementOptions] = useState<SettlementOption[]>([]);
   const [settlementPage, setSettlementPage] = useState(0);
   const [settlementHasMore, setSettlementHasMore] = useState(false);
@@ -93,6 +96,7 @@ function CustomerFormContent({
   const formRef = useRef<HTMLFormElement>(null);
   const submittingRef = useRef(false);
   const settlementContextRef = useRef('');
+  const cityContextRef = useRef('');
   const editing = Boolean(customer);
 
   // Fetch catalog data only while the form is mounted. Historical values
@@ -131,22 +135,17 @@ function CustomerFormContent({
     if (!selectedStateId) return;
     let cancelled = false;
     const base = '/customers/geography/states/' + selectedStateId;
-    void Promise.all([
-      api.get<GeographyOption[]>(base + '/municipalities'),
-      api.get<GeographyOption[]>(base + '/cities'),
-    ])
-      .then(([municipalityResponse, cityResponse]) => {
+    void api
+      .get<GeographyOption[]>(base + '/municipalities')
+      .then(({ data }) => {
         if (cancelled) return;
-        setMunicipalityOptions(
-          Array.isArray(municipalityResponse.data) ? municipalityResponse.data : [],
-        );
-        setCityOptions(Array.isArray(cityResponse.data) ? cityResponse.data : []);
+        setMunicipalityOptions(Array.isArray(data) ? data : []);
         setGeographyStatus('');
       })
       .catch(() => {
         if (!cancelled) {
           setGeographyStatus(
-            'No se pudieron cargar municipios o ciudades. Puedes escribirlos manualmente.',
+            'No se pudieron cargar municipios. Puedes escribirlos manualmente.',
           );
         }
       });
@@ -158,6 +157,91 @@ function CustomerFormContent({
   const selectedMunicipalityId = municipalityOptions.find(
     (option) => option.name === municipality,
   )?.id;
+
+  // PostalKit's state-wide city list is not municipality-scoped.
+  // Instead derive suggestions from that municipality's postal-code records.
+  useEffect(() => {
+    cityContextRef.current =
+      String(selectedStateId) + ':' + String(selectedMunicipalityId);
+    if (!selectedStateId || !selectedMunicipalityId) return;
+    let cancelled = false;
+    void api
+      .get<{ items: GeographyOption[]; hasMore: boolean }>(
+        '/customers/geography/states/' +
+          selectedStateId +
+          '/municipalities/' +
+          selectedMunicipalityId +
+          '/cities?page=1',
+      )
+      .then(({ data }) => {
+        if (cancelled) return;
+        setCityOptions(Array.isArray(data.items) ? data.items : []);
+        setCityHasMore(data.hasMore === true);
+        setCityPage(1);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setGeographyStatus(
+            'No se pudieron cargar ciudades de este municipio. Puedes escribir la ciudad manualmente.',
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedStateId, selectedMunicipalityId]);
+
+  function clearCitySuggestions() {
+    setCityOptions([]);
+    setCityPage(0);
+    setCityHasMore(false);
+    setCityLoading(false);
+  }
+
+  function loadMoreCities() {
+    if (
+      !selectedStateId ||
+      !selectedMunicipalityId ||
+      !cityHasMore ||
+      cityLoading
+    ) {
+      return;
+    }
+    const page = cityPage + 1;
+    const context = cityContextRef.current;
+    setCityLoading(true);
+    void api
+      .get<{ items: GeographyOption[]; hasMore: boolean }>(
+        '/customers/geography/states/' +
+          selectedStateId +
+          '/municipalities/' +
+          selectedMunicipalityId +
+          '/cities?page=' +
+          page,
+      )
+      .then(({ data }) => {
+        if (context !== cityContextRef.current) return;
+        setCityOptions((current) => {
+          const known = new Set(current.map((option) => option.id));
+          return [
+            ...current,
+            ...(Array.isArray(data.items) ? data.items : []).filter(
+              (option) => !known.has(option.id),
+            ),
+          ];
+        });
+        setCityHasMore(data.hasMore === true);
+        setCityPage(page);
+      })
+      .catch(() => {
+        if (context === cityContextRef.current) {
+          setGeographyStatus('No fue posible cargar más ciudades.');
+        }
+      })
+      .finally(() => {
+        if (context === cityContextRef.current) setCityLoading(false);
+      });
+  }
 
   useEffect(() => {
     settlementContextRef.current =
@@ -625,7 +709,7 @@ function CustomerFormContent({
                 setMunicipality('');
                 setCity('');
                 setMunicipalityOptions([]);
-                setCityOptions([]);
+                clearCitySuggestions();
                 clearSettlementResults();
                 setPostalCode('');
                 setNeighborhood('');
@@ -663,6 +747,7 @@ function CustomerFormContent({
             disabled={saving}
             onChange={(value) => {
               setMunicipality(value);
+              clearCitySuggestions();
               clearSettlementResults();
               setCity('');
               setNeighborhood('');
@@ -684,6 +769,10 @@ function CustomerFormContent({
                 label: option.name,
               }))}
               disabled={saving}
+              loading={cityLoading}
+              hasMore={cityHasMore}
+              onLoadMore={loadMoreCities}
+              loadMoreLabel="Ver más ciudades"
               onChange={(value) => {
                 setCity(value);
                 setFormError('');
