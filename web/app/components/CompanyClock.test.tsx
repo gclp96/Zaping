@@ -13,10 +13,8 @@ describe('CompanyClock', () => {
   it('formats the same instant using the authenticated company timezone', () => {
     expect(formatCompanyDateTime(sameInstant, 'America/Hermosillo')?.time).toBe('21:30');
     expect(formatCompanyDateTime(sameInstant, 'America/Mexico_City')?.time).toBe('22:30');
-    expect(formatCompanyDateTime(sameInstant, 'America/Hermosillo')?.date).toMatch(/^Mar/i);
-    expect(formatCompanyDateTime(sameInstant, 'America/Hermosillo')?.date).toMatch(/17/);
-    expect(formatCompanyDateTime(sameInstant, 'America/Hermosillo')?.date).toMatch(/de nov/);
-    expect(formatCompanyDateTime(sameInstant, 'America/Hermosillo')?.date).not.toMatch(/De Nov/);
+    expect(formatCompanyDateTime(sameInstant, 'America/Hermosillo')?.date).toBe('Martes 17 de noviembre de 2026');
+    expect(formatCompanyDateTime(sameInstant, 'America/Mexico_City')?.date).toBe('Martes 17 de noviembre de 2026');
   });
 
   it('avoids showing an incorrect local clock when the timezone is invalid', () => {
