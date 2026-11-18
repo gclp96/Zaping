@@ -110,6 +110,7 @@ function mockHomeSuccess({
           lastName: 'Test',
           role: homeRole,
           companyTimezone: 'America/Hermosillo',
+          companyName: 'Zaping QA Company A',
         },
       } as never;
     }
@@ -151,10 +152,15 @@ describe('HomePage', () => {
       screen.getByRole('heading', { level: 1, name: 'Inicio' }),
     ).toBeTruthy();
     expect(screen.getByText('Resumen de tu operación diaria.')).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Bienvenida' })).toBeTruthy();
     expect(container.firstElementChild?.classList.contains('max-w-none')).toBe(
       true,
     );
 
+    await screen.findByRole('heading', { level: 2, name: 'Hola, Admin' });
+    expect(
+      screen.getByText('Aquí tienes un resumen de la operación en Zaping QA Company A.'),
+    ).toBeTruthy();
     await screen.findByText('Productos sin stock');
     await waitFor(() => {
       expect(api.get).toHaveBeenCalledWith('/equipment');
@@ -171,6 +177,9 @@ describe('HomePage', () => {
     expect(within(operationalSummary).getByText('Cotizaciones')).toBeTruthy();
     expect(within(operationalSummary).getByText('Compras')).toBeTruthy();
     expect(within(operationalSummary).getByText('Ventas')).toBeTruthy();
+    expect(
+      within(operationalSummary).getByRole('link', { name: 'Cotizaciones' }).getAttribute('href'),
+    ).toBe('/quotes');
     expect(screen.queryByText('Valor de inventario')).toBeNull();
     expect(screen.queryByText('Ventas recientes')).toBeNull();
     expect(screen.queryByText('Productos')).toBeNull();
@@ -252,6 +261,9 @@ describe('HomePage', () => {
 
     render(<HomePage />);
     await screen.findByRole('button', { name: 'Nueva cotización' });
+
+    const quotationAction = screen.getByRole('button', { name: 'Nueva cotización' });
+    expect(quotationAction.classList.contains('bg-blue-50/80')).toBe(true);
 
     for (const [label, href] of [
       ['Nueva cotización', '/quotes'],
@@ -348,6 +360,7 @@ describe('HomePage', () => {
           lastName: 'Test',
           role: homeRole,
           companyTimezone: 'America/Hermosillo',
+          companyName: 'Zaping QA Company A',
         },
       } as never;
     }

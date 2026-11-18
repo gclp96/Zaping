@@ -57,8 +57,8 @@ function AttentionCard({ item }: { item: AttentionItem }) {
   const Icon = item.icon;
 
   return (
-    <Card className="h-full border border-border shadow-subtle">
-      <div className="flex h-full flex-col gap-5">
+    <Card className="h-full border border-border/80 shadow-subtle transition-shadow duration-[var(--motion-duration-fast)] hover:shadow-md">
+      <div className="flex h-full flex-col gap-4">
         <div className="flex items-start justify-between gap-4">
           <span
             className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-ui-md ${item.iconClassName}`}
@@ -69,8 +69,8 @@ function AttentionCard({ item }: { item: AttentionItem }) {
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-text">{item.label}</p>
-          <p className="mt-1 text-sm text-text-muted">{item.description}</p>
+          <p className="text-base font-semibold text-text">{item.label}</p>
+          <p className="mt-1 text-sm leading-5 text-text-muted">{item.description}</p>
         </div>
 
         <Link
