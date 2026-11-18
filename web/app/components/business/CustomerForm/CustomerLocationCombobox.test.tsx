@@ -10,7 +10,15 @@ const options = [
   { key: '2', value: 'Centro', label: 'Centro · CP 83140', postalCode: '83140' },
 ];
 
-function Fixture({ onSelect = vi.fn() }: { onSelect?: (value: string) => void }) {
+function Fixture({
+  onSelect = vi.fn(),
+  emptyMessage,
+  values = options,
+}: {
+  onSelect?: (value: string) => void;
+  emptyMessage?: string;
+  values?: typeof options;
+}) {
   const [value, setValue] = useState('');
   return (
     <div data-testid="modal-body">
@@ -19,7 +27,8 @@ function Fixture({ onSelect = vi.fn() }: { onSelect?: (value: string) => void })
         label="Colonia / asentamiento"
         placeholder="Busca una colonia"
         value={value}
-        options={options}
+        options={values}
+        emptyMessage={emptyMessage}
         onChange={setValue}
         onSelect={(option) => onSelect(option.value)}
       />
@@ -55,6 +64,33 @@ describe('CustomerLocationCombobox', () => {
     expect(await screen.findByRole('option', { name: 'Jesús García' })).toBeTruthy();
     await user.keyboard('{Enter}');
     expect((input as HTMLInputElement).value).toBe('Jesús García');
+  });
+
+  it('shows a municipality-specific explanation when no cities exist', async () => {
+    const user = userEvent.setup();
+    render(
+      <Fixture
+        values={[]}
+        emptyMessage="No hay ciudades registradas para este municipio. Puedes escribirla manualmente."
+      />,
+    );
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Mostrar opciones de Colonia / asentamiento',
+      }),
+    );
+    expect(
+      screen.getByText('No hay ciudades registradas para este municipio. Puedes escribirla manualmente.'),
+    ).toBeTruthy();
+    await user.type(
+      screen.getByRole('combobox', { name: 'Colonia / asentamiento' }),
+      'Localidad capturada',
+    );
+    expect(
+      (screen.getByRole('combobox', {
+        name: 'Colonia / asentamiento',
+      }) as HTMLInputElement).value,
+    ).toBe('Localidad capturada');
   });
 
   it('keeps manual capture possible when no catalog match exists', async () => {
