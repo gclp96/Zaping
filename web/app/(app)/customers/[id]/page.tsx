@@ -36,11 +36,15 @@ import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 type CustomerDetail = {
   id: string;
   name: string;
+  legalName?: string | null;
   type: string | null;
   email: string | null;
   phone: string | null;
   contactName: string | null;
   address: string | null;
+  postalCode?: string | null;
+  neighborhood?: string | null;
+  municipality?: string | null;
   city?: string | null;
   state?: string | null;
   countryCode?: string | null;
@@ -395,6 +399,10 @@ export default function CustomerDetailPage() {
                   value={customerTypeLabel(currentState.data.customer.type)}
                 />
                 <DetailField
+                  label="Razón social"
+                  value={currentState.data.customer.legalName ?? null}
+                />
+                <DetailField
                   label="Correo"
                   value={currentState.data.customer.email}
                   href={
@@ -419,6 +427,18 @@ export default function CustomerDetailPage() {
                 <DetailField
                   label="Ubicación"
                   value={customerLocationLabel(currentState.data.customer)}
+                />
+                <DetailField
+                  label="Código postal"
+                  value={currentState.data.customer.postalCode ?? null}
+                />
+                <DetailField
+                  label="Colonia"
+                  value={currentState.data.customer.neighborhood ?? null}
+                />
+                <DetailField
+                  label="Municipio"
+                  value={currentState.data.customer.municipality ?? null}
                 />
                 <DetailField
                   label="Dirección"
