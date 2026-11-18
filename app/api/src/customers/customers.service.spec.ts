@@ -58,6 +58,131 @@ describe('CustomersService', () => {
     service = moduleRef.get<CustomersService>(CustomersService);
   });
 
+  it('normalizes postal lookup without guessing missing data', () => {
+    expect(
+      service.normalizePostalLookup('83000', {
+        data: {
+          state: { name: 'Sonora' },
+          municipality: { name: 'Hermosillo' },
+          city: { name: 'Hermosillo' },
+          settlements: [{ name: 'Centro' }, { name: '5 de Mayo' }],
+        },
+      }),
+    ).toEqual({
+      code: '83000',
+      state: 'Sonora',
+      municipality: 'Hermosillo',
+      city: 'Hermosillo',
+      settlements: ['Centro', '5 de Mayo'],
+    });
+    expect(service.normalizePostalLookup('00000', {})).toEqual({
+      code: '00000',
+      settlements: [],
+    });
+  });
+
+  it('normalizes state, municipality, and city options safely', () => {
+    expect(
+      service.normalizeGeographyOptions({
+        data: [
+          { id: 26, name: 'Sonora', code: '26' },
+          { id: 0, name: 'Invalid' },
+          { id: 12, name: 'Hermosillo' },
+          { id: 3, name: '' },
+          null,
+        ],
+      }),
+    ).toEqual([
+      { id: 26, name: 'Sonora', code: '26' },
+      { id: 12, name: 'Hermosillo' },
+    ]);
+    expect(service.normalizeGeographyOptions({ data: {} })).toEqual([]);
+    expect(service.normalizeGeographyOptions(null)).toEqual([]);
+  });
+
+  it('normalizes municipality settlements with distinct IDs and postal codes', () => {
+    expect(
+      service.normalizeMunicipalitySettlements(
+        {
+          data: [
+            { id: 53, name: 'Centro', postal_code: { code: '83140' } },
+            { id: 54, name: 'Centro', postal_code: { code: '83141' } },
+            { id: -1, name: 'Invalid' },
+            { id: 55, name: 'Ejido', postal_code: null },
+          ],
+          meta: { total: 55, per_page: 20 },
+        },
+        1,
+      ),
+    ).toEqual({
+      items: [
+        { id: 53, name: 'Centro', postalCode: '83140' },
+        { id: 54, name: 'Centro', postalCode: '83141' },
+        { id: 55, name: 'Ejido', postalCode: null },
+      ],
+      hasMore: true,
+    });
+    expect(
+      service.normalizeMunicipalitySettlements(
+        { data: [{ id: 1, name: 'Centro' }], meta: { total: 25 } },
+        2,
+      ),
+    ).toEqual({
+      items: [{ id: 1, name: 'Centro', postalCode: null }],
+      hasMore: false,
+    });
+    expect(service.normalizeMunicipalitySettlements(null, 1)).toEqual({
+      items: [],
+      hasMore: false,
+    });
+  });
+
+  it('does not invent a city from a municipality without city data', () => {
+    expect(
+      service.normalizePostalLookup('73590', {
+        data: {
+          state: { name: 'Puebla' },
+          municipality: { name: 'Acateno' },
+          city: null,
+          settlements: [{ name: 'Anáhuac' }],
+        },
+      }),
+    ).toEqual({
+      code: '73590',
+      state: 'Puebla',
+      municipality: 'Acateno',
+      city: '',
+      settlements: ['Anáhuac'],
+    });
+  });
+
+  it('derives only cities attached to a municipality postal code page', () => {
+    expect(
+      service.normalizeMunicipalityCities(
+        {
+          data: [
+            { code: '73590', city: null },
+            { code: '73591', city: { id: 10, name: 'Ciudad verificada' } },
+            { code: '73592', city: { id: 10, name: 'Ciudad verificada' } },
+            { code: '73593', city: { id: 11, name: 'Otra ciudad' } },
+          ],
+          meta: { total: 25 },
+        },
+        1,
+      ),
+    ).toEqual({
+      items: [
+        { id: 10, name: 'Ciudad verificada' },
+        { id: 11, name: 'Otra ciudad' },
+      ],
+      hasMore: true,
+    });
+    expect(service.normalizeMunicipalityCities({}, 1)).toEqual({
+      items: [],
+      hasMore: false,
+    });
+  });
+
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
@@ -107,10 +232,17 @@ describe('CustomersService', () => {
       data: {
         companyId: 'company-1',
         name: activeCustomer.name,
+        legalName: undefined,
         type: activeCustomer.type,
         email: activeCustomer.email,
         phone: activeCustomer.phone,
         address: undefined,
+        postalCode: undefined,
+        neighborhood: undefined,
+        municipality: undefined,
+        city: undefined,
+        state: undefined,
+        countryCode: undefined,
         contactName: undefined,
         notes: undefined,
       },
@@ -141,10 +273,14 @@ describe('CustomersService', () => {
       },
       data: {
         name: updatedCustomer.name,
+        legalName: undefined,
         type: undefined,
         email: undefined,
         phone: undefined,
         address: undefined,
+        city: undefined,
+        state: undefined,
+        countryCode: undefined,
         contactName: undefined,
         notes: undefined,
       },

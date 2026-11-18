@@ -1,9 +1,12 @@
 import {
   Body,
+  BadRequestException,
+  ServiceUnavailableException,
   Controller,
   Delete,
   Get,
   Param,
+  Query,
   Patch,
   Post,
   Request,
@@ -29,6 +32,244 @@ export class CustomersController {
   findAll(@Request() req: any) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
     return this.customersService.findAll(req.user.companyId);
+  }
+
+  /**
+   * Authenticated postal assistance. The provider token never reaches the browser.
+   * Manual entry remains available when POSTALKIT_API_KEY is not configured.
+   */
+  @Get('postal-lookup/:code')
+  async lookupPostalCode(@Param('code') code: string) {
+    if (!/^\d{5}$/.test(code)) {
+      throw new BadRequestException('Código postal inválido');
+    }
+    const key = process.env.POSTALKIT_API_KEY;
+    if (!key) {
+      throw new ServiceUnavailableException('Consulta postal no configurada');
+    }
+    try {
+      const response = await fetch(
+        'https://api.postalkit.mx/v1/postal-codes/' + code,
+        {
+          headers: { Authorization: 'Bearer ' + key },
+          signal: AbortSignal.timeout(4500),
+        },
+      );
+      if (response.status === 404) return { code, settlements: [] };
+      if (!response.ok) {
+        throw new ServiceUnavailableException(
+          'Consulta postal temporalmente no disponible',
+        );
+      }
+      const body: unknown = await response.json();
+      return this.customersService.normalizePostalLookup(code, body);
+    } catch {
+      throw new ServiceUnavailableException(
+        'Consulta postal temporalmente no disponible',
+      );
+    }
+  }
+
+  /**
+   * Geography is read-only and shared by tenants. The provider credential
+   * is never exposed, and only fixed routes with a numeric state ID are used.
+   * Cache catalog responses to limit provider usage during QA.
+   */
+  private readonly geographyCache = new Map<
+    string,
+    {
+      expiresAt: number;
+      values: Array<{ id: number; name: string; code?: string }>;
+    }
+  >();
+
+  private async getGeography(path: string) {
+    const cached = this.geographyCache.get(path);
+    if (cached && cached.expiresAt > Date.now()) return cached.values;
+
+    const key = process.env.POSTALKIT_API_KEY;
+    if (!key) {
+      throw new ServiceUnavailableException('Consulta postal no configurada');
+    }
+
+    try {
+      const response = await fetch('https://api.postalkit.mx/v1/' + path, {
+        headers: { Authorization: 'Bearer ' + key },
+        signal: AbortSignal.timeout(4500),
+      });
+      if (!response.ok) {
+        throw new ServiceUnavailableException(
+          'Catálogo geográfico temporalmente no disponible',
+        );
+      }
+
+      const payload: unknown = await response.json();
+      const values = this.customersService.normalizeGeographyOptions(payload);
+      this.geographyCache.set(path, {
+        values,
+        expiresAt: Date.now() + 60 * 60 * 1000,
+      });
+      return values;
+    } catch {
+      throw new ServiceUnavailableException(
+        'Catálogo geográfico temporalmente no disponible',
+      );
+    }
+  }
+
+  @Get('geography/states')
+  listStates() {
+    return this.getGeography('states');
+  }
+
+  @Get('geography/states/:id/municipalities')
+  listMunicipalities(@Param('id') id: string) {
+    if (!/^\d{1,3}$/.test(id)) {
+      throw new BadRequestException('Estado inválido');
+    }
+    return this.getGeography('states/' + id + '/municipalities');
+  }
+
+  @Get('geography/states/:id/cities')
+  listCities(@Param('id') id: string) {
+    if (!/^\d{1,3}$/.test(id)) {
+      throw new BadRequestException('Estado inválido');
+    }
+    return this.getGeography('states/' + id + '/cities');
+  }
+
+  private readonly settlementCache = new Map<
+    string,
+    {
+      expiresAt: number;
+      data: {
+        items: Array<{ id: number; name: string; postalCode: string | null }>;
+        hasMore: boolean;
+      };
+    }
+  >();
+
+  @Get('geography/states/:stateId/municipalities/:municipalityId/settlements')
+  async listMunicipalitySettlements(
+    @Param('stateId') stateId: string,
+    @Param('municipalityId') municipalityId: string,
+    @Query('page') pageInput = '1',
+  ) {
+    if (
+      !/^\d{1,3}$/.test(stateId) ||
+      !/^\d{1,8}$/.test(municipalityId) ||
+      !/^\d{1,4}$/.test(pageInput)
+    ) {
+      throw new BadRequestException('Parámetros geográficos inválidos');
+    }
+    const page = Number(pageInput);
+    if (!Number.isSafeInteger(page) || page < 1 || page > 1000) {
+      throw new BadRequestException('Página inválida');
+    }
+    const path =
+      'states/' +
+      stateId +
+      '/municipalities/' +
+      municipalityId +
+      '/settlements?page=' +
+      page;
+    const cached = this.settlementCache.get(path);
+    if (cached && cached.expiresAt > Date.now()) return cached.data;
+
+    const key = process.env.POSTALKIT_API_KEY;
+    if (!key) {
+      throw new ServiceUnavailableException('Consulta postal no configurada');
+    }
+    try {
+      const response = await fetch('https://api.postalkit.mx/v1/' + path, {
+        headers: { Authorization: 'Bearer ' + key },
+        signal: AbortSignal.timeout(4500),
+      });
+      if (!response.ok) {
+        throw new ServiceUnavailableException(
+          'Colonias temporalmente no disponibles',
+        );
+      }
+      const payload: unknown = await response.json();
+      const data = this.customersService.normalizeMunicipalitySettlements(
+        payload,
+        page,
+      );
+      this.settlementCache.set(path, {
+        data,
+        expiresAt: Date.now() + 60 * 60 * 1000,
+      });
+      return data;
+    } catch {
+      throw new ServiceUnavailableException(
+        'Colonias temporalmente no disponibles',
+      );
+    }
+  }
+
+  private readonly municipalityCityCache = new Map<
+    string,
+    {
+      expiresAt: number;
+      data: {
+        items: Array<{ id: number; name: string }>;
+        hasMore: boolean;
+      };
+    }
+  >();
+
+  @Get('geography/states/:stateId/municipalities/:municipalityId/cities')
+  async listMunicipalityCities(
+    @Param('stateId') stateId: string,
+    @Param('municipalityId') municipalityId: string,
+    @Query('page') pageInput = '1',
+  ) {
+    if (
+      !/^\d{1,3}$/.test(stateId) ||
+      !/^\d{1,8}$/.test(municipalityId) ||
+      !/^\d{1,4}$/.test(pageInput)
+    ) {
+      throw new BadRequestException('Parámetros geográficos inválidos');
+    }
+    const page = Number(pageInput);
+    if (!Number.isSafeInteger(page) || page < 1 || page > 1000) {
+      throw new BadRequestException('Página inválida');
+    }
+    const path =
+      'municipalities/' + municipalityId + '/postal-codes?page=' + page;
+    const cacheKey = stateId + ':' + path;
+    const cached = this.municipalityCityCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.data;
+
+    const key = process.env.POSTALKIT_API_KEY;
+    if (!key) {
+      throw new ServiceUnavailableException('Consulta postal no configurada');
+    }
+    try {
+      const response = await fetch('https://api.postalkit.mx/v1/' + path, {
+        headers: { Authorization: 'Bearer ' + key },
+        signal: AbortSignal.timeout(4500),
+      });
+      if (!response.ok) {
+        throw new ServiceUnavailableException(
+          'Ciudades temporalmente no disponibles',
+        );
+      }
+      const payload: unknown = await response.json();
+      const data = this.customersService.normalizeMunicipalityCities(
+        payload,
+        page,
+      );
+      this.municipalityCityCache.set(cacheKey, {
+        data,
+        expiresAt: Date.now() + 60 * 60 * 1000,
+      });
+      return data;
+    } catch {
+      throw new ServiceUnavailableException(
+        'Ciudades temporalmente no disponibles',
+      );
+    }
   }
 
   @Get(':id/overview')

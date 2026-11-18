@@ -47,6 +47,9 @@ const clinicCustomer = {
   email: 'contacto@norte.test',
   phone: '6621001000',
   address: 'Hermosillo Centro',
+  city: 'Hermosillo',
+  state: 'Sonora',
+  countryCode: 'MX',
   contactName: 'Ana López',
   notes: 'Cuenta clínica',
 };
@@ -58,6 +61,9 @@ const hospitalCustomer = {
   email: 'compras@sur.test',
   phone: '6442002000',
   address: 'Ciudad Obregón',
+  city: 'Ciudad Obregón',
+  state: 'Sonora',
+  countryCode: 'MX',
   contactName: 'Luis Pérez',
   notes: null,
 };
@@ -75,7 +81,21 @@ function buildCustomer(index: number) {
   };
 }
 
-function configureApiMocks(customerData = customers) {
+type TestCustomer = {
+  id: string;
+  name: string;
+  type: string;
+  email: string;
+  phone: string;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  countryCode: string | null;
+  contactName: string | null;
+  notes: string | null;
+};
+
+function configureApiMocks(customerData: TestCustomer[] = customers) {
   vi.mocked(api.get).mockImplementation(async (url) =>
     String(url) === '/auth/me'
       ? ({
@@ -141,7 +161,10 @@ async function completeCustomerForm(
   name: string,
 ) {
   await user.type(screen.getByRole('textbox', { name: 'Nombre' }), name);
-  await user.type(screen.getByRole('textbox', { name: 'Tipo' }), 'Clínica');
+  await user.selectOptions(
+    within(screen.getByRole('dialog')).getByRole('combobox', { name: 'Tipo' }),
+    'CLINIC',
+  );
   await user.type(
     screen.getByRole('textbox', { name: 'Email' }),
     'nuevo@cliente.test',
@@ -168,31 +191,25 @@ describe('CustomersPage', () => {
     cleanup();
   });
 
-  it('carga las columnas útiles y busca por nombre, email y teléfono', async () => {
+  it('muestra las columnas útiles y busca por nombre sin tildes', async () => {
     const user = userEvent.setup();
     render(<CustomersPage />);
 
     expect(screen.getByText('Cargando clientes...')).toBeTruthy();
     expect(await screen.findByText(clinicCustomer.name)).toBeTruthy();
-    expect(screen.getByText(clinicCustomer.type)).toBeTruthy();
-    expect(screen.getByText(clinicCustomer.email)).toBeTruthy();
-    expect(screen.getByText(clinicCustomer.phone)).toBeTruthy();
-    expect(screen.getByText(clinicCustomer.address)).toBeTruthy();
+    const clinicRow = screen.getByText(clinicCustomer.name).closest('tr');
+    expect(clinicRow).not.toBeNull();
+    expect(within(clinicRow as HTMLElement).getByText('Clínica')).toBeTruthy();
+    expect(
+      within(clinicRow as HTMLElement).getByText('Hermosillo, Sonora'),
+    ).toBeTruthy();
+    expect(screen.queryByText(clinicCustomer.email)).toBeNull();
+    expect(screen.queryByText(clinicCustomer.phone)).toBeNull();
 
-    const search = screen.getByRole('searchbox', { name: 'Buscar clientes' });
-
-    await user.type(search, '  clínica norte  ');
+    const search = screen.getByRole('searchbox', { name: 'Nombre' });
+    await user.type(search, '  clinica norte  ');
     expect(screen.getByText(clinicCustomer.name)).toBeTruthy();
     expect(screen.queryByText(hospitalCustomer.name)).toBeNull();
-
-    await user.clear(search);
-    await user.type(search, hospitalCustomer.email.toUpperCase());
-    expect(screen.getByText(hospitalCustomer.name)).toBeTruthy();
-    expect(screen.queryByText(clinicCustomer.name)).toBeNull();
-
-    await user.clear(search);
-    await user.type(search, clinicCustomer.phone);
-    expect(screen.getByText(clinicCustomer.name)).toBeTruthy();
 
     await user.clear(search);
     await user.type(search, 'sin coincidencias');
@@ -200,29 +217,73 @@ describe('CustomersPage', () => {
     expect(
       screen.getByText('No encontramos clientes con esa búsqueda.'),
     ).toBeTruthy();
-    await user.click(screen.getByRole('button', { name: 'Limpiar búsqueda' }));
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
     expect(screen.getByText(clinicCustomer.name)).toBeTruthy();
   });
 
-  it('busca también por tipo y contacto, sin exigir acentos', async () => {
+  it('combina los tres filtros y permite restablecerlos', async () => {
     const user = userEvent.setup();
     await renderCustomersPage();
 
-    const search = screen.getByRole('searchbox', { name: 'Buscar clientes' });
-    await user.type(search, 'clinica');
+    const typeFilter = screen.getByRole('combobox', { name: 'Tipo' });
+    const locationFilter = screen.getByRole('combobox', { name: 'Ubicación' });
+    const search = screen.getByRole('searchbox', { name: 'Nombre' });
+
+    await user.selectOptions(typeFilter, 'CLINIC');
     expect(screen.getByText('1 coincidencia')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Limpiar búsqueda' })).toBeTruthy();
     expect(screen.getByText(clinicCustomer.name)).toBeTruthy();
     expect(screen.queryByText(hospitalCustomer.name)).toBeNull();
 
-    await user.clear(search);
-    await user.type(search, 'luis perez');
-    expect(screen.getByText(hospitalCustomer.name)).toBeTruthy();
-    expect(screen.queryByText(clinicCustomer.name)).toBeNull();
+    await user.selectOptions(locationFilter, 'HERMOSILLO|SONORA|MX');
+    await user.type(search, 'norte');
+    expect(screen.getByText(clinicCustomer.name)).toBeTruthy();
 
-    await user.clear(search);
-    await user.type(search, 'obregon');
+    await user.selectOptions(locationFilter, 'CIUDAD_OBREGON|SONORA|MX');
+    expect(screen.getByText('Sin clientes coincidentes')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect(screen.getByText(clinicCustomer.name)).toBeTruthy();
     expect(screen.getByText(hospitalCustomer.name)).toBeTruthy();
+    expect((typeFilter as HTMLSelectElement).value).toBe('');
+    expect((locationFilter as HTMLSelectElement).value).toBe('');
+    expect((search as HTMLInputElement).value).toBe('');
+  });
+
+  it('muestra municipio y estado sin ciudad y permite filtrar esa ubicación', async () => {
+    const user = userEvent.setup();
+    const customerFromMunicipality = {
+      ...clinicCustomer,
+      id: 'qa-ux005d-address',
+      name: 'QA-UX005D-Domicilio',
+      type: 'INDIVIDUAL',
+      municipality: 'Acateno',
+      city: null,
+      state: 'Puebla',
+      countryCode: 'MX',
+    };
+    configureApiMocks([clinicCustomer, customerFromMunicipality]);
+    render(<CustomersPage />);
+    const row = (await screen.findByText(customerFromMunicipality.name)).closest('tr');
+    expect(row).not.toBeNull();
+    expect(
+      within(row as HTMLElement).getByText('Acateno, Puebla'),
+    ).toBeTruthy();
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Ubicación' }),
+      'ACATENO|PUEBLA|MX',
+    );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Tipo' }),
+      'INDIVIDUAL',
+    );
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Nombre' }),
+      'domicilio',
+    );
+    expect(screen.getByText(customerFromMunicipality.name)).toBeTruthy();
+    expect(screen.queryByText(clinicCustomer.name)).toBeNull();
+    expect(screen.getByText('1 coincidencia')).toBeTruthy();
   });
 
   it('muestra datos vacíos con indicadores discretos y simplifica la paginación', async () => {
@@ -231,6 +292,9 @@ describe('CustomersPage', () => {
       id: 'empty-customer',
       name: 'Cliente sin datos',
       type: '',
+      city: null,
+      state: null,
+      countryCode: null,
       email: '',
       phone: '',
       address: '',
@@ -247,13 +311,44 @@ describe('CustomersPage', () => {
     expect(within(tools).getByText('Clientes activos')).toBeTruthy();
     expect(within(tools).getByText('1')).toBeTruthy();
     expect(within(tools).queryByText('1 cliente')).toBeNull();
-    expect(screen.getByLabelText('Tipo sin registrar').textContent).toBe('—');
-    expect(screen.getByLabelText('Correo sin registrar').textContent).toBe('—');
-    expect(screen.getByLabelText('Teléfono sin registrar').textContent).toBe('—');
-    expect(screen.getByLabelText('Dirección sin registrar').textContent).toBe('—');
+    expect(screen.getByLabelText('Tipo sin clasificar').textContent).toBe(
+      'Por clasificar',
+    );
+    expect(screen.getByLabelText('Ubicación sin registrar').textContent).toBe(
+      'Sin ubicación',
+    );
     expect(screen.getByText('Mostrando 1-1 de 1')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Página siguiente' })).toBeNull();
     expect(screen.queryByRole('combobox', { name: 'Filas por página' })).toBeNull();
+  });
+
+  it('permite filtrar por clientes sin clasificación o ubicación', async () => {
+    const user = userEvent.setup();
+    const unclassified = {
+      ...clinicCustomer,
+      id: 'unknown',
+      name: 'Cliente heredado',
+      type: 'LICITACION',
+      city: null,
+      state: null,
+      countryCode: null,
+    };
+    configureApiMocks([clinicCustomer, unclassified]);
+    render(<CustomersPage />);
+    await screen.findByText('Cliente heredado');
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Tipo' }),
+      '__UNCLASSIFIED__',
+    );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Ubicación' }),
+      '__UNLOCATED__',
+    );
+    expect(screen.getByText('Cliente heredado')).toBeTruthy();
+    expect(screen.queryByText(clinicCustomer.name)).toBeNull();
+    const row = screen.getByText('Cliente heredado').closest('tr');
+    expect(within(row as HTMLElement).getByText('Por clasificar')).toBeTruthy();
   });
 
   it('destaca el nombre y muestra el contacto sin duplicar columnas', async () => {
@@ -263,7 +358,9 @@ describe('CustomersPage', () => {
     expect(row).not.toBeNull();
     expect(within(row as HTMLElement).getByText('Contacto: Ana López')).toBeTruthy();
     expect(within(row as HTMLElement).getByText('Clínica')).toBeTruthy();
-    expect(within(row as HTMLElement).getByText(clinicCustomer.email)).toBeTruthy();
+    expect(
+      within(row as HTMLElement).getByText('Hermosillo, Sonora'),
+    ).toBeTruthy();
   });
 
   it('ordena columnas claras con el ciclo ascendente, descendente y neutral', async () => {
@@ -337,7 +434,7 @@ describe('CustomersPage', () => {
     await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
     expect(screen.getByText('Cliente 10')).toBeTruthy();
 
-    const search = screen.getByRole('searchbox', { name: 'Buscar clientes' });
+    const search = screen.getByRole('searchbox', { name: 'Nombre' });
     await user.type(search, 'Cliente 29');
     expect(screen.getByText('Mostrando 1-1 de 1')).toBeTruthy();
     expect(screen.getByText('Cliente 29')).toBeTruthy();
@@ -380,6 +477,9 @@ describe('CustomersPage', () => {
       email: 'nuevo@cliente.test',
       phone: '6623334444',
       address: null,
+      city: null,
+      state: null,
+      countryCode: 'MX',
       contactName: null,
       notes: null,
     };
@@ -398,11 +498,18 @@ describe('CustomersPage', () => {
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith('/customers', {
         name: newCustomer.name,
-        type: 'Clínica',
+        legalName: null,
+        type: 'CLINIC',
         email: newCustomer.email,
         phone: newCustomer.phone,
         contactName: undefined,
         address: undefined,
+        postalCode: null,
+        neighborhood: null,
+        municipality: null,
+        city: null,
+        state: null,
+        countryCode: 'MX',
         notes: undefined,
       });
     });
@@ -454,11 +561,18 @@ describe('CustomersPage', () => {
         `/customers/${clinicCustomer.id}`,
         {
           name: updatedCustomer.name,
-          type: clinicCustomer.type,
+          legalName: null,
+          type: undefined,
           email: clinicCustomer.email,
           phone: clinicCustomer.phone,
           contactName: clinicCustomer.contactName,
           address: clinicCustomer.address,
+          postalCode: null,
+          neighborhood: null,
+          municipality: null,
+          city: clinicCustomer.city,
+          state: clinicCustomer.state,
+          countryCode: clinicCustomer.countryCode,
           notes: clinicCustomer.notes,
         },
       );

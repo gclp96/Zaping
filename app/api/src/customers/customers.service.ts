@@ -8,6 +8,155 @@ import { UpdateCustomerDto } from './dto/update-customer.dto';
 export class CustomersService {
   constructor(private readonly prisma: PrismaService) {}
 
+  normalizePostalLookup(code: string, payload: unknown) {
+    if (!payload || typeof payload !== 'object' || !('data' in payload)) {
+      return { code, settlements: [] };
+    }
+    const data = payload.data;
+    if (!data || typeof data !== 'object') {
+      return { code, settlements: [] };
+    }
+    const postal = data as {
+      state?: { name?: string };
+      municipality?: { name?: string };
+      city?: { name?: string } | null;
+      settlements?: Array<{ name?: string }>;
+    };
+    return {
+      code,
+      state: postal.state?.name ?? '',
+      municipality: postal.municipality?.name ?? '',
+      city: postal.city?.name ?? '',
+      settlements: Array.isArray(postal.settlements)
+        ? postal.settlements
+            .map((settlement) => settlement.name)
+            .filter((name): name is string => typeof name === 'string')
+        : [],
+    };
+  }
+
+  normalizeGeographyOptions(payload: unknown) {
+    if (!payload || typeof payload !== 'object' || !('data' in payload)) {
+      return [];
+    }
+    const records = payload.data;
+    if (!Array.isArray(records)) return [];
+
+    return records.flatMap((entry: unknown) => {
+      if (!entry || typeof entry !== 'object') return [];
+      const item = entry as { id?: unknown; name?: unknown; code?: unknown };
+      if (
+        typeof item.id !== 'number' ||
+        !Number.isSafeInteger(item.id) ||
+        item.id < 1 ||
+        typeof item.name !== 'string' ||
+        !item.name.trim()
+      ) {
+        return [];
+      }
+      return [
+        {
+          id: item.id,
+          name: item.name,
+          ...(typeof item.code === 'string' ? { code: item.code } : {}),
+        },
+      ];
+    });
+  }
+
+  normalizeMunicipalitySettlements(payload: unknown, page: number) {
+    const empty = { items: [], hasMore: false };
+    if (!payload || typeof payload !== 'object' || !('data' in payload)) {
+      return empty;
+    }
+    if (!Array.isArray(payload.data)) return empty;
+
+    const items = payload.data.flatMap((entry: unknown) => {
+      if (!entry || typeof entry !== 'object') return [];
+      const item = entry as {
+        id?: unknown;
+        name?: unknown;
+        postal_code?: { code?: unknown } | null;
+      };
+      if (
+        typeof item.id !== 'number' ||
+        !Number.isSafeInteger(item.id) ||
+        item.id < 1 ||
+        typeof item.name !== 'string' ||
+        !item.name.trim()
+      ) {
+        return [];
+      }
+      return [
+        {
+          id: item.id,
+          name: item.name.trim(),
+          postalCode:
+            typeof item.postal_code?.code === 'string' &&
+            /^\d{5}$/.test(item.postal_code.code)
+              ? item.postal_code.code
+              : null,
+        },
+      ];
+    });
+
+    const meta = 'meta' in payload ? payload.meta : null;
+    const total =
+      meta &&
+      typeof meta === 'object' &&
+      'total' in meta &&
+      typeof meta.total === 'number' &&
+      Number.isFinite(meta.total)
+        ? meta.total
+        : null;
+    return {
+      items,
+      hasMore: total !== null ? page * 20 < total : items.length === 20,
+    };
+  }
+
+  normalizeMunicipalityCities(payload: unknown, page: number) {
+    const empty = { items: [], hasMore: false };
+    if (!payload || typeof payload !== 'object' || !('data' in payload)) {
+      return empty;
+    }
+    if (!Array.isArray(payload.data)) return empty;
+
+    const seen = new Set<number>();
+    const items = payload.data.flatMap((entry: unknown) => {
+      if (!entry || typeof entry !== 'object' || !('city' in entry)) return [];
+      const city = entry.city;
+      if (!city || typeof city !== 'object') return [];
+      const item = city as { id?: unknown; name?: unknown };
+      if (
+        typeof item.id !== 'number' ||
+        !Number.isSafeInteger(item.id) ||
+        item.id < 1 ||
+        typeof item.name !== 'string' ||
+        !item.name.trim() ||
+        seen.has(item.id)
+      ) {
+        return [];
+      }
+      seen.add(item.id);
+      return [{ id: item.id, name: item.name.trim() }];
+    });
+
+    const meta = 'meta' in payload ? payload.meta : null;
+    const total =
+      meta &&
+      typeof meta === 'object' &&
+      'total' in meta &&
+      typeof meta.total === 'number' &&
+      Number.isFinite(meta.total)
+        ? meta.total
+        : null;
+    return {
+      items,
+      hasMore: total !== null ? page * 20 < total : payload.data.length === 20,
+    };
+  }
+
   async findOne(companyId: string, customerId: string) {
     const customer = await this.prisma.customer.findFirst({
       where: {
@@ -33,11 +182,18 @@ export class CustomersService {
       select: {
         id: true,
         name: true,
+        legalName: true,
         type: true,
         email: true,
         phone: true,
         contactName: true,
         address: true,
+        postalCode: true,
+        neighborhood: true,
+        municipality: true,
+        city: true,
+        state: true,
+        countryCode: true,
         notes: true,
         isActive: true,
         createdAt: true,
@@ -105,10 +261,17 @@ export class CustomersService {
       data: {
         companyId,
         name: dto.name,
+        legalName: dto.legalName,
         type: dto.type,
         email: dto.email,
         phone: dto.phone,
         address: dto.address,
+        postalCode: dto.postalCode,
+        neighborhood: dto.neighborhood,
+        municipality: dto.municipality,
+        city: dto.city,
+        state: dto.state,
+        countryCode: dto.countryCode,
         contactName: dto.contactName,
         notes: dto.notes,
       },
@@ -119,10 +282,17 @@ export class CustomersService {
     const customer = await this.findOne(companyId, customerId);
     const data = {
       name: dto.name,
+      legalName: dto.legalName,
       type: dto.type,
       email: dto.email,
       phone: dto.phone,
       address: dto.address,
+      postalCode: dto.postalCode,
+      neighborhood: dto.neighborhood,
+      municipality: dto.municipality,
+      city: dto.city,
+      state: dto.state,
+      countryCode: dto.countryCode,
       contactName: dto.contactName,
       notes: dto.notes,
     };

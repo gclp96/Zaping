@@ -26,17 +26,28 @@ import { getQuoteStatusDescriptor } from '@/app/(app)/quotes/quote-status';
 import { getSaleStatusDescriptor } from '@/app/(app)/sales/sale-status';
 import type { QuoteStatus } from '@/app/(app)/quotes/types';
 import type { SaleStatus } from '@/app/(app)/sales/types';
+import {
+  customerLocationLabel,
+  customerTypeLabel,
+} from '../customer-classification';
 import { api } from '@/services/api';
 import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 
 type CustomerDetail = {
   id: string;
   name: string;
+  legalName?: string | null;
   type: string | null;
   email: string | null;
   phone: string | null;
   contactName: string | null;
   address: string | null;
+  postalCode?: string | null;
+  neighborhood?: string | null;
+  municipality?: string | null;
+  city?: string | null;
+  state?: string | null;
+  countryCode?: string | null;
   notes: string | null;
   isActive: boolean;
   createdAt: string;
@@ -383,7 +394,14 @@ export default function CustomerDetailPage() {
                 <h3 className="font-semibold text-text">Datos generales y contacto</h3>
               </div>
               <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
-                <DetailField label="Tipo" value={currentState.data.customer.type} />
+                <DetailField
+                  label="Tipo"
+                  value={customerTypeLabel(currentState.data.customer.type)}
+                />
+                <DetailField
+                  label="Razón social"
+                  value={currentState.data.customer.legalName ?? null}
+                />
                 <DetailField
                   label="Correo"
                   value={currentState.data.customer.email}
@@ -405,6 +423,22 @@ export default function CustomerDetailPage() {
                 <DetailField
                   label="Persona de contacto"
                   value={currentState.data.customer.contactName}
+                />
+                <DetailField
+                  label="Ubicación"
+                  value={customerLocationLabel(currentState.data.customer)}
+                />
+                <DetailField
+                  label="Código postal"
+                  value={currentState.data.customer.postalCode ?? null}
+                />
+                <DetailField
+                  label="Colonia"
+                  value={currentState.data.customer.neighborhood ?? null}
+                />
+                <DetailField
+                  label="Municipio"
+                  value={currentState.data.customer.municipality ?? null}
                 />
                 <DetailField
                   label="Dirección"

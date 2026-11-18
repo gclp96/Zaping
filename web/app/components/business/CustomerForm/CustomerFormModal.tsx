@@ -1,23 +1,36 @@
-import { useId, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Building2, ContactRound, MapPin } from 'lucide-react';
 
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
+import {
+  CUSTOMER_TYPE_OPTIONS,
+  resolveCustomerType,
+} from '@/app/(app)/customers/customer-classification';
 
 import Button from '../../ui/Button';
 import Input from '../../ui/Input';
 import Modal from '../../ui/Modal';
+import Select from '../../ui/Select';
+import CustomerLocationCombobox, { type LocationOption } from './CustomerLocationCombobox';
 
 import type {
   CustomerFormCustomer,
   CustomerFormModalProps,
 } from './CustomerForm.types';
 
+type SettlementOption = { id: number; name: string; postalCode: string | null };
+
+type GeographyOption = {
+  id: number;
+  name: string;
+  code?: string;
+};
+
 type FormErrors = {
   name?: string;
   type?: string;
   email?: string;
-  phone?: string;
 };
 
 type CustomerFormContentProps = {
@@ -43,17 +56,347 @@ function CustomerFormContent({
   onSaved,
 }: CustomerFormContentProps) {
   const [name, setName] = useState(customer?.name ?? '');
-  const [customerType, setCustomerType] = useState(customer?.type ?? '');
+  const [legalName, setLegalName] = useState(customer?.legalName ?? '');
+  const [customerType, setCustomerType] = useState(
+    resolveCustomerType(customer?.type) ?? '',
+  );
+  const [typeTouched, setTypeTouched] = useState(false);
   const [email, setEmail] = useState(customer?.email ?? '');
   const [phone, setPhone] = useState(customer?.phone ?? '');
   const [contactName, setContactName] = useState(customer?.contactName ?? '');
   const [address, setAddress] = useState(customer?.address ?? '');
+  const [postalCode, setPostalCode] = useState(customer?.postalCode ?? '');
+  const [neighborhood, setNeighborhood] = useState(customer?.neighborhood ?? '');
+  const [municipality, setMunicipality] = useState(customer?.municipality ?? '');
+  const [postalMatches, setPostalMatches] = useState<string[]>([]);
+  const [postalStatus, setPostalStatus] = useState('');
+  const [postalLoading, setPostalLoading] = useState(false);
+  const [postalLookupRequested, setPostalLookupRequested] = useState(false);
+  const [city, setCity] = useState(customer?.city ?? '');
+  const [state, setState] = useState(customer?.state ?? '');
+  const [countryCode, setCountryCode] = useState(
+    customer?.countryCode ?? (customer ? '' : 'MX'),
+  );
+  const [stateOptions, setStateOptions] = useState<GeographyOption[]>([]);
+  const [municipalityOptions, setMunicipalityOptions] = useState<
+    GeographyOption[]
+  >([]);
+  const [cityOptions, setCityOptions] = useState<GeographyOption[]>([]);
+  const [cityPage, setCityPage] = useState(0);
+  const [cityHasMore, setCityHasMore] = useState(false);
+  const [cityLoading, setCityLoading] = useState(false);
+  const [settlementOptions, setSettlementOptions] = useState<SettlementOption[]>([]);
+  const [settlementPage, setSettlementPage] = useState(0);
+  const [settlementHasMore, setSettlementHasMore] = useState(false);
+  const [settlementLoading, setSettlementLoading] = useState(false);
+  const [geographyStatus, setGeographyStatus] = useState('');
   const [notes, setNotes] = useState(customer?.notes ?? '');
   const [errors, setErrors] = useState<FormErrors>({});
   const [formError, setFormError] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const submittingRef = useRef(false);
+  const settlementContextRef = useRef('');
+  const cityContextRef = useRef('');
   const editing = Boolean(customer);
+
+  // Fetch catalog data only while the form is mounted. Historical values
+  // remain editable even when the external geographic catalog is unavailable.
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .get<GeographyOption[]>('/customers/geography/states')
+      .then(({ data }) => {
+        if (!cancelled && Array.isArray(data)) {
+          setStateOptions(
+            data.filter(
+              (option) =>
+                typeof option.id === 'number' &&
+                typeof option.name === 'string' &&
+                option.name.trim().length > 0,
+            ),
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setGeographyStatus(
+          'Catálogo de estados no disponible. Puedes escribir la ubicación manualmente.',
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedStateId = stateOptions.find(
+    (option) => option.name === state,
+  )?.id;
+
+  useEffect(() => {
+    if (!selectedStateId) return;
+    let cancelled = false;
+    const base = '/customers/geography/states/' + selectedStateId;
+    void api
+      .get<GeographyOption[]>(base + '/municipalities')
+      .then(({ data }) => {
+        if (cancelled) return;
+        setMunicipalityOptions(Array.isArray(data) ? data : []);
+        setGeographyStatus('');
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setGeographyStatus(
+            'No se pudieron cargar municipios. Puedes escribirlos manualmente.',
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedStateId]);
+
+  const selectedMunicipalityId = municipalityOptions.find(
+    (option) => option.name === municipality,
+  )?.id;
+
+  // PostalKit's state-wide city list is not municipality-scoped.
+  // Instead derive suggestions from that municipality's postal-code records.
+  useEffect(() => {
+    cityContextRef.current =
+      String(selectedStateId) + ':' + String(selectedMunicipalityId);
+    if (!selectedStateId || !selectedMunicipalityId) return;
+    let cancelled = false;
+    void api
+      .get<{ items: GeographyOption[]; hasMore: boolean }>(
+        '/customers/geography/states/' +
+          selectedStateId +
+          '/municipalities/' +
+          selectedMunicipalityId +
+          '/cities?page=1',
+      )
+      .then(({ data }) => {
+        if (cancelled) return;
+        setCityOptions(Array.isArray(data.items) ? data.items : []);
+        setCityHasMore(data.hasMore === true);
+        setCityPage(1);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setGeographyStatus(
+            'No se pudieron cargar ciudades de este municipio. Puedes escribir la ciudad manualmente.',
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedStateId, selectedMunicipalityId]);
+
+  function clearCitySuggestions() {
+    setCityOptions([]);
+    setCityPage(0);
+    setCityHasMore(false);
+    setCityLoading(false);
+  }
+
+  function loadMoreCities() {
+    if (
+      !selectedStateId ||
+      !selectedMunicipalityId ||
+      !cityHasMore ||
+      cityLoading
+    ) {
+      return;
+    }
+    const page = cityPage + 1;
+    const context = cityContextRef.current;
+    setCityLoading(true);
+    void api
+      .get<{ items: GeographyOption[]; hasMore: boolean }>(
+        '/customers/geography/states/' +
+          selectedStateId +
+          '/municipalities/' +
+          selectedMunicipalityId +
+          '/cities?page=' +
+          page,
+      )
+      .then(({ data }) => {
+        if (context !== cityContextRef.current) return;
+        setCityOptions((current) => {
+          const known = new Set(current.map((option) => option.id));
+          return [
+            ...current,
+            ...(Array.isArray(data.items) ? data.items : []).filter(
+              (option) => !known.has(option.id),
+            ),
+          ];
+        });
+        setCityHasMore(data.hasMore === true);
+        setCityPage(page);
+      })
+      .catch(() => {
+        if (context === cityContextRef.current) {
+          setGeographyStatus('No fue posible cargar más ciudades.');
+        }
+      })
+      .finally(() => {
+        if (context === cityContextRef.current) setCityLoading(false);
+      });
+  }
+
+  useEffect(() => {
+    settlementContextRef.current =
+      String(selectedStateId) +
+      ':' +
+      String(selectedMunicipalityId) +
+      ':' +
+      postalCode +
+      ':' +
+      String(postalMatches.length);
+    if (
+      !selectedStateId ||
+      !selectedMunicipalityId ||
+      postalMatches.length > 0 ||
+      postalCode.length > 0
+    ) {
+      return;
+    }
+    let cancelled = false;
+    void api
+      .get<{ items: SettlementOption[]; hasMore: boolean }>(
+        '/customers/geography/states/' +
+          selectedStateId +
+          '/municipalities/' +
+          selectedMunicipalityId +
+          '/settlements?page=1',
+      )
+      .then(({ data }) => {
+        if (cancelled) return;
+        setSettlementOptions(Array.isArray(data.items) ? data.items : []);
+        setSettlementHasMore(data.hasMore === true);
+        setSettlementPage(1);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setGeographyStatus(
+            'No fue posible cargar las colonias. Puedes escribirlas manualmente.',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSettlementLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedStateId, selectedMunicipalityId, postalCode, postalMatches.length]);
+
+  function clearSettlementResults() {
+    setSettlementOptions([]);
+    setSettlementPage(0);
+    setSettlementHasMore(false);
+    setSettlementLoading(false);
+  }
+
+  function loadMoreSettlements() {
+    if (
+      !selectedStateId ||
+      !selectedMunicipalityId ||
+      !settlementHasMore ||
+      settlementLoading
+    ) {
+      return;
+    }
+    setSettlementLoading(true);
+    const page = settlementPage + 1;
+    const context = settlementContextRef.current;
+    void api
+      .get<{ items: SettlementOption[]; hasMore: boolean }>(
+        '/customers/geography/states/' +
+          selectedStateId +
+          '/municipalities/' +
+          selectedMunicipalityId +
+          '/settlements?page=' +
+          page,
+      )
+      .then(({ data }) => {
+        if (context !== settlementContextRef.current) return;
+        setSettlementOptions((current) => [
+          ...current,
+          ...(Array.isArray(data.items) ? data.items : []),
+        ]);
+        setSettlementHasMore(data.hasMore === true);
+        setSettlementPage(page);
+      })
+      .catch(() => {
+        if (context === settlementContextRef.current) {
+          setGeographyStatus('No fue posible cargar más colonias.');
+        }
+      })
+      .finally(() => {
+        if (context === settlementContextRef.current) setSettlementLoading(false);
+      });
+  }
+
+  const neighborhoodSuggestions: LocationOption[] = postalMatches.length
+    ? postalMatches.map((value, index) => ({
+        key: 'postal-' + index,
+        value,
+        label: value,
+      }))
+    : settlementOptions.map((item) => ({
+        key: 'settlement-' + item.id,
+        value: item.name,
+        label: item.postalCode
+          ? item.name + ' · CP ' + item.postalCode
+          : item.name,
+        postalCode: item.postalCode,
+      }));
+
+  useEffect(() => {
+    if (!postalLookupRequested || !/^\d{5}$/.test(postalCode) || countryCode.toUpperCase() !== 'MX') {
+      return;
+    }
+    let cancelled = false;
+    const timeout = setTimeout(() => {
+      void api
+        .get<{
+          state?: string;
+          municipality?: string;
+          city?: string;
+          settlements: string[];
+        }>('/customers/postal-lookup/' + postalCode)
+        .then(({ data }) => {
+          if (cancelled) return;
+          setPostalMatches(data.settlements);
+          setPostalStatus(
+            data.settlements.length
+              ? 'Selecciona una colonia de la lista.'
+              : 'Código postal sin resultados. Puedes escribir el domicilio manualmente.',
+          );
+          if (data.settlements.length) {
+            setState(data.state ?? '');
+            setCity(data.city ?? '');
+            setMunicipality(data.municipality ?? '');
+          }
+        })
+        .catch((error: unknown) => {
+          if (cancelled) return;
+          const message = getApiErrorMessage(error, '');
+          setPostalStatus(
+            message.includes('Consulta postal no configurada')
+              ? 'Autocompletado postal no configurado. Puedes capturar el domicilio manualmente.'
+              : 'Consulta no disponible. Puedes capturar el domicilio manualmente.',
+          );
+        })
+        .finally(() => {
+          if (!cancelled) setPostalLoading(false);
+        });
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [postalCode, countryCode, postalLookupRequested]);
 
   function clearFieldError(field: keyof FormErrors) {
     setErrors((current) => ({ ...current, [field]: undefined }));
@@ -65,21 +408,15 @@ function CustomerFormContent({
     const trimmedName = name.trim();
     const trimmedType = customerType.trim();
     const trimmedEmail = email.trim();
-    const trimmedPhone = phone.trim();
 
     if (!trimmedName) {
       nextErrors.name = 'El nombre del cliente es obligatorio.';
     }
-    if (!trimmedType) {
+    if (!trimmedType && (!customer || typeTouched)) {
       nextErrors.type = 'El tipo de cliente es obligatorio.';
     }
-    if (!trimmedEmail) {
-      nextErrors.email = 'El correo electrónico es obligatorio.';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       nextErrors.email = 'Ingresa un correo electrónico válido.';
-    }
-    if (!trimmedPhone) {
-      nextErrors.phone = 'El teléfono es obligatorio.';
     }
 
     setErrors(nextErrors);
@@ -87,7 +424,9 @@ function CustomerFormContent({
     const firstInvalidField = (Object.keys(nextErrors) as (keyof FormErrors)[])[0];
     if (firstInvalidField) {
       formRef.current
-        ?.querySelector<HTMLInputElement>('[name="' + firstInvalidField + '"]')
+        ?.querySelector<HTMLInputElement | HTMLSelectElement>(
+          '[name="' + firstInvalidField + '"]',
+        )
         ?.focus();
       return false;
     }
@@ -103,11 +442,18 @@ function CustomerFormContent({
 
     const payload = {
       name: name.trim(),
-      type: customerType.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
+      legalName: normalizeOptionalValue(legalName) ?? null,
+      type: customer && !typeTouched ? undefined : customerType.trim(),
+      email: normalizeOptionalValue(email) ?? null,
+      phone: normalizeOptionalValue(phone) ?? null,
       contactName: normalizeOptionalValue(contactName),
       address: normalizeOptionalValue(address),
+      postalCode: normalizeOptionalValue(postalCode) ?? null,
+      neighborhood: normalizeOptionalValue(neighborhood) ?? null,
+      municipality: normalizeOptionalValue(municipality) ?? null,
+      city: normalizeOptionalValue(city) ?? null,
+      state: normalizeOptionalValue(state) ?? null,
+      countryCode: normalizeOptionalValue(countryCode)?.toUpperCase() ?? null,
       notes: normalizeOptionalValue(notes),
     };
 
@@ -177,7 +523,7 @@ function CustomerFormContent({
           <Input
             name="name"
             label="Nombre"
-            placeholder="Nombre comercial o razón social"
+            placeholder="Nombre comercial o identificador del cliente"
             value={name}
             required
             disabled={saving}
@@ -187,21 +533,39 @@ function CustomerFormContent({
               clearFieldError('name');
             }}
           />
-          <Input
-            name="type"
-            label="Tipo"
-            placeholder="Ej. Hospital, clínica o distribuidor"
-            helperText="Escribe el tipo de cliente."
-            value={customerType}
-            required
-            disabled={saving}
-            error={errors.type}
-            onChange={(event) => {
-              setCustomerType(event.target.value);
-              clearFieldError('type');
-            }}
-          />
+          <div>
+            <Select
+              name="type"
+              label="Tipo"
+              value={customerType}
+              options={[...CUSTOMER_TYPE_OPTIONS]}
+              placeholder="Selecciona el tipo de cliente"
+              required
+              disabled={saving}
+              error={errors.type}
+              onChange={(event) => {
+                setCustomerType(event.target.value);
+                setTypeTouched(true);
+                clearFieldError('type');
+              }}
+            />
+            {customer?.type?.trim() && !resolveCustomerType(customer.type) ? (
+              <p className="mt-2 text-xs text-amber-700">
+                Clasificación anterior: {customer.type}. Selecciona una categoría
+                del catálogo para actualizarla.
+              </p>
+            ) : null}
+          </div>
         </div>
+        <Input
+          name="legalName"
+          label="Razón social"
+          placeholder="Nombre o denominación fiscal (opcional)"
+          value={legalName}
+          maxLength={255}
+          disabled={saving}
+          onChange={(event) => setLegalName(event.target.value)}
+        />
       </section>
 
       <section
@@ -222,7 +586,6 @@ function CustomerFormContent({
             autoComplete="email"
             placeholder="correo@empresa.com"
             value={email}
-            required
             disabled={saving}
             error={errors.email}
             onChange={(event) => {
@@ -237,12 +600,10 @@ function CustomerFormContent({
             autoComplete="tel"
             placeholder="Teléfono de contacto"
             value={phone}
-            required
             disabled={saving}
-            error={errors.phone}
             onChange={(event) => {
               setPhone(event.target.value);
-              clearFieldError('phone');
+              setFormError('');
             }}
           />
           <div className="sm:col-span-2">
@@ -274,6 +635,163 @@ function CustomerFormContent({
             </span>
           </h3>
         </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            name="postalCode"
+            label="Código postal"
+            placeholder="Código postal de 5 dígitos"
+            inputMode="numeric"
+            maxLength={5}
+            value={postalCode}
+            disabled={saving}
+            onChange={(event) => {
+              setPostalCode(event.target.value.replace(/\D/g, '').slice(0, 5));
+              setPostalLookupRequested(true);
+              setCountryCode('MX');
+              clearSettlementResults();
+              setPostalMatches([]);
+              setPostalStatus('');
+              setPostalLoading(/^\d{5}$/.test(event.target.value.replace(/\D/g, '')));
+              setNeighborhood('');
+            }}
+          />
+          <div className="space-y-1">
+            <CustomerLocationCombobox
+              name="neighborhood"
+              label="Colonia / asentamiento"
+              placeholder="Busca o escribe la colonia"
+              value={neighborhood}
+              options={neighborhoodSuggestions}
+              disabled={saving}
+              loading={settlementLoading}
+              hasMore={postalMatches.length === 0 && settlementHasMore}
+              onLoadMore={loadMoreSettlements}
+              onChange={(value) => setNeighborhood(value)}
+              onSelect={(option) => {
+                setNeighborhood(option.value);
+                if (option.postalCode) {
+                  clearSettlementResults();
+                  setPostalCode(option.postalCode);
+                  setPostalLookupRequested(false);
+                  setPostalStatus('');
+                }
+              }}
+            />
+            {postalStatus ? (
+              <p role="status" className="text-xs text-text-muted">
+                {postalStatus}
+              </p>
+            ) : null}
+            {postalLoading && /^\d{5}$/.test(postalCode) ? (
+              <p className="text-xs text-text-muted">
+                Buscando código postal...
+              </p>
+            ) : null}
+          </div>
+          {stateOptions.length ? (
+            <Select
+              name="state"
+              label="Estado / provincia"
+              value={state}
+              options={[
+                ...(!stateOptions.some((option) => option.name === state) && state
+                  ? [{ value: state, label: state + ' (registrado)' }]
+                  : []),
+                ...stateOptions.map((option) => ({
+                  value: option.name,
+                  label: option.name,
+                })),
+              ]}
+              placeholder="Selecciona un estado"
+              disabled={saving}
+              onChange={(event) => {
+                setState(event.target.value);
+                setMunicipality('');
+                setCity('');
+                setMunicipalityOptions([]);
+                clearCitySuggestions();
+                clearSettlementResults();
+                setPostalCode('');
+                setNeighborhood('');
+                setPostalMatches([]);
+                setPostalLookupRequested(false);
+                setPostalStatus('');
+                setPostalLoading(false);
+                setFormError('');
+              }}
+            />
+          ) : (
+            <Input
+              name="state"
+              label="Estado / provincia"
+              placeholder="Ej. Sonora"
+              value={state}
+              maxLength={120}
+              disabled={saving}
+              onChange={(event) => {
+                setState(event.target.value);
+                setFormError('');
+              }}
+            />
+          )}
+          <CustomerLocationCombobox
+            name="municipality"
+            label="Municipio"
+            placeholder="Busca o escribe el municipio"
+            value={municipality}
+            options={municipalityOptions.map((option) => ({
+              key: 'municipality-' + option.id,
+              value: option.name,
+              label: option.name,
+            }))}
+            disabled={saving}
+            onChange={(value) => {
+              setMunicipality(value);
+              clearCitySuggestions();
+              clearSettlementResults();
+              setCity('');
+              setNeighborhood('');
+              setPostalCode('');
+              setPostalMatches([]);
+              setPostalStatus('');
+              setPostalLookupRequested(false);
+            }}
+          />
+          <div className="sm:col-span-2">
+            <CustomerLocationCombobox
+              name="city"
+              label="Ciudad"
+              placeholder="Busca o escribe la ciudad"
+              value={city}
+              options={cityOptions.map((option) => ({
+                key: 'city-' + option.id,
+                value: option.name,
+                label: option.name,
+              }))}
+              disabled={saving}
+              loading={cityLoading}
+              hasMore={cityHasMore}
+              onLoadMore={loadMoreCities}
+              loadMoreLabel="Ver más ciudades"
+              emptyMessage={
+                !selectedMunicipalityId
+                  ? 'Selecciona un municipio o escribe la ciudad manualmente.'
+                  : cityOptions.length === 0
+                    ? 'No hay ciudades registradas para este municipio. Puedes escribirla manualmente.'
+                    : 'No hay coincidencias para esta ciudad. Puedes escribirla manualmente.'
+              }
+              onChange={(value) => {
+                setCity(value);
+                setFormError('');
+              }}
+            />
+          </div>
+        </div>
+        {geographyStatus ? (
+          <p role="status" className="text-xs text-text-muted">
+            {geographyStatus}
+          </p>
+        ) : null}
         <Input
           name="address"
           label="Dirección"

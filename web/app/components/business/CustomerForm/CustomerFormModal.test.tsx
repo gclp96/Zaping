@@ -14,7 +14,7 @@ import { api } from '@/services/api';
 import CustomerFormModal from './CustomerFormModal';
 
 vi.mock('@/services/api', () => ({
-  api: { post: vi.fn(), patch: vi.fn() },
+  api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
 }));
 
 vi.mock('@/services/errors', () => ({
@@ -38,7 +38,10 @@ async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
     screen.getByRole('textbox', { name: 'Nombre' }),
     '  Clínica del Centro  ',
   );
-  await user.type(screen.getByRole('textbox', { name: 'Tipo' }), '  Clínica  ');
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: 'Tipo' }),
+    'CLINIC',
+  );
   await user.type(
     screen.getByRole('textbox', { name: 'Email' }),
     '  centro@clinica.test  ',
@@ -48,7 +51,8 @@ async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
 
 describe('CustomerFormModal', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    vi.mocked(api.get).mockResolvedValue({ data: [] } as never);
     vi.mocked(api.post).mockResolvedValue({ data: customer } as never);
     vi.mocked(api.patch).mockResolvedValue({ data: customer } as never);
   });
@@ -75,18 +79,42 @@ describe('CustomerFormModal', () => {
       within(dialog).getByRole('heading', { name: /Información adicional/ }),
     ).toBeTruthy();
 
-    for (const label of ['Nombre', 'Tipo', 'Email', 'Teléfono']) {
+    for (const label of ['Nombre']) {
       expect(
         (screen.getByRole('textbox', { name: label }) as HTMLInputElement)
           .required,
       ).toBe(true);
     }
-    for (const label of ['Contacto', 'Dirección']) {
+    expect(
+      (screen.getByRole('combobox', { name: 'Tipo' }) as HTMLSelectElement)
+        .required,
+    ).toBe(true);
+    for (const label of ['Email', 'Teléfono', 'Razón social', 'Código postal', 'Contacto', 'Dirección', 'Estado / provincia']) {
       expect(
         (screen.getByRole('textbox', { name: label }) as HTMLInputElement)
           .required,
       ).toBe(false);
     }
+    for (const label of ['Municipio', 'Ciudad']) {
+      expect(
+        (screen.getByRole('combobox', { name: label }) as HTMLInputElement)
+          .required,
+      ).toBe(false);
+    }
+  });
+
+  it('does not display the technical ISO country field', () => {
+    render(<CustomerFormModal isOpen onClose={vi.fn()} onSaved={vi.fn()} />);
+    expect(screen.queryByRole('textbox', { name: 'País (código ISO)' })).toBeNull();
+  });
+
+  it('explains when the postal service needs configuration', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.get).mockRejectedValue(new Error('Consulta postal no configurada'));
+    render(<CustomerFormModal isOpen onClose={vi.fn()} onSaved={vi.fn()} />);
+    await user.type(screen.getByRole('textbox', { name: 'Código postal' }), '83140');
+    expect(await screen.findByText(/Autocompletado postal no configurado/)).toBeTruthy();
+    expect(screen.getByRole('combobox', { name: 'Colonia / asentamiento' })).toBeTruthy();
   });
 
   it('keeps save and cancel actions outside the scrollable form content', async () => {
@@ -132,16 +160,273 @@ describe('CustomerFormModal', () => {
     expect(nameField.getAttribute('aria-invalid')).toBe('true');
     expect(screen.getByText('El nombre del cliente es obligatorio.')).toBeTruthy();
     expect(screen.getByText('El tipo de cliente es obligatorio.')).toBeTruthy();
-    expect(
-      screen.getByText('El correo electrónico es obligatorio.'),
-    ).toBeTruthy();
-    expect(screen.getByText('El teléfono es obligatorio.')).toBeTruthy();
     expect(api.post).not.toHaveBeenCalled();
 
     await user.type(nameField, 'Cliente QA');
     expect(
       screen.queryByText('El nombre del cliente es obligatorio.'),
     ).toBeNull();
+  });
+
+  it('lists municipality colonias inside the modal and fills their CP', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === '/customers/geography/states') {
+        return Promise.resolve({
+          data: [{ id: 26, name: 'Sonora', code: '26' }],
+        } as never);
+      }
+      if (url === '/customers/geography/states/26/municipalities') {
+        return Promise.resolve({
+          data: [{ id: 1, name: 'Hermosillo', code: '030' }],
+        } as never);
+      }
+      if (url === '/customers/geography/states/26/cities') {
+        return Promise.resolve({
+          data: [{ id: 2, name: 'Hermosillo' }],
+        } as never);
+      }
+      if (
+        url === '/customers/geography/states/26/municipalities/1/settlements?page=1'
+      ) {
+        return Promise.resolve({
+          data: {
+            items: [
+              { id: 10, name: 'Centro', postalCode: '83140' },
+              { id: 11, name: 'Centro', postalCode: '83141' },
+            ],
+            hasMore: true,
+          },
+        } as never);
+      }
+      if (
+        url === '/customers/geography/states/26/municipalities/1/settlements?page=2'
+      ) {
+        return Promise.resolve({
+          data: {
+            items: [{ id: 12, name: 'Las Palmas', postalCode: '83142' }],
+            hasMore: false,
+          },
+        } as never);
+      }
+      return Promise.reject(new Error('Unknown endpoint: ' + url));
+    });
+    render(<CustomerFormModal isOpen onClose={vi.fn()} onSaved={vi.fn()} />);
+    const stateField = await screen.findByRole('combobox', {
+      name: 'Estado / provincia',
+    });
+    await user.selectOptions(stateField, 'Sonora');
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith(
+        '/customers/geography/states/26/municipalities',
+      );
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Mostrar opciones de Municipio' }));
+    await user.click(await screen.findByRole('option', { name: 'Hermosillo' }));
+    expect(
+      (screen.getByRole('combobox', { name: 'Municipio' }) as HTMLInputElement).value,
+    ).toBe('Hermosillo');
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith(
+        '/customers/geography/states/26/municipalities/1/settlements?page=1',
+      );
+    });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Mostrar opciones de Colonia / asentamiento' }),
+    );
+    expect(await screen.findByRole('option', { name: 'Centro · CP 83140' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Centro · CP 83141' })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Ver más colonias' }));
+    expect(
+      await screen.findByRole('option', { name: 'Las Palmas · CP 83142' }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole('option', { name: 'Las Palmas · CP 83142' }));
+    expect(
+      (screen.getByRole('textbox', { name: 'Código postal' }) as HTMLInputElement).value,
+    ).toBe('83142');
+    expect(
+      (screen.getByRole('combobox', { name: 'Colonia / asentamiento' }) as HTMLInputElement).value,
+    ).toBe('Las Palmas');
+
+    await user.type(screen.getByRole('textbox', { name: 'Dirección' }), 'Calle 12 #30');
+    expect(
+      (screen.getByRole('textbox', { name: 'Dirección' }) as HTMLInputElement).value,
+    ).toBe('Calle 12 #30');
+  });
+
+  it('does not suggest cities from other municipalities in the same state', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === '/customers/geography/states') {
+        return Promise.resolve({
+          data: [{ id: 21, name: 'Puebla', code: '21' }],
+        } as never);
+      }
+      if (url === '/customers/geography/states/21/municipalities') {
+        return Promise.resolve({
+          data: [{ id: 123, name: 'Acateno' }],
+        } as never);
+      }
+      if (url === '/customers/geography/states/21/municipalities/123/cities?page=1') {
+        return Promise.resolve({
+          data: { items: [], hasMore: false },
+        } as never);
+      }
+      if (url === '/customers/geography/states/21/municipalities/123/settlements?page=1') {
+        return Promise.resolve({
+          data: { items: [{ id: 55, name: 'Anáhuac', postalCode: '73590' }], hasMore: false },
+        } as never);
+      }
+      return Promise.reject(new Error('Unknown endpoint: ' + url));
+    });
+    render(<CustomerFormModal isOpen onClose={vi.fn()} onSaved={vi.fn()} />);
+    await user.selectOptions(
+      await screen.findByRole('combobox', { name: 'Estado / provincia' }),
+      'Puebla',
+    );
+    await user.click(screen.getByRole('button', { name: 'Mostrar opciones de Municipio' }));
+    await user.click(await screen.findByRole('option', { name: 'Acateno' }));
+
+    await waitFor(() =>
+      expect(api.get).toHaveBeenCalledWith(
+        '/customers/geography/states/21/municipalities/123/cities?page=1',
+      ),
+    );
+    expect(api.get).not.toHaveBeenCalledWith('/customers/geography/states/21/cities');
+    await user.click(screen.getByRole('button', { name: 'Mostrar opciones de Ciudad' }));
+    expect(
+      await screen.findByText(
+        'No hay ciudades registradas para este municipio. Puedes escribirla manualmente.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole('option', { name: 'Amozoc' })).toBeNull();
+    const cityField = screen.getByRole('combobox', { name: 'Ciudad' });
+    await user.type(cityField, 'Localidad de captura manual');
+    expect((cityField as HTMLInputElement).value).toBe('Localidad de captura manual');
+  });
+
+  it('offers postal settlements and fills the selected location', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        state: 'Sonora',
+        municipality: 'Hermosillo',
+        city: 'Hermosillo',
+        settlements: ['Centro', '5 de Mayo'],
+      },
+    } as never);
+    render(<CustomerFormModal isOpen onClose={vi.fn()} onSaved={vi.fn()} />);
+    await user.type(screen.getByRole('textbox', { name: 'Código postal' }), '83000');
+    expect(await screen.findByRole('combobox', { name: 'Colonia / asentamiento' })).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.getByText('Selecciona una colonia de la lista.')).toBeTruthy(),
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Mostrar opciones de Colonia / asentamiento' }),
+    );
+    await user.click(screen.getByRole('option', { name: 'Centro' }));
+    expect((screen.getByRole('combobox', { name: 'Ciudad' }) as HTMLInputElement).value).toBe('Hermosillo');
+    expect((screen.getByRole('textbox', { name: 'Estado / provincia' }) as HTMLInputElement).value).toBe('Sonora');
+    expect(api.get).toHaveBeenCalledWith('/customers/postal-lookup/83000');
+  });
+
+  it('looks up a Mexican postal code when editing a legacy customer without countryCode', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        state: 'Sonora',
+        municipality: 'Hermosillo',
+        city: 'Hermosillo',
+        settlements: ['Colonia de prueba'],
+      },
+    } as never);
+    render(
+      <CustomerFormModal
+        isOpen
+        customer={customer}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    );
+    await user.type(screen.getByRole('textbox', { name: 'Código postal' }), '83140');
+    expect(
+      await screen.findByRole('combobox', { name: 'Colonia / asentamiento' }),
+    ).toBeTruthy();
+    await waitFor(() =>
+      expect(api.get).toHaveBeenCalledWith('/customers/postal-lookup/83140'),
+    );
+    expect(screen.queryByRole('textbox', { name: 'País (código ISO)' })).toBeNull();
+  });
+
+  it('allows manual address entry when postal lookup is unavailable', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.get).mockRejectedValue(new Error('Postal service offline'));
+    render(<CustomerFormModal isOpen onClose={vi.fn()} onSaved={vi.fn()} />);
+    await user.type(screen.getByRole('textbox', { name: 'Código postal' }), '83000');
+    expect(
+      await screen.findByText(/Consulta no disponible/),
+    ).toBeTruthy();
+    await user.type(
+      screen.getByRole('combobox', { name: 'Colonia / asentamiento' }),
+      'Las Palmas',
+    );
+    await user.type(screen.getByRole('combobox', { name: 'Ciudad' }), 'Hermosillo');
+    await user.type(screen.getByRole('textbox', { name: 'Estado / provincia' }), 'Sonora');
+    await user.type(screen.getByRole('textbox', { name: 'Nombre' }), 'Cliente manual');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Tipo' }), 'BUSINESS');
+    await user.click(screen.getByRole('button', { name: 'Registrar cliente' }));
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/customers',
+        expect.objectContaining({
+          postalCode: '83000',
+          neighborhood: 'Las Palmas',
+          city: 'Hermosillo',
+          state: 'Sonora',
+        }),
+      ),
+    );
+  });
+
+  it('keeps an unclassified historical type when editing another field', async () => {
+    const user = userEvent.setup();
+    render(
+      <CustomerFormModal
+        isOpen
+        customer={{ ...customer, type: 'Tipo histórico desconocido' }}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Razón social' }),
+      'Hospital del Norte SA de CV',
+    );
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledWith(
+        '/customers/customer-a',
+        expect.objectContaining({
+          name: customer.name,
+          legalName: 'Hospital del Norte SA de CV',
+          type: undefined,
+        }),
+      ),
+    );
+  });
+
+  it('creates a customer with only name and type', async () => {
+    const user = userEvent.setup();
+    render(<CustomerFormModal isOpen onClose={vi.fn()} onSaved={vi.fn()} />);
+    await user.type(screen.getByRole('textbox', { name: 'Nombre' }), 'Hospital QA');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Tipo' }), 'HOSPITAL');
+    await user.click(screen.getByRole('button', { name: 'Registrar cliente' }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/customers', expect.objectContaining({
+      name: 'Hospital QA', type: 'HOSPITAL', email: null, phone: null,
+    })));
   });
 
   it('validates the email format and focuses it when invalid', async () => {
@@ -151,7 +436,10 @@ describe('CustomerFormModal', () => {
     );
 
     await user.type(screen.getByRole('textbox', { name: 'Nombre' }), 'Cliente QA');
-    await user.type(screen.getByRole('textbox', { name: 'Tipo' }), 'Hospital');
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Tipo' }),
+      'HOSPITAL',
+    );
     await user.type(screen.getByRole('textbox', { name: 'Email' }), 'invalido');
     await user.type(screen.getByRole('textbox', { name: 'Teléfono' }), '6621231234');
     await user.click(screen.getByRole('button', { name: 'Registrar cliente' }));
@@ -182,11 +470,18 @@ describe('CustomerFormModal', () => {
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith('/customers', {
         name: 'Clínica del Centro',
-        type: 'Clínica',
+        legalName: null,
+        type: 'CLINIC',
         email: 'centro@clinica.test',
         phone: '6621112233',
         contactName: 'Ana',
         address: 'Norte',
+        postalCode: null,
+        neighborhood: null,
+        municipality: null,
+        city: null,
+        state: null,
+        countryCode: 'MX',
         notes: 'Verificar datos',
       });
       expect(onSaved).toHaveBeenCalledWith(customer);
@@ -223,15 +518,59 @@ describe('CustomerFormModal', () => {
     await waitFor(() =>
       expect(api.patch).toHaveBeenCalledWith('/customers/customer-a', {
         name: 'Hospital Actualizado',
-        type: customer.type,
+        legalName: null,
+        type: undefined,
         email: customer.email,
         phone: customer.phone,
         contactName: customer.contactName,
         address: customer.address,
+        postalCode: null,
+        neighborhood: null,
+        municipality: null,
+        city: null,
+        state: null,
+        countryCode: null,
         notes: customer.notes,
       }),
     );
     expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('saves explicit classification and structured location on legacy edits', async () => {
+    const user = userEvent.setup();
+    render(
+      <CustomerFormModal
+        isOpen
+        customer={{ ...customer, type: 'Licitación histórica', countryCode: 'MX' }}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/Clasificación anterior/)).toBeTruthy();
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Tipo' }),
+      'PUBLIC_INSTITUTION',
+    );
+    await user.type(screen.getByRole('combobox', { name: 'Ciudad' }), 'Hermosillo');
+    await user.type(
+      screen.getByRole('textbox', { name: 'Estado / provincia' }),
+      'Sonora',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() =>
+      expect(api.patch).toHaveBeenCalledWith(
+        '/customers/customer-a',
+        expect.objectContaining({
+          type: 'PUBLIC_INSTITUTION',
+          city: 'Hermosillo',
+          state: 'Sonora',
+          countryCode: 'MX',
+        }),
+      ),
+    );
   });
 
   it('keeps the form open after an API failure and allows resubmission', async () => {
