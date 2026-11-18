@@ -8,9 +8,6 @@ import {
   ArrowRight,
   Building2,
   FileText,
-  Mail,
-  MapPin,
-  Phone,
   ShoppingCart,
   UserRound,
 } from 'lucide-react';
@@ -249,7 +246,7 @@ export default function CustomerDetailPage() {
   const timezone =
     sessionState.status === 'success'
       ? sessionState.user.companyTimezone
-      : 'America/Hermosillo';
+      : 'UTC';
   const authorized = hasRole(role, COMMERCIAL_ROLES);
   const requestKey = companyId + ':' + customerId;
 
