@@ -233,9 +233,9 @@ describe('CustomersController', () => {
       json: () => Promise.resolve(payload),
     } as Response);
 
-    await expect(controller.listMunicipalityCities('21', '123', '1')).resolves.toEqual(
-      normalized,
-    );
+    await expect(
+      controller.listMunicipalityCities('21', '123', '1'),
+    ).resolves.toEqual(normalized);
     expect(provider).toHaveBeenCalledWith(
       'https://api.postalkit.mx/v1/municipalities/123/postal-codes?page=1',
       expect.objectContaining({
@@ -249,12 +249,12 @@ describe('CustomersController', () => {
 
   it('rejects invalid municipality city query parameters', async () => {
     const provider = jest.spyOn(global, 'fetch');
-    await expect(controller.listMunicipalityCities('21', '../', '1')).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-    await expect(controller.listMunicipalityCities('21', '123', '1001')).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      controller.listMunicipalityCities('21', '../', '1'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      controller.listMunicipalityCities('21', '123', '1001'),
+    ).rejects.toBeInstanceOf(BadRequestException);
     expect(provider).not.toHaveBeenCalled();
   });
 
