@@ -50,6 +50,14 @@ export function useHomeData() {
   const sessionState = useAuthenticatedSession();
   const currentUserRole =
     sessionState.status === 'success' ? sessionState.user?.role ?? null : null;
+  const currentUserName =
+    sessionState.status === 'success'
+      ? sessionState.user.firstName?.trim() || ''
+      : '';
+  const currentCompanyName =
+    sessionState.status === 'success'
+      ? sessionState.user.companyName?.trim() || ''
+      : '';
   const [dashboardState, setDashboardState] = useState<
     ResourceState<DashboardData>
   >(() => createResourceState<DashboardData>());
@@ -188,6 +196,8 @@ export function useHomeData() {
     attentionUpdating,
     attentionHasErrors,
     currentUserRole,
+    currentUserName,
+    currentCompanyName,
     sessionLoading: sessionState.status === 'loading',
   };
 }
