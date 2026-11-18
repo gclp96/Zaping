@@ -632,9 +632,9 @@ describe('QuotesPage', () => {
     'Clínica nueva',
   );
 
-  await user.type(
-    customerScope.getByLabelText(/^tipo/i),
-    'Clínica',
+  await user.selectOptions(
+    customerScope.getByRole('combobox', { name: 'Tipo' }),
+    'CLINIC',
   );
 
   await user.type(
@@ -658,11 +658,14 @@ describe('QuotesPage', () => {
       '/customers',
       {
         name: 'Clínica nueva',
-        type: 'Clínica',
+        type: 'CLINIC',
         email: 'compras@clinicanueva.com',
         phone: '6627654321',
         contactName: undefined,
         address: undefined,
+        city: null,
+        state: null,
+        countryCode: 'MX',
         notes: undefined,
       },
     );
