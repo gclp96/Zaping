@@ -41,7 +41,7 @@ export default function Sidebar({
   return (
     <aside
       id={id}
-      className={`min-h-screen flex-col overflow-y-auto bg-slate-950 py-4 text-white ${
+      className={`zaping-sidebar-scroll min-h-0 flex-col overflow-y-auto overscroll-contain bg-slate-950 py-4 text-white ${
         collapsed ? "w-20 px-2" : "w-64 px-4"
       } ${
         transitionEnabled
@@ -101,22 +101,29 @@ export default function Sidebar({
       </div>
 
       <nav
-        className={`${collapsed ? "mt-6 space-y-6" : "mt-8 space-y-7"}`}
+        className={`${collapsed ? "mt-5 space-y-5" : "mt-6 space-y-5"}`}
         aria-label="Navegación principal"
       >
         {navigationGroups.map((group) => (
-          <div key={group.label}>
+          <div
+            key={group.label}
+            className={
+              collapsed
+                ? "border-b border-white/10 pb-3 last:border-b-0 last:pb-0"
+                : undefined
+            }
+          >
             <p
               className={
                 collapsed
                   ? "sr-only"
-                  : "mb-2 px-3 text-xs font-semibold uppercase text-slate-500"
+                  : "mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400"
               }
             >
               {group.label}
             </p>
 
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-0.5">
               {group.items.map((item) => {
                 const active = isNavigationItemActive(pathname, item.href);
                 const Icon = item.icon;
@@ -128,7 +135,7 @@ export default function Sidebar({
                     aria-current={active ? "page" : undefined}
                     aria-label={collapsed ? item.label : undefined}
                     title={collapsed ? item.label : undefined}
-                    className={`flex min-h-10 items-center rounded-ui-md border-l-2 text-sm font-medium transition-colors duration-[var(--motion-duration-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+                    className={`flex min-h-10 items-center rounded-ui-md border-l-2 py-2 text-sm font-medium transition-colors duration-[var(--motion-duration-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
                       collapsed ? "justify-center px-2" : "gap-3 px-3"
                     } ${
                       active
@@ -143,7 +150,7 @@ export default function Sidebar({
                       size={19}
                       strokeWidth={1.8}
                     />
-                    <span className={collapsed ? "sr-only" : "truncate"}>
+                    <span className={collapsed ? "sr-only" : "min-w-0 whitespace-normal break-words leading-5"}>
                       {item.label}
                     </span>
                   </Link>

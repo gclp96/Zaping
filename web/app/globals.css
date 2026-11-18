@@ -134,3 +134,26 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* Navigation scroll remains keyboard/mouse accessible without a dominant OS track. */
+.zaping-sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 0.45) transparent;
+}
+
+.zaping-sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.zaping-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.zaping-sidebar-scroll::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgb(148 163 184 / 0.45);
+}
+
+.zaping-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(148 163 184 / 0.7);
+}

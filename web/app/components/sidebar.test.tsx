@@ -11,17 +11,17 @@ const expectedNavigation = [
   ["Cotizaciones", "/quotes"],
   ["Ventas", "/sales"],
   ["Proveedores", "/suppliers"],
-  ["Compras", "/purchases"],
+  ["Órdenes de compra", "/purchases"],
   ["Recepciones", "/purchase-receipts"],
   ["Documentos de proveedor", "/supplier-documents"],
   ["Productos", "/products"],
+  ["Categorías", "/categories"],
   ["Inventario", "/inventory"],
   ["Equipos", "/equipment"],
   ["Casos de salud", "/healthcare-cases"],
   ["Médicos", "/doctors"],
   ["Hospitales", "/hospitals"],
   ["Usuarios", "/users"],
-  ["Categorías", "/categories"],
 ] as const;
 
 afterEach(() => {
@@ -52,8 +52,8 @@ describe("Sidebar", () => {
     render(<Sidebar pathname="/dashboard" currentUserRole="ADMIN" />);
 
     for (const group of [
-      "INICIO",
-      "COMERCIAL",
+      "GENERAL",
+      "VENTAS",
       "COMPRAS",
       "INVENTARIO",
       "SALUD",
@@ -92,15 +92,15 @@ describe("Sidebar", () => {
           "Cotizaciones",
           "Ventas",
           "Productos",
+          "Categorías",
           "Inventario",
           "Casos de salud",
           "Médicos",
           "Hospitales",
-          "Categorías",
         ],
         hidden: [
           "Proveedores",
-          "Compras",
+          "Órdenes de compra",
           "Recepciones",
           "Documentos de proveedor",
           "Equipos",
@@ -113,15 +113,15 @@ describe("Sidebar", () => {
           "Inicio",
           "Dashboard",
           "Proveedores",
-          "Compras",
+          "Órdenes de compra",
           "Recepciones",
           "Productos",
+          "Categorías",
           "Inventario",
           "Equipos",
           "Casos de salud",
           "Médicos",
           "Hospitales",
-          "Categorías",
         ],
         hidden: ["Clientes", "Cotizaciones", "Ventas", "Documentos de proveedor", "Usuarios"],
       },
@@ -208,6 +208,15 @@ describe("Sidebar", () => {
     expect(
       productsLink.querySelector("span")?.classList.contains("sr-only"),
     ).toBe(true);
+
+    const navigation = screen.getByRole("navigation", {
+      name: "Navegación principal",
+    });
+    const groups = Array.from(navigation.children);
+    expect(groups.length).toBeGreaterThan(1);
+    expect(groups[0].classList.contains("border-b")).toBe(true);
+    expect(groups[groups.length - 1].classList.contains("last:border-b-0")).toBe(true);
+    expect(screen.getByRole("complementary").classList.contains("zaping-sidebar-scroll")).toBe(true);
   });
 
   it("shows Users navigation for ADMIN users", () => {
