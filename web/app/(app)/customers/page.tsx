@@ -407,7 +407,10 @@ export default function CustomersPage() {
                             aria-live="polite"
                             className="text-xs font-medium tabular-nums text-text-secondary"
                           >
-                            {sortedCustomers.length} {sortedCustomers.length === 1 ? 'coincidencia' : 'coincidencias'}
+                            {sortedCustomers.length}{' '}
+                            {sortedCustomers.length === 1
+                              ? 'coincidencia'
+                              : 'coincidencias'}
                           </span>
                           <Button
                             type="button"
