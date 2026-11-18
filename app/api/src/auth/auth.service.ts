@@ -38,6 +38,8 @@ export class AuthService {
         id: user.companyId,
       },
       select: {
+        name: true,
+        tradeName: true,
         timezone: true,
       },
     });
@@ -49,6 +51,7 @@ export class AuthService {
     return {
       ...user,
       companyTimezone: company.timezone,
+      companyName: company.tradeName?.trim() || company.name,
     };
   }
 
