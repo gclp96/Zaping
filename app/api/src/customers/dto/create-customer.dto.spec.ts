@@ -24,6 +24,35 @@ describe('CreateCustomerDto', () => {
     phone: '5551000000',
   };
 
+  it('requires only name and type', async () => {
+    await expect(
+      transformDto({ name: 'Clínica nueva', type: 'CLINIC' }),
+    ).resolves.toMatchObject({ name: 'Clínica nueva', type: 'CLINIC' });
+    await expect(
+      transformDto({ name: 'Clínica nueva', type: 'CLINIC', email: 'invalid' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('validates postal and legal identity fields', async () => {
+    await expect(
+      transformDto({
+        ...validPayload,
+        legalName: 'Clínica Nueva SA de CV',
+        postalCode: '83000',
+        neighborhood: 'Centro',
+        municipality: 'Hermosillo',
+      }),
+    ).resolves.toMatchObject({
+      legalName: 'Clínica Nueva SA de CV',
+      postalCode: '83000',
+      neighborhood: 'Centro',
+      municipality: 'Hermosillo',
+    });
+    await expect(
+      transformDto({ ...validPayload, postalCode: '8300' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('accepts the existing customer creation contract', async () => {
     await expect(transformDto(validPayload)).resolves.toMatchObject(
       validPayload,
