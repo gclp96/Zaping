@@ -304,7 +304,9 @@ describe('CustomerFormModal', () => {
     expect(
       await screen.findByRole('combobox', { name: 'Colonia / asentamiento' }),
     ).toBeTruthy();
-    expect(api.get).toHaveBeenCalledWith('/customers/postal-lookup/83140');
+    await waitFor(() =>
+      expect(api.get).toHaveBeenCalledWith('/customers/postal-lookup/83140'),
+    );
     expect(screen.queryByRole('textbox', { name: 'País (código ISO)' })).toBeNull();
   });
 
