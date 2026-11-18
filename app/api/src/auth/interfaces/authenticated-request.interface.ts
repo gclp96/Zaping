@@ -12,6 +12,7 @@ export interface AuthenticatedUser {
 
 export interface AuthenticatedSession extends AuthenticatedUser {
   companyTimezone: string;
+  companyName: string;
 }
 
 export interface AuthenticatedRequest extends Request {
