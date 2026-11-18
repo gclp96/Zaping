@@ -25,8 +25,13 @@ services:
     entrypoint: ["sh", "-ec"]
     command:
       - |
+        test "$(pwd)" = "/work"
+        test -f /source/prisma/schema.prisma
         cp /source/package.json /source/package-lock.json /source/prisma.config.ts /work/
-        cp -R /source/prisma /work/prisma
+        # Only remove copied schema files inside the isolated rehearsal-api volume.
+        rm -rf /work/prisma
+        mkdir -p /work/prisma
+        cp -R /source/prisma/. /work/prisma/
         npm ci --no-audit --no-fund
 
   # This service never exposes a listening port or runs the Zaping application.
