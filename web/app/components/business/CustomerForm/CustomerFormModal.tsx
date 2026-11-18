@@ -510,7 +510,7 @@ function CustomerFormContent({
           ) : (
             <Input
               name="state"
-              label="Estado"
+              label="Estado / provincia"
               placeholder="Ej. Sonora"
               value={state}
               maxLength={120}
