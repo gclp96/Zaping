@@ -94,7 +94,16 @@ function CustomerFormContent({
     void api
       .get<GeographyOption[]>('/customers/geography/states')
       .then(({ data }) => {
-        if (!cancelled && Array.isArray(data)) setStateOptions(data);
+        if (!cancelled && Array.isArray(data)) {
+          setStateOptions(
+            data.filter(
+              (option) =>
+                typeof option.id === 'number' &&
+                typeof option.name === 'string' &&
+                option.name.trim().length > 0,
+            ),
+          );
+        }
       })
       .catch(() => {
         if (!cancelled) setGeographyStatus(
