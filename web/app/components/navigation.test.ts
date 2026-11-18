@@ -46,7 +46,7 @@ describe("operational navigation and independent account titles", () => {
   });
   it("preserves existing operational matching and unknown-route fallback", () => {
     expect(getRouteTitle("/products")).toBe("Productos");
-    expect(getRouteTitle("/purchases/id")).toBe("Compras");
+    expect(getRouteTitle("/purchases/id")).toBe("Órdenes de compra");
     expect(isNavigationItemActive("/products-other", "/products")).toBe(false);
     expect(isNavigationItemActive("/products/id", "/products")).toBe(true);
     expect(isNavigationItemActive("/products", "/")).toBe(false);
