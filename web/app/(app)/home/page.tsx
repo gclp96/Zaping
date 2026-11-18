@@ -23,6 +23,7 @@ import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
 
 import HomeAttentionSection from './HomeAttentionSection';
+import RecentActivitySection from './RecentActivitySection';
 import { useHomeData } from './useHomeData';
 
 type QuickAction = {
@@ -190,6 +191,8 @@ export default function HomePage() {
     attentionUpdating,
     attentionHasErrors,
     currentUserRole,
+    currentCompanyId,
+    currentCompanyTimezone,
     currentUserName,
     currentCompanyName,
     sessionLoading,
@@ -352,6 +355,13 @@ export default function HomePage() {
               )}
             </Section>
           </div>
+          {currentCompanyId ? (
+            <RecentActivitySection
+              key={currentCompanyId}
+              companyId={currentCompanyId}
+              timezone={currentCompanyTimezone}
+            />
+          ) : null}
         </>
       )}
     </PageContainer>
