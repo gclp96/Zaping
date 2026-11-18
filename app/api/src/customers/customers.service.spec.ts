@@ -137,6 +137,52 @@ describe('CustomersService', () => {
     });
   });
 
+  it('does not invent a city from a municipality without city data', () => {
+    expect(
+      service.normalizePostalLookup('73590', {
+        data: {
+          state: { name: 'Puebla' },
+          municipality: { name: 'Acateno' },
+          city: null,
+          settlements: [{ name: 'Anáhuac' }],
+        },
+      }),
+    ).toEqual({
+      code: '73590',
+      state: 'Puebla',
+      municipality: 'Acateno',
+      city: '',
+      settlements: ['Anáhuac'],
+    });
+  });
+
+  it('derives only cities attached to a municipality postal code page', () => {
+    expect(
+      service.normalizeMunicipalityCities(
+        {
+          data: [
+            { code: '73590', city: null },
+            { code: '73591', city: { id: 10, name: 'Ciudad verificada' } },
+            { code: '73592', city: { id: 10, name: 'Ciudad verificada' } },
+            { code: '73593', city: { id: 11, name: 'Otra ciudad' } },
+          ],
+          meta: { total: 25 },
+        },
+        1,
+      ),
+    ).toEqual({
+      items: [
+        { id: 10, name: 'Ciudad verificada' },
+        { id: 11, name: 'Otra ciudad' },
+      ],
+      hasMore: true,
+    });
+    expect(service.normalizeMunicipalityCities({}, 1)).toEqual({
+      items: [],
+      hasMore: false,
+    });
+  });
+
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
