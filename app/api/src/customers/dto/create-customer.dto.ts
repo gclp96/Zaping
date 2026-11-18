@@ -31,7 +31,7 @@ export class CreateCustomerDto {
 
   @IsString()
   @IsOptional()
-  @Matches(/^\\d{5}$/)
+  @Matches(/^\d{5}$/)
   postalCode?: string | null;
 
   @IsString()
