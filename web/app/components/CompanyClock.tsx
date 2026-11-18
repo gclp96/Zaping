@@ -21,7 +21,7 @@ export function formatCompanyDateTime(now: Date, timezone: string) {
       hourCycle: 'h23',
       timeZone: timezone,
     }).format(now);
-    return { date, time };
+    return { date: date.charAt(0).toUpperCase() + date.slice(1), time };
   } catch {
     return null;
   }
@@ -49,7 +49,7 @@ export default function CompanyClock({ timezone }: CompanyClockProps) {
       <div className="flex flex-col text-xs leading-tight text-text-secondary">
         {formatted ? (
           <>
-            <span className="capitalize">{formatted.date}</span>
+            <span>{formatted.date}</span>
             <time dateTime={now?.toISOString()} className="mt-0.5 font-semibold tabular-nums text-text">
               {formatted.time}
             </time>
