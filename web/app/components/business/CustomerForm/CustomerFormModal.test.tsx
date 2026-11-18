@@ -78,7 +78,7 @@ describe('CustomerFormModal', () => {
       within(dialog).getByRole('heading', { name: /Información adicional/ }),
     ).toBeTruthy();
 
-    for (const label of ['Nombre', 'Email', 'Teléfono']) {
+    for (const label of ['Nombre']) {
       expect(
         (screen.getByRole('textbox', { name: label }) as HTMLInputElement)
           .required,
@@ -88,7 +88,7 @@ describe('CustomerFormModal', () => {
       (screen.getByRole('combobox', { name: 'Tipo' }) as HTMLSelectElement)
         .required,
     ).toBe(true);
-    for (const label of ['Contacto', 'Dirección', 'Ciudad', 'Estado / provincia', 'País (código ISO)']) {
+    for (const label of ['Email', 'Teléfono', 'Razón social', 'Código postal', 'Municipio', 'Contacto', 'Dirección', 'Ciudad', 'Estado / provincia', 'País (código ISO)']) {
       expect(
         (screen.getByRole('textbox', { name: label }) as HTMLInputElement)
           .required,
@@ -139,16 +139,23 @@ describe('CustomerFormModal', () => {
     expect(nameField.getAttribute('aria-invalid')).toBe('true');
     expect(screen.getByText('El nombre del cliente es obligatorio.')).toBeTruthy();
     expect(screen.getByText('El tipo de cliente es obligatorio.')).toBeTruthy();
-    expect(
-      screen.getByText('El correo electrónico es obligatorio.'),
-    ).toBeTruthy();
-    expect(screen.getByText('El teléfono es obligatorio.')).toBeTruthy();
     expect(api.post).not.toHaveBeenCalled();
 
     await user.type(nameField, 'Cliente QA');
     expect(
       screen.queryByText('El nombre del cliente es obligatorio.'),
     ).toBeNull();
+  });
+
+  it('creates a customer with only name and type', async () => {
+    const user = userEvent.setup();
+    render(<CustomerFormModal isOpen onClose={vi.fn()} onSaved={vi.fn()} />);
+    await user.type(screen.getByRole('textbox', { name: 'Nombre' }), 'Hospital QA');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Tipo' }), 'HOSPITAL');
+    await user.click(screen.getByRole('button', { name: 'Registrar cliente' }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/customers', expect.objectContaining({
+      name: 'Hospital QA', type: 'HOSPITAL', email: null, phone: null,
+    })));
   });
 
   it('validates the email format and focuses it when invalid', async () => {
@@ -192,11 +199,15 @@ describe('CustomerFormModal', () => {
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith('/customers', {
         name: 'Clínica del Centro',
+        legalName: null,
         type: 'CLINIC',
         email: 'centro@clinica.test',
         phone: '6621112233',
         contactName: 'Ana',
         address: 'Norte',
+        postalCode: null,
+        neighborhood: null,
+        municipality: null,
         city: null,
         state: null,
         countryCode: 'MX',
@@ -236,11 +247,15 @@ describe('CustomerFormModal', () => {
     await waitFor(() =>
       expect(api.patch).toHaveBeenCalledWith('/customers/customer-a', {
         name: 'Hospital Actualizado',
+        legalName: null,
         type: undefined,
         email: customer.email,
         phone: customer.phone,
         contactName: customer.contactName,
         address: customer.address,
+        postalCode: null,
+        neighborhood: null,
+        municipality: null,
         city: null,
         state: null,
         countryCode: null,
