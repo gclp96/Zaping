@@ -57,6 +57,13 @@ Limpiar el catálogo de Clientes y ofrecer exactamente tres filtros visibles: no
 - El campo Dirección continúa siendo libre. No convertir valores fiscales, código postal comercial o razón social en campos obligatorios.
 - QA requerido: verificar visualmente que el menú no sobresalga del modal y que municipio/colonia puedan escogerse con mouse o teclado; consultar páginas adicionales, desambiguar homónimos, cambiar estado y cancelar consultas anteriores, validar la búsqueda inversa por CP, editar clientes históricos, y persistencia.
 
+## QA de coherencia geográfica — Ciudades por municipio
+- Evitar sugerencias de todas las ciudades del estado una vez que hay un municipio identificado. El endpoint `/v1/states/{id}/cities` no incluye relación municipal verificable; mostrarlo completo puede mezclar municipios.
+- Utilizar exclusivamente los nombres de ciudad adjuntos a los códigos postales del municipio seleccionado (`/v1/municipalities/{id}/postal-codes?page=N`). La nueva ruta autenticada `GET /customers/geography/states/:stateId/municipalities/:municipalityId/cities?page=N` normaliza ciudades verificadas, conserva paginación y cachea por una hora. No se descargan páginas adicionales salvo que el usuario elija `Ver más ciudades`.
+- Si PostalKit no identifica ciudad para un CP, conservar Ciudad en blanco y permitir capturarla manualmente; **nunca copiar el nombre del Municipio al campo Ciudad de manera automática**.
+- QA concreto: Puebla → Acateno → CP 73590 / colonia Anáhuac no debe mostrar Acatlán de Osorio, Amozoc o Atlixco por el mero hecho de pertenecer a Puebla. Una ciudad ausente no bloquea el guardado.
+- No hay cambios de Prisma ni backfill de direcciones históricas. Ciudad sigue siendo opcional.
+
 ## Seguridad y compatibilidad
 - Mantener JWT/RBAC ADMIN, MANAGER, SALES actuales. Sin permisos nuevos.
 - Escrituras y lecturas siguen aisladas por Company. Nada de filtros exclusivos en frontend para autorización.
