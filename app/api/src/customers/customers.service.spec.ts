@@ -59,14 +59,16 @@ describe('CustomersService', () => {
   });
 
   it('normalizes postal lookup without guessing missing data', () => {
-    expect(service.normalizePostalLookup('83000', {
-      data: {
-        state: { name: 'Sonora' },
-        municipality: { name: 'Hermosillo' },
-        city: { name: 'Hermosillo' },
-        settlements: [{ name: 'Centro' }, { name: '5 de Mayo' }],
-      },
-    })).toEqual({
+    expect(
+      service.normalizePostalLookup('83000', {
+        data: {
+          state: { name: 'Sonora' },
+          municipality: { name: 'Hermosillo' },
+          city: { name: 'Hermosillo' },
+          settlements: [{ name: 'Centro' }, { name: '5 de Mayo' }],
+        },
+      }),
+    ).toEqual({
       code: '83000',
       state: 'Sonora',
       municipality: 'Hermosillo',
@@ -74,7 +76,8 @@ describe('CustomersService', () => {
       settlements: ['Centro', '5 de Mayo'],
     });
     expect(service.normalizePostalLookup('00000', {})).toEqual({
-      code: '00000', settlements: [],
+      code: '00000',
+      settlements: [],
     });
   });
 
