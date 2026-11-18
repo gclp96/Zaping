@@ -14,6 +14,7 @@ export default function DataTablePagination({
   pageIndex,
   pageSize,
   totalRows,
+  compact = false,
   onPageChange,
   onPageSizeChange,
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
@@ -39,7 +40,8 @@ export default function DataTablePagination({
         Mostrando {firstRow}-{lastRow} de {totalRows}
       </p>
 
-      <div className="flex flex-wrap items-center gap-3">
+      {!compact ? (
+        <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm text-text-secondary">
           Filas por página
           <select
@@ -87,6 +89,7 @@ export default function DataTablePagination({
           </Button>
         </div>
       </div>
+      ) : null}
     </nav>
   );
 }
