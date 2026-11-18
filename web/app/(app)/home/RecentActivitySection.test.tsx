@@ -60,7 +60,7 @@ describe('RecentActivitySection', () => {
   });
 
   it('shows tenant-scoped results without inventing a detailed link', async () => {
-    render(
+    const { container } = render(
       <RecentActivitySection
         companyId="company-a"
         timezone="America/Hermosillo"
@@ -79,8 +79,7 @@ describe('RecentActivitySection', () => {
       '/quotes',
       '/purchases',
     ]);
-    const date = screen.getAllByRole('time');
-    expect(date).toHaveLength(4);
+    expect(container.querySelectorAll('time')).toHaveLength(4);
   });
 
   it('formats timestamps in the company timezone rather than the browser timezone', () => {
