@@ -188,11 +188,29 @@ export default function HomeAttentionSection({
       description="Operaciones pendientes derivadas de la información actual."
     >
       {attentionItems.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          {attentionItems.map((item) => (
-            <AttentionCard key={item.key} item={item} />
+        <ul
+          aria-label="Alertas operativas"
+          className={`grid list-none gap-4 p-0 ${
+            attentionItems.length === 3
+              ? 'md:grid-cols-2 2xl:grid-cols-3'
+              : attentionItems.length === 1
+                ? 'grid-cols-1'
+                : 'md:grid-cols-2'
+          }`}
+        >
+          {attentionItems.map((item, index) => (
+            <li
+              key={item.key}
+              className={
+                attentionItems.length === 3 && index === 2
+                  ? 'md:col-span-2 2xl:col-span-1'
+                  : undefined
+              }
+            >
+              <AttentionCard item={item} />
+            </li>
           ))}
-        </div>
+        </ul>
       ) : updating ? (
         <p className="text-sm text-text-muted" aria-live="polite">
           Actualizando prioridades...

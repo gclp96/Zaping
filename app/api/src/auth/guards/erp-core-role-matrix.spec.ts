@@ -142,6 +142,7 @@ const roleMatrix: RoleMatrix[] = [
     controller: DashboardController,
     methods: {
       getDashboard: allRoles,
+      getRecentActivity: allRoles,
     },
   },
   {

@@ -13,6 +13,16 @@ export class DashboardController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES, UserRole.WAREHOUSE)
+  @Get('recent-activity')
+  getRecentActivity(@Request() req: AuthenticatedRequest) {
+    return this.dashboardService.getRecentActivity(
+      req.user.companyId,
+      req.user.role,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES, UserRole.WAREHOUSE)
   @Get()
   getDashboard(@Request() req: AuthenticatedRequest) {
     return this.dashboardService.get(req.user.companyId, req.user.role);

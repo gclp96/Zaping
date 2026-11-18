@@ -50,6 +50,13 @@ export function useHomeData() {
   const sessionState = useAuthenticatedSession();
   const currentUserRole =
     sessionState.status === 'success' ? sessionState.user?.role ?? null : null;
+  const currentCompanyId =
+    sessionState.status === 'success' ? sessionState.user.companyId : '';
+  const currentCompanyTimezone =
+    sessionState.status === 'success'
+      ? sessionState.user.companyTimezone
+      : '';
+
   const currentUserName =
     sessionState.status === 'success'
       ? sessionState.user.firstName?.trim() || ''
@@ -196,6 +203,8 @@ export function useHomeData() {
     attentionUpdating,
     attentionHasErrors,
     currentUserRole,
+    currentCompanyId,
+    currentCompanyTimezone,
     currentUserName,
     currentCompanyName,
     sessionLoading: sessionState.status === 'loading',
