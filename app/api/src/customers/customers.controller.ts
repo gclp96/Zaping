@@ -207,6 +207,70 @@ export class CustomersController {
     }
   }
 
+  private readonly municipalityCityCache = new Map<
+    string,
+    {
+      expiresAt: number;
+      data: {
+        items: Array<{ id: number; name: string }>;
+        hasMore: boolean;
+      };
+    }
+  >();
+
+  @Get('geography/states/:stateId/municipalities/:municipalityId/cities')
+  async listMunicipalityCities(
+    @Param('stateId') stateId: string,
+    @Param('municipalityId') municipalityId: string,
+    @Query('page') pageInput = '1',
+  ) {
+    if (
+      !/^\d{1,3}$/.test(stateId) ||
+      !/^\d{1,8}$/.test(municipalityId) ||
+      !/^\d{1,4}$/.test(pageInput)
+    ) {
+      throw new BadRequestException('Parámetros geográficos inválidos');
+    }
+    const page = Number(pageInput);
+    if (!Number.isSafeInteger(page) || page < 1 || page > 1000) {
+      throw new BadRequestException('Página inválida');
+    }
+    const path = 'municipalities/' + municipalityId + '/postal-codes?page=' + page;
+    const cacheKey = stateId + ':' + path;
+    const cached = this.municipalityCityCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.data;
+
+    const key = process.env.POSTALKIT_API_KEY;
+    if (!key) {
+      throw new ServiceUnavailableException('Consulta postal no configurada');
+    }
+    try {
+      const response = await fetch('https://api.postalkit.mx/v1/' + path, {
+        headers: { Authorization: 'Bearer ' + key },
+        signal: AbortSignal.timeout(4500),
+      });
+      if (!response.ok) {
+        throw new ServiceUnavailableException(
+          'Ciudades temporalmente no disponibles',
+        );
+      }
+      const payload: unknown = await response.json();
+      const data = this.customersService.normalizeMunicipalityCities(
+        payload,
+        page,
+      );
+      this.municipalityCityCache.set(cacheKey, {
+        data,
+        expiresAt: Date.now() + 60 * 60 * 1000,
+      });
+      return data;
+    } catch {
+      throw new ServiceUnavailableException(
+        'Ciudades temporalmente no disponibles',
+      );
+    }
+  }
+
   @Get(':id/overview')
   getOverview(@Request() req: any, @Param('id') id: string) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
