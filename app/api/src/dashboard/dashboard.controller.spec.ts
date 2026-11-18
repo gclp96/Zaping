@@ -7,11 +7,12 @@ import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.i
 
 describe('DashboardController', () => {
   let controller: DashboardController;
-  let dashboardService: { get: jest.Mock };
+  let dashboardService: { get: jest.Mock; getRecentActivity: jest.Mock };
 
   beforeEach(async () => {
     dashboardService = {
       get: jest.fn(),
+      getRecentActivity: jest.fn(),
     };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -29,6 +30,24 @@ describe('DashboardController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  it.each([
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.SALES,
+    UserRole.WAREHOUSE,
+  ])('scopes recent activity to the authenticated company for %s', (role) => {
+    const request = {
+      user: { companyId: 'company-1', role },
+    } as AuthenticatedRequest;
+
+    void controller.getRecentActivity(request);
+
+    expect(dashboardService.getRecentActivity).toHaveBeenCalledWith(
+      'company-1',
+      role,
+    );
   });
 
   it.each([
