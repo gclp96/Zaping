@@ -247,8 +247,8 @@ describe('AuthenticatedAppLayout', () => {
   it('renders all approved existing navigation groups', () => {
     renderInShell(<div>Shell child</div>);
 
-    expect(screen.getByText('INICIO')).toBeTruthy();
-    expect(screen.getByText('COMERCIAL')).toBeTruthy();
+    expect(screen.getByText('GENERAL')).toBeTruthy();
+    expect(screen.getByText('VENTAS')).toBeTruthy();
     expect(screen.getByText('COMPRAS')).toBeTruthy();
     expect(screen.getByText('INVENTARIO')).toBeTruthy();
     expect(screen.getByText('ADMINISTRACIÓN')).toBeTruthy();
@@ -276,7 +276,7 @@ describe('AuthenticatedAppLayout', () => {
       screen.getByRole('link', { name: 'Proveedores' }).getAttribute('href'),
     ).toBe('/suppliers');
     expect(
-      screen.getByRole('link', { name: 'Compras' }).getAttribute('href'),
+      screen.getByRole('link', { name: 'Órdenes de compra' }).getAttribute('href'),
     ).toBe('/purchases');
     expect(
       screen.getByRole('link', { name: 'Recepciones' }).getAttribute('href'),
@@ -311,13 +311,13 @@ describe('AuthenticatedAppLayout', () => {
       within(inventoryGroup as HTMLElement)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Productos', 'Inventario', 'Equipos']);
+    ).toEqual(['Productos', 'Categorías', 'Inventario', 'Equipos']);
   });
 
   it('renders Inicio before Dashboard in the INICIO group', () => {
     renderInShell(<div>Shell child</div>);
 
-    const startGroup = screen.getByText('INICIO').parentElement;
+    const startGroup = screen.getByText('GENERAL').parentElement;
     expect(startGroup).toBeTruthy();
     expect(
       within(startGroup as HTMLElement)
@@ -335,7 +335,7 @@ describe('AuthenticatedAppLayout', () => {
       within(purchasesGroup as HTMLElement)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Proveedores', 'Compras', 'Recepciones', 'Documentos de proveedor']);
+    ).toEqual(['Proveedores', 'Órdenes de compra', 'Recepciones', 'Documentos de proveedor']);
   });
 
   it('marks Dashboard active for the Dashboard route', () => {
@@ -391,7 +391,7 @@ describe('AuthenticatedAppLayout', () => {
 
     expect(
       screen
-        .getByRole('link', { name: 'Compras' })
+        .getByRole('link', { name: 'Órdenes de compra' })
         .getAttribute('aria-current'),
     ).toBe('page');
   });
@@ -435,7 +435,7 @@ describe('AuthenticatedAppLayout', () => {
 
     expect(
       screen
-        .getByRole('link', { name: 'Compras' })
+        .getByRole('link', { name: 'Órdenes de compra' })
         .getAttribute('aria-current'),
     ).toBeNull();
   });
@@ -456,7 +456,7 @@ describe('AuthenticatedAppLayout', () => {
     ['/home', 'Inicio'],
     ['/dashboard', 'Dashboard'],
     ['/products', 'Productos'],
-    ['/purchases', 'Compras'],
+    ['/purchases', 'Órdenes de compra'],
     ['/purchase-receipts/receipt-1', 'Recepciones'],
     ['/quotes', 'Cotizaciones'],
     ['/sales', 'Ventas'],
