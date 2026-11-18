@@ -232,7 +232,7 @@ describe('CustomersPage', () => {
       email: '',
       phone: '',
       address: '',
-      contactName: null,
+      contactName: '',
     };
     configureApiMocks([customerWithoutDetails]);
 
