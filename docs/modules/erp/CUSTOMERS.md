@@ -3190,3 +3190,14 @@ physical location
 ≠
 economic payer
 ```
+
+---
+
+## CRM-DASH — extensión comercial pendiente (2026-11-18)
+
+**Estado:** decisión de producto aprobada; **BACKLOG / NO IMPLEMENTADO**. La evolución propuesta convierte la página Clientes en un CRM ligero: `Resumen comercial | Directorio | Oportunidades`, con indicadores ejecutivos, oportunidades y seguimientos, sin alterar el dominio maestro de Customer ni los ciclos de vida de Quotes/Sales.
+
+El trabajo se planificará **después de ERP Pilot Readiness P0**. `CRM-001` conserva su significado preexistente de carteras, responsables y permisos comerciales; `CRM-DASH-01..05` identifican entregas distintas. No declarar métricas por vendedor ni conversión hasta que existan datos y reglas de atribución verificadas. Esta nota **no modifica modelos, endpoints ni permisos CURRENT**.
+
+**Documento fuente:** [CRM_DASHBOARD_PROPOSAL_2026-11-18.md](CRM_DASHBOARD_PROPOSAL_2026-11-18.md).  
+**Roadmap / backlog:** [ROADMAP.md](../../project/ROADMAP.md) y [PROJECT_BOARD.md](../../project/PROJECT_BOARD.md).
