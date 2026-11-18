@@ -257,6 +257,52 @@ describe('CustomerFormModal', () => {
     ).toBe('Calle 12 #30');
   });
 
+  it('does not suggest cities from other municipalities in the same state', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === '/customers/geography/states') {
+        return Promise.resolve({
+          data: [{ id: 21, name: 'Puebla', code: '21' }],
+        } as never);
+      }
+      if (url === '/customers/geography/states/21/municipalities') {
+        return Promise.resolve({
+          data: [{ id: 123, name: 'Acateno' }],
+        } as never);
+      }
+      if (url === '/customers/geography/states/21/municipalities/123/cities?page=1') {
+        return Promise.resolve({
+          data: { items: [], hasMore: false },
+        } as never);
+      }
+      if (url === '/customers/geography/states/21/municipalities/123/settlements?page=1') {
+        return Promise.resolve({
+          data: { items: [{ id: 55, name: 'Anáhuac', postalCode: '73590' }], hasMore: false },
+        } as never);
+      }
+      return Promise.reject(new Error('Unknown endpoint: ' + url));
+    });
+    render(<CustomerFormModal isOpen onClose={vi.fn()} onSaved={vi.fn()} />);
+    await user.selectOptions(
+      await screen.findByRole('combobox', { name: 'Estado / provincia' }),
+      'Puebla',
+    );
+    await user.click(screen.getByRole('button', { name: 'Mostrar opciones de Municipio' }));
+    await user.click(await screen.findByRole('option', { name: 'Acateno' }));
+
+    await waitFor(() =>
+      expect(api.get).toHaveBeenCalledWith(
+        '/customers/geography/states/21/municipalities/123/cities?page=1',
+      ),
+    );
+    expect(api.get).not.toHaveBeenCalledWith('/customers/geography/states/21/cities');
+    await user.click(screen.getByRole('button', { name: 'Mostrar opciones de Ciudad' }));
+    expect(screen.queryByRole('option', { name: 'Amozoc' })).toBeNull();
+    const cityField = screen.getByRole('combobox', { name: 'Ciudad' });
+    await user.type(cityField, 'Localidad de captura manual');
+    expect((cityField as HTMLInputElement).value).toBe('Localidad de captura manual');
+  });
+
   it('offers postal settlements and fills the selected location', async () => {
     const user = userEvent.setup();
     vi.mocked(api.get).mockResolvedValue({
