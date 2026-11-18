@@ -4023,3 +4023,29 @@ sprint.
 Fuera: `IN_PREPARATION`, reopen, mutación de items `PREPARED`, lotes/seriales,
 reserva física, Inventory Movement, Dispatch/Custody/Return y arquitectura no
 relacionada. No se asignan SP, Forecast ni Commitment.
+
+---
+
+## CRM-DASH — Dashboard comercial dentro de Clientes (registro 2026-11-18)
+
+**Estado general:** APROBADO COMO DIRECCIÓN DE PRODUCTO / BACKLOG / NO IMPLEMENTADO  
+**Orden de prioridad:** después de ERP Pilot Readiness P0; no es un gate del piloto actual.  
+**Sprint, responsable, fechas, SP, Target, Forecast, Commitment y Actual:** no asignados.  
+**Límite actual:** solo registro documental; no habilita desarrollo, merges, migraciones, features ni despliegues durante la estabilización.
+
+**Contexto:** INSAP utiliza Dynamics para prospección, oportunidades y seguimiento de vendedores. Zaping evolucionará **Clientes** como CRM ligero, sin sustituir Dynamics de inmediato. Propuesta de vistas: `Resumen comercial | Directorio | Oportunidades`.
+
+| Ticket | Alcance | Estado | Dependencias / entrada a Ready |
+|---|---|---|---|
+| CRM-DASH-01 | Métricas de Clientes, Cotizaciones y Ventas verificables; UI de Resumen | BACKLOG / PENDIENTE | P0, definiciones KPI, read model, QA tenant/RBAC |
+| CRM-001 | Propiedad de carteras, responsables, permisos y atribución comercial transversal | PREEXISTENTE / PENDIENTE | Matriz Clientes/Quotes/Sales y roles aprobada |
+| CRM-DASH-02 | Prospectos, oportunidades y etapas de pipeline | BACKLOG / PENDIENTE | Modelo/lifecycle aprobado, CRM-001 |
+| CRM-DASH-03 | Seguimientos: llamadas, visitas, reuniones y tareas con vencimiento | BACKLOG / PENDIENTE | Modelo de actividad, responsables y permisos |
+| CRM-DASH-04 | Conversión, pipeline y desempeño comercial por vendedor | BACKLOG / PENDIENTE | CRM-001/02/03, KPIs auditables y atribución |
+| CRM-DASH-05 | Zaping Executive AI: lectura de indicadores por ChatGPT/MCP | FUTURE / PENDIENTE | KPI confiables, OAuth/scopes, control de acceso, auditoría |
+
+**Acceptance Criteria propuestos para CRM-DASH-01:** sin regresión de Directorio/Ficha; métricas reales por Company con fórmula y período explícitos; estados `0`, `sin datos`, `error` y `forbidden` diferenciados; QA por rol/tenant; unitarias, integración, lint, typecheck, build y CI verificados antes de cerrar DoD.
+
+**No declarar DONE:** no hay implementación, QA de esta iniciativa, fechas ni aceptación comercial comprometidas. `CRM-001` no se renombra ni reutiliza; la identidad ya existe en UX-005D.
+
+**Fuente de especificación:** [CRM_DASHBOARD_PROPOSAL_2026-11-18.md](../modules/erp/CRM_DASHBOARD_PROPOSAL_2026-11-18.md).
