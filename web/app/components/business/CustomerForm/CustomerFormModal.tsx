@@ -18,6 +18,12 @@ import type {
   CustomerFormModalProps,
 } from './CustomerForm.types';
 
+type GeographyOption = {
+  id: number;
+  name: string;
+  code?: string;
+};
+
 type FormErrors = {
   name?: string;
   type?: string;
@@ -68,12 +74,69 @@ function CustomerFormContent({
   const [countryCode, setCountryCode] = useState(
     customer?.countryCode ?? (customer ? '' : 'MX'),
   );
+  const [stateOptions, setStateOptions] = useState<GeographyOption[]>([]);
+  const [municipalityOptions, setMunicipalityOptions] = useState<
+    GeographyOption[]
+  >([]);
+  const [cityOptions, setCityOptions] = useState<GeographyOption[]>([]);
+  const [geographyStatus, setGeographyStatus] = useState('');
   const [notes, setNotes] = useState(customer?.notes ?? '');
   const [errors, setErrors] = useState<FormErrors>({});
   const [formError, setFormError] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const submittingRef = useRef(false);
   const editing = Boolean(customer);
+
+  // Fetch catalog data only while the form is mounted. Historical values
+  // remain editable even when the external geographic catalog is unavailable.
+  useEffect(() => {
+    let cancelled = false;
+    void api
+      .get<GeographyOption[]>('/customers/geography/states')
+      .then(({ data }) => {
+        if (!cancelled && Array.isArray(data)) setStateOptions(data);
+      })
+      .catch(() => {
+        if (!cancelled) setGeographyStatus(
+          'Catálogo de estados no disponible. Puedes escribir la ubicación manualmente.',
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedStateId = stateOptions.find(
+    (option) => option.name === state,
+  )?.id;
+
+  useEffect(() => {
+    if (!selectedStateId) return;
+    let cancelled = false;
+    const base = '/customers/geography/states/' + selectedStateId;
+    void Promise.all([
+      api.get<GeographyOption[]>(base + '/municipalities'),
+      api.get<GeographyOption[]>(base + '/cities'),
+    ])
+      .then(([municipalityResponse, cityResponse]) => {
+        if (cancelled) return;
+        setMunicipalityOptions(
+          Array.isArray(municipalityResponse.data) ? municipalityResponse.data : [],
+        );
+        setCityOptions(Array.isArray(cityResponse.data) ? cityResponse.data : []);
+        setGeographyStatus('');
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setGeographyStatus(
+            'No se pudieron cargar municipios o ciudades. Puedes escribirlos manualmente.',
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedStateId]);
 
   useEffect(() => {
     if (!postalLookupRequested || !/^\d{5}$/.test(postalCode) || countryCode.toUpperCase() !== 'MX') {
@@ -413,40 +476,94 @@ function CustomerFormContent({
             {postalStatus ? <p role="status" className="text-xs text-text-muted">{postalStatus}</p> : null}
             {postalLoading && countryCode.toUpperCase() === 'MX' && /^\d{5}$/.test(postalCode) ? <p className="text-xs text-text-muted">Buscando código postal...</p> : null}
           </div>
-          <Input
-            name="city"
-            label="Ciudad"
-            placeholder="Ej. Hermosillo"
-            value={city}
-            maxLength={120}
-            disabled={saving}
-            onChange={(event) => {
-              setCity(event.target.value);
-              setFormError('');
-            }}
-          />
-          <Input
-            name="state"
-            label="Estado / provincia"
-            placeholder="Ej. Sonora"
-            value={state}
-            maxLength={120}
-            disabled={saving}
-            onChange={(event) => {
-              setState(event.target.value);
-              setFormError('');
-            }}
-          />
+          {stateOptions.length ? (
+            <Select
+              name="state"
+              label="Estado"
+              value={state}
+              options={[
+                ...(!stateOptions.some((option) => option.name === state) && state
+                  ? [{ value: state, label: state + ' (registrado)' }]
+                  : []),
+                ...stateOptions.map((option) => ({
+                  value: option.name,
+                  label: option.name,
+                })),
+              ]}
+              placeholder="Selecciona un estado"
+              disabled={saving}
+              onChange={(event) => {
+                setState(event.target.value);
+                setMunicipality('');
+                setCity('');
+                setMunicipalityOptions([]);
+                setCityOptions([]);
+                setPostalCode('');
+                setNeighborhood('');
+                setPostalMatches([]);
+                setPostalLookupRequested(false);
+                setPostalStatus('');
+                setPostalLoading(false);
+                setFormError('');
+              }}
+            />
+          ) : (
+            <Input
+              name="state"
+              label="Estado"
+              placeholder="Ej. Sonora"
+              value={state}
+              maxLength={120}
+              disabled={saving}
+              onChange={(event) => {
+                setState(event.target.value);
+                setFormError('');
+              }}
+            />
+          )}
+          <div>
+            <Input
+              name="municipality"
+              label="Municipio / alcaldía"
+              placeholder="Selecciona o escribe el municipio"
+              list="customer-municipalities"
+              value={municipality}
+              maxLength={120}
+              disabled={saving}
+              onChange={(event) => setMunicipality(event.target.value)}
+            />
+            <datalist id="customer-municipalities">
+              {municipalityOptions.map((option) => (
+                <option key={option.id} value={option.name} />
+              ))}
+            </datalist>
+          </div>
+          <div className="sm:col-span-2">
+            <Input
+              name="city"
+              label="Ciudad / localidad"
+              placeholder="Selecciona o escribe la ciudad"
+              list="customer-cities"
+              value={city}
+              maxLength={120}
+              disabled={saving}
+              onChange={(event) => {
+                setCity(event.target.value);
+                setFormError('');
+              }}
+            />
+            <datalist id="customer-cities">
+              {cityOptions.map((option) => (
+                <option key={option.id} value={option.name} />
+              ))}
+            </datalist>
+          </div>
         </div>
-        <Input
-          name="municipality"
-          label="Municipio"
-          placeholder="Ej. Hermosillo"
-          value={municipality}
-          maxLength={120}
-          disabled={saving}
-          onChange={(event) => setMunicipality(event.target.value)}
-        />
+        {geographyStatus ? (
+          <p role="status" className="text-xs text-text-muted">
+            {geographyStatus}
+          </p>
+        ) : null}
         <Input
           name="address"
           label="Dirección"
