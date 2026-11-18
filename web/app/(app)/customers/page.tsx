@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Building2, Plus, Search } from 'lucide-react';
 
 import { useAuthenticatedSession } from '@/app/auth-session';
 import { canManageCustomers, hasRole, COMMERCIAL_ROLES } from '@/app/erp-role-access';
@@ -9,11 +9,11 @@ import CustomerFormModal from '@/app/components/business/CustomerForm';
 import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import DataTable, {
-  DataTableToolbar,
   type DataTableColumn,
   type SortState,
 } from '@/app/components/ui/DataTable';
 import Loading from '@/app/components/ui/Loading';
+import Input from '@/app/components/ui/Input';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
@@ -41,15 +41,30 @@ const customerCollator = new Intl.Collator('es-MX', {
   sensitivity: 'base',
 });
 
+function normalizeCustomerSearch(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('es-MX')
+    .trim();
+}
+
 function customerMatchesSearch(customer: Customer, search: string): boolean {
-  const normalizedSearch = search.trim().toLocaleLowerCase('es-MX');
+  const normalizedSearch = normalizeCustomerSearch(search);
 
   if (!normalizedSearch) {
     return true;
   }
 
-  return [customer.name, customer.email, customer.phone, customer.address].some(
-    (value) => value?.toLocaleLowerCase('es-MX').includes(normalizedSearch),
+  return [
+    customer.name,
+    customer.type,
+    customer.email,
+    customer.phone,
+    customer.address,
+    customer.contactName,
+  ].some((value) =>
+    value ? normalizeCustomerSearch(value).includes(normalizedSearch) : false,
   );
 }
 
@@ -62,11 +77,11 @@ function compareCustomers(
     columnId === 'name'
       ? first.name
       : columnId === 'type'
-        ? first.type
+        ? first.type ?? ''
         : columnId === 'email'
-          ? first.email
+          ? first.email ?? ''
           : columnId === 'phone'
-            ? first.phone
+            ? first.phone ?? ''
             : columnId === 'address'
               ? first.address || ''
               : '';
@@ -74,11 +89,11 @@ function compareCustomers(
     columnId === 'name'
       ? second.name
       : columnId === 'type'
-        ? second.type
+        ? second.type ?? ''
         : columnId === 'email'
-          ? second.email
+          ? second.email ?? ''
           : columnId === 'phone'
-            ? second.phone
+            ? second.phone ?? ''
             : columnId === 'address'
               ? second.address || ''
               : '';
@@ -231,31 +246,66 @@ export default function CustomersPage() {
     {
       id: 'name',
       header: 'Cliente',
-      cell: (customer) => customer.name,
+      cell: (customer) => (
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+            <Building2 aria-hidden="true" size={19} />
+          </span>
+          <div className="min-w-0">
+            <p className="break-words font-semibold text-text">{customer.name}</p>
+            {customer.contactName?.trim() ? (
+              <p className="mt-0.5 truncate text-xs text-text-muted">
+                Contacto: {customer.contactName}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ),
       sortable: true,
       priority: 'primary',
-      minWidth: 180,
+      minWidth: 220,
     },
     {
       id: 'type',
       header: 'Tipo',
-      cell: (customer) => customer.type,
+      cell: (customer) =>
+        customer.type?.trim() ? (
+          <span className="inline-flex max-w-full items-center rounded-full border border-border bg-surface-subtle px-2.5 py-1 text-xs font-medium text-text-secondary">
+            <span className="truncate">{customer.type}</span>
+          </span>
+        ) : (
+          <span className="text-text-muted" aria-label="Tipo sin registrar">
+            —
+          </span>
+        ),
       sortable: true,
       priority: 'secondary',
       minWidth: 130,
     },
     {
       id: 'email',
-      header: 'Email',
-      cell: (customer) => customer.email,
+      header: 'Correo',
+      cell: (customer) =>
+        customer.email?.trim() ? (
+          <span className="break-all">{customer.email}</span>
+        ) : (
+          <span className="text-text-muted" aria-label="Correo sin registrar">
+            —
+          </span>
+        ),
       sortable: true,
       priority: 'secondary',
-      minWidth: 220,
+      minWidth: 200,
     },
     {
       id: 'phone',
       header: 'Teléfono',
-      cell: (customer) => customer.phone,
+      cell: (customer) =>
+        customer.phone?.trim() || (
+          <span className="text-text-muted" aria-label="Teléfono sin registrar">
+            —
+          </span>
+        ),
       sortable: true,
       priority: 'tertiary',
       minWidth: 140,
@@ -263,10 +313,15 @@ export default function CustomersPage() {
     {
       id: 'address',
       header: 'Dirección',
-      cell: (customer) => customer.address || 'Sin dirección',
+      cell: (customer) =>
+        customer.address?.trim() || (
+          <span className="text-text-muted" aria-label="Dirección sin registrar">
+            —
+          </span>
+        ),
       sortable: true,
       priority: 'tertiary',
-      minWidth: 220,
+      minWidth: 200,
     },
   ];
 
@@ -317,34 +372,62 @@ export default function CustomersPage() {
                 onChange: setSorting,
               }}
               toolbar={
-                customers.length > 0 ? (
-                  <DataTableToolbar
-                    search={{
-                      value: search,
-                      label: 'Buscar clientes',
-                      placeholder: 'Nombre, email, teléfono o dirección',
-                      onChange: (value) => {
-                        setSearch(value);
-                        setPageIndex(0);
-                      },
-                    }}
-                    actions={
-                      isFiltered ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSearch('');
+                <div
+                  role="group"
+                  aria-label="Herramientas de clientes"
+                  className="flex flex-col gap-3 rounded-xl border border-border bg-surface px-4 py-3 lg:flex-row lg:items-end lg:justify-between"
+                >
+                  <div className="flex min-h-10 shrink-0 items-center gap-2 lg:self-center">
+                    <h2 className="text-base font-semibold text-text">
+                      Clientes activos
+                    </h2>
+                    <span className="rounded-full bg-primary-subtle px-2.5 py-0.5 text-xs font-semibold tabular-nums text-primary">
+                      {customers.length}
+                    </span>
+                  </div>
+                  {customers.length > 0 ? (
+                    <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end lg:justify-end">
+                      <div className="w-full min-w-0 sm:w-80 xl:w-[28rem]">
+                        <Input
+                          type="search"
+                          label="Buscar clientes"
+                          value={search}
+                          placeholder="Nombre, tipo, correo, teléfono o contacto"
+                          startAdornment={<Search aria-hidden="true" size={17} />}
+                          onChange={(event) => {
+                            setSearch(event.target.value);
                             setPageIndex(0);
                           }}
-                        >
-                          Limpiar búsqueda
-                        </Button>
-                      ) : null
-                    }
-                  />
-                ) : undefined
+                        />
+                      </div>
+                      {isFiltered ? (
+                        <div className="flex shrink-0 flex-wrap items-center gap-2">
+                          <span
+                            role="status"
+                            aria-live="polite"
+                            className="text-xs font-medium tabular-nums text-text-secondary"
+                          >
+                            {sortedCustomers.length}{' '}
+                            {sortedCustomers.length === 1
+                              ? 'coincidencia'
+                              : 'coincidencias'}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSearch('');
+                              setPageIndex(0);
+                            }}
+                          >
+                            Limpiar búsqueda
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
               }
               pagination={
                 customers.length > 0
@@ -352,6 +435,7 @@ export default function CustomersPage() {
                       pageIndex,
                       pageSize,
                       totalRows: sortedCustomers.length,
+                      compact: sortedCustomers.length <= pageSize,
                       pageSizeOptions: PAGE_SIZE_OPTIONS,
                       onPageChange: setPageIndex,
                       onPageSizeChange: (nextPageSize) => {
