@@ -43,7 +43,8 @@ const adminSession: AuthenticatedSession = {
   firstName: "Admin",
   lastName: "Test",
   role: "ADMIN",
-  companyTimezone: "America/Hermosillo", companyName: 'QA Company',
+  companyTimezone: "America/Hermosillo",
+  companyName: 'QA Company',
 };
 
 const salesSession: AuthenticatedSession = {
