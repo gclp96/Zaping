@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import CustomerLocationCombobox from './CustomerLocationCombobox';
 
@@ -28,6 +28,7 @@ function Fixture({ onSelect = vi.fn() }: { onSelect?: (value: string) => void })
 }
 
 describe('CustomerLocationCombobox', () => {
+  afterEach(() => cleanup());
   it('shows options in an internal scrolling list and selects a colonia', async () => {
     const user = userEvent.setup();
     const selected = vi.fn();
