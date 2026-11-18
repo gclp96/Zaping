@@ -87,21 +87,26 @@ export class CustomersService {
       ) {
         return [];
       }
-      return [{
-        id: item.id,
-        name: item.name.trim(),
-        postalCode:
-          typeof item.postal_code?.code === 'string' &&
-          /^\d{5}$/.test(item.postal_code.code)
-            ? item.postal_code.code
-            : null,
-      }];
+      return [
+        {
+          id: item.id,
+          name: item.name.trim(),
+          postalCode:
+            typeof item.postal_code?.code === 'string' &&
+            /^\d{5}$/.test(item.postal_code.code)
+              ? item.postal_code.code
+              : null,
+        },
+      ];
     });
 
     const meta = 'meta' in payload ? payload.meta : null;
     const total =
-      meta && typeof meta === 'object' && 'total' in meta &&
-      typeof meta.total === 'number' && Number.isFinite(meta.total)
+      meta &&
+      typeof meta === 'object' &&
+      'total' in meta &&
+      typeof meta.total === 'number' &&
+      Number.isFinite(meta.total)
         ? meta.total
         : null;
     return {
