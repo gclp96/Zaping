@@ -8,6 +8,33 @@ import { UpdateCustomerDto } from './dto/update-customer.dto';
 export class CustomersService {
   constructor(private readonly prisma: PrismaService) {}
 
+  normalizePostalLookup(code: string, payload: unknown) {
+    if (!payload || typeof payload !== 'object' || !('data' in payload)) {
+      return { code, settlements: [] };
+    }
+    const data = payload.data;
+    if (!data || typeof data !== 'object') {
+      return { code, settlements: [] };
+    }
+    const postal = data as {
+      state?: { name?: string };
+      municipality?: { name?: string };
+      city?: { name?: string } | null;
+      settlements?: Array<{ name?: string }>;
+    };
+    return {
+      code,
+      state: postal.state?.name ?? '',
+      municipality: postal.municipality?.name ?? '',
+      city: postal.city?.name ?? postal.municipality?.name ?? '',
+      settlements: Array.isArray(postal.settlements)
+        ? postal.settlements
+            .map((settlement) => settlement.name)
+            .filter((name): name is string => typeof name === 'string')
+        : [],
+    };
+  }
+
   async findOne(companyId: string, customerId: string) {
     const customer = await this.prisma.customer.findFirst({
       where: {
