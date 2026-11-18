@@ -59,11 +59,18 @@ const kinds: Record<RecentActivity['type'], ActivityKind> = {
 };
 
 export function getRecentActivityHref(item: RecentActivity): string {
-  // The three document lists do not yet have URL-addressable detail pages.
-  // Receipts do have an authorized, tenant-scoped detail route.
-  return item.type === 'RECEIPT'
-    ? '/purchase-receipts/' + encodeURIComponent(item.id)
-    : kinds[item.type].listHref;
+  // Only quotes lack a stable detail route today; the remaining modules
+  // already support direct, tenant-authorized document navigation.
+  if (item.type === 'RECEIPT') {
+    return '/purchase-receipts/' + encodeURIComponent(item.id);
+  }
+  if (item.type === 'PURCHASE') {
+    return '/purchases/' + encodeURIComponent(item.id);
+  }
+  if (item.type === 'SALE') {
+    return '/sales?saleId=' + encodeURIComponent(item.id);
+  }
+  return kinds[item.type].listHref;
 }
 
 export function formatRecentActivityDate(
