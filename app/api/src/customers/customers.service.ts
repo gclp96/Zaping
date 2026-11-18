@@ -64,6 +64,52 @@ export class CustomersService {
     });
   }
 
+  normalizeMunicipalitySettlements(payload: unknown, page: number) {
+    const empty = { items: [], hasMore: false };
+    if (!payload || typeof payload !== 'object' || !('data' in payload)) {
+      return empty;
+    }
+    if (!Array.isArray(payload.data)) return empty;
+
+    const items = payload.data.flatMap((entry: unknown) => {
+      if (!entry || typeof entry !== 'object') return [];
+      const item = entry as {
+        id?: unknown;
+        name?: unknown;
+        postal_code?: { code?: unknown } | null;
+      };
+      if (
+        typeof item.id !== 'number' ||
+        !Number.isSafeInteger(item.id) ||
+        item.id < 1 ||
+        typeof item.name !== 'string' ||
+        !item.name.trim()
+      ) {
+        return [];
+      }
+      return [{
+        id: item.id,
+        name: item.name.trim(),
+        postalCode:
+          typeof item.postal_code?.code === 'string' &&
+          /^\d{5}$/.test(item.postal_code.code)
+            ? item.postal_code.code
+            : null,
+      }];
+    });
+
+    const meta = 'meta' in payload ? payload.meta : null;
+    const total =
+      meta && typeof meta === 'object' && 'total' in meta &&
+      typeof meta.total === 'number' && Number.isFinite(meta.total)
+        ? meta.total
+        : null;
+    return {
+      items,
+      hasMore: total !== null ? page * 20 < total : items.length === 20,
+    };
+  }
+
   async findOne(companyId: string, customerId: string) {
     const customer = await this.prisma.customer.findFirst({
       where: {
