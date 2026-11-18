@@ -3,10 +3,15 @@ import { Building2, ContactRound, MapPin } from 'lucide-react';
 
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
+import {
+  CUSTOMER_TYPE_OPTIONS,
+  resolveCustomerType,
+} from '@/app/(app)/customers/customer-classification';
 
 import Button from '../../ui/Button';
 import Input from '../../ui/Input';
 import Modal from '../../ui/Modal';
+import Select from '../../ui/Select';
 
 import type {
   CustomerFormCustomer,
@@ -43,11 +48,18 @@ function CustomerFormContent({
   onSaved,
 }: CustomerFormContentProps) {
   const [name, setName] = useState(customer?.name ?? '');
-  const [customerType, setCustomerType] = useState(customer?.type ?? '');
+  const [customerType, setCustomerType] = useState(
+    resolveCustomerType(customer?.type) ?? '',
+  );
   const [email, setEmail] = useState(customer?.email ?? '');
   const [phone, setPhone] = useState(customer?.phone ?? '');
   const [contactName, setContactName] = useState(customer?.contactName ?? '');
   const [address, setAddress] = useState(customer?.address ?? '');
+  const [city, setCity] = useState(customer?.city ?? '');
+  const [state, setState] = useState(customer?.state ?? '');
+  const [countryCode, setCountryCode] = useState(
+    customer?.countryCode ?? (customer ? '' : 'MX'),
+  );
   const [notes, setNotes] = useState(customer?.notes ?? '');
   const [errors, setErrors] = useState<FormErrors>({});
   const [formError, setFormError] = useState('');
@@ -87,7 +99,9 @@ function CustomerFormContent({
     const firstInvalidField = (Object.keys(nextErrors) as (keyof FormErrors)[])[0];
     if (firstInvalidField) {
       formRef.current
-        ?.querySelector<HTMLInputElement>('[name="' + firstInvalidField + '"]')
+        ?.querySelector<HTMLInputElement | HTMLSelectElement>(
+          '[name="' + firstInvalidField + '"]',
+        )
         ?.focus();
       return false;
     }
@@ -108,6 +122,9 @@ function CustomerFormContent({
       phone: phone.trim(),
       contactName: normalizeOptionalValue(contactName),
       address: normalizeOptionalValue(address),
+      city: normalizeOptionalValue(city) ?? null,
+      state: normalizeOptionalValue(state) ?? null,
+      countryCode: normalizeOptionalValue(countryCode)?.toUpperCase() ?? null,
       notes: normalizeOptionalValue(notes),
     };
 
@@ -187,20 +204,28 @@ function CustomerFormContent({
               clearFieldError('name');
             }}
           />
-          <Input
-            name="type"
-            label="Tipo"
-            placeholder="Ej. Hospital, clínica o distribuidor"
-            helperText="Escribe el tipo de cliente."
-            value={customerType}
-            required
-            disabled={saving}
-            error={errors.type}
-            onChange={(event) => {
-              setCustomerType(event.target.value);
-              clearFieldError('type');
-            }}
-          />
+          <div>
+            <Select
+              name="type"
+              label="Tipo"
+              value={customerType}
+              options={[...CUSTOMER_TYPE_OPTIONS]}
+              placeholder="Selecciona el tipo de cliente"
+              required
+              disabled={saving}
+              error={errors.type}
+              onChange={(event) => {
+                setCustomerType(event.target.value);
+                clearFieldError('type');
+              }}
+            />
+            {customer?.type?.trim() && !resolveCustomerType(customer.type) ? (
+              <p className="mt-2 text-xs text-amber-700">
+                Clasificación anterior: {customer.type}. Selecciona una categoría
+                del catálogo para actualizarla.
+              </p>
+            ) : null}
+          </div>
         </div>
       </section>
 
@@ -273,6 +298,47 @@ function CustomerFormContent({
               (opcional)
             </span>
           </h3>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            name="city"
+            label="Ciudad"
+            placeholder="Ej. Hermosillo"
+            value={city}
+            maxLength={120}
+            disabled={saving}
+            onChange={(event) => {
+              setCity(event.target.value);
+              setFormError('');
+            }}
+          />
+          <Input
+            name="state"
+            label="Estado / provincia"
+            placeholder="Ej. Sonora"
+            value={state}
+            maxLength={120}
+            disabled={saving}
+            onChange={(event) => {
+              setState(event.target.value);
+              setFormError('');
+            }}
+          />
+        </div>
+        <div className="sm:max-w-xs">
+          <Input
+            name="countryCode"
+            label="País (código ISO)"
+            placeholder="MX"
+            helperText="Dos letras, por ejemplo MX o US."
+            value={countryCode}
+            maxLength={2}
+            disabled={saving}
+            onChange={(event) => {
+              setCountryCode(event.target.value.toUpperCase());
+              setFormError('');
+            }}
+          />
         </div>
         <Input
           name="address"
