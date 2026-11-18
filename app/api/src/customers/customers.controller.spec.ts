@@ -11,6 +11,7 @@ describe('CustomersController', () => {
   let controller: CustomersController;
   const getOverview = jest.fn();
   const normalizePostalLookup = jest.fn();
+  const normalizeGeographyOptions = jest.fn();
   const originalKey = process.env.POSTALKIT_API_KEY;
 
   afterEach(() => {
@@ -28,7 +29,7 @@ describe('CustomersController', () => {
       providers: [
         {
           provide: CustomersService,
-          useValue: { getOverview, normalizePostalLookup },
+          useValue: { getOverview, normalizePostalLookup, normalizeGeographyOptions },
         },
       ],
     }).compile();
@@ -107,6 +108,57 @@ describe('CustomersController', () => {
     provider.mockRejectedValueOnce(new Error('network unavailable'));
     await expect(controller.lookupPostalCode('83000')).rejects.toBeInstanceOf(
       ServiceUnavailableException,
+    );
+  });
+
+  it('lists states without exposing the provider key', async () => {
+    process.env.POSTALKIT_API_KEY = 'test-key';
+    const payload = {
+      data: [{ id: 2, name: 'Sonora', code: '26' }],
+    };
+    const catalog = [{ id: 2, name: 'Sonora', code: '26' }];
+    normalizeGeographyOptions.mockReturnValue(catalog);
+    const provider = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(payload),
+    } as Response);
+
+    await expect(controller.listStates()).resolves.toEqual(catalog);
+    expect(provider).toHaveBeenCalledWith(
+      'https://api.postalkit.mx/v1/states',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer test-key' },
+      }),
+    );
+    expect(normalizeGeographyOptions).toHaveBeenCalledWith(payload);
+  });
+
+  it('restricts state IDs and calls the documented municipality/city routes', async () => {
+    process.env.POSTALKIT_API_KEY = 'test-key';
+    const provider = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ data: [] }),
+    } as Response);
+    normalizeGeographyOptions.mockReturnValue([]);
+
+    await expect(controller.listMunicipalities('invalid')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    await expect(controller.listCities('../other')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    await expect(controller.listMunicipalities('26')).resolves.toEqual([]);
+    await expect(controller.listCities('26')).resolves.toEqual([]);
+    expect(provider).toHaveBeenCalledTimes(2);
+    expect(provider).toHaveBeenCalledWith(
+      'https://api.postalkit.mx/v1/states/26/municipalities',
+      expect.anything(),
+    );
+    expect(provider).toHaveBeenCalledWith(
+      'https://api.postalkit.mx/v1/states/26/cities',
+      expect.anything(),
     );
   });
 
