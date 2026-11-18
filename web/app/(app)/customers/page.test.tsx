@@ -210,6 +210,8 @@ describe('CustomersPage', () => {
 
     const search = screen.getByRole('searchbox', { name: 'Buscar clientes' });
     await user.type(search, 'clinica');
+    expect(screen.getByText('1 coincidencias')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Limpiar búsqueda' })).toBeTruthy();
     expect(screen.getByText(clinicCustomer.name)).toBeTruthy();
     expect(screen.queryByText(hospitalCustomer.name)).toBeNull();
 
@@ -239,8 +241,12 @@ describe('CustomersPage', () => {
     render(<CustomersPage />);
     await screen.findByText('Cliente sin datos');
 
-    expect(screen.getByText('Clientes activos')).toBeTruthy();
-    expect(screen.getByText('1 cliente')).toBeTruthy();
+    const tools = screen.getByRole('group', {
+      name: 'Herramientas de clientes',
+    });
+    expect(within(tools).getByText('Clientes activos')).toBeTruthy();
+    expect(within(tools).getByText('1')).toBeTruthy();
+    expect(within(tools).queryByText('1 cliente')).toBeNull();
     expect(screen.getByLabelText('Tipo sin registrar').textContent).toBe('—');
     expect(screen.getByLabelText('Correo sin registrar').textContent).toBe('—');
     expect(screen.getByLabelText('Teléfono sin registrar').textContent).toBe('—');
