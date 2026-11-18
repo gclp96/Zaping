@@ -114,7 +114,7 @@ describe('CustomerFormModal', () => {
     render(<CustomerFormModal isOpen onClose={vi.fn()} onSaved={vi.fn()} />);
     await user.type(screen.getByRole('textbox', { name: 'Código postal' }), '83140');
     expect(await screen.findByText(/Autocompletado postal no configurado/)).toBeTruthy();
-    expect(screen.getByRole('textbox', { name: 'Colonia / asentamiento' })).toBeTruthy();
+    expect(screen.getByRole('combobox', { name: 'Colonia / asentamiento' })).toBeTruthy();
   });
 
   it('keeps save and cancel actions outside the scrollable form content', async () => {
@@ -168,7 +168,7 @@ describe('CustomerFormModal', () => {
     ).toBeNull();
   });
 
-  it('loads state, municipality and city suggestions without restricting manual addresses', async () => {
+  it('lists municipality colonias inside the modal and fills their CP', async () => {
     const user = userEvent.setup();
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === '/customers/geography/states') {
@@ -186,6 +186,19 @@ describe('CustomerFormModal', () => {
           data: [{ id: 2, name: 'Hermosillo' }],
         } as never);
       }
+      if (
+        url === '/customers/geography/states/26/municipalities/1/settlements?page=1'
+      ) {
+        return Promise.resolve({
+          data: {
+            items: [
+              { id: 10, name: 'Centro', postalCode: '83140' },
+              { id: 11, name: 'Centro', postalCode: '83141' },
+            ],
+            hasMore: false,
+          },
+        } as never);
+      }
       return Promise.reject(new Error('Unknown endpoint: ' + url));
     });
     render(<CustomerFormModal isOpen onClose={vi.fn()} onSaved={vi.fn()} />);
@@ -194,25 +207,38 @@ describe('CustomerFormModal', () => {
     });
     await user.selectOptions(stateField, 'Sonora');
     await waitFor(() => {
-      expect(
-        document.querySelector('#customer-municipalities option[value="Hermosillo"]'),
-      ).not.toBeNull();
-      expect(
-        document.querySelector('#customer-cities option[value="Hermosillo"]'),
-      ).not.toBeNull();
+      expect(api.get).toHaveBeenCalledWith(
+        '/customers/geography/states/26/municipalities',
+      );
     });
-    await user.type(screen.getByRole('combobox', { name: 'Municipio' }), 'Hermosillo');
-    await user.type(screen.getByRole('combobox', { name: 'Ciudad' }), 'Hermosillo');
+
+    await user.click(screen.getByRole('button', { name: 'Mostrar opciones de Municipio' }));
+    await user.click(await screen.findByRole('option', { name: 'Hermosillo' }));
+    expect(
+      (screen.getByRole('combobox', { name: 'Municipio' }) as HTMLInputElement).value,
+    ).toBe('Hermosillo');
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith(
+        '/customers/geography/states/26/municipalities/1/settlements?page=1',
+      );
+    });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Mostrar opciones de Colonia / asentamiento' }),
+    );
+    await user.click(await screen.findByRole('option', { name: 'Centro · CP 83140' }));
+    expect(
+      (screen.getByRole('textbox', { name: 'Código postal' }) as HTMLInputElement).value,
+    ).toBe('83140');
+    expect(
+      (screen.getByRole('combobox', { name: 'Colonia / asentamiento' }) as HTMLInputElement).value,
+    ).toBe('Centro');
+
     await user.type(screen.getByRole('textbox', { name: 'Dirección' }), 'Calle 12 #30');
     expect(
       (screen.getByRole('textbox', { name: 'Dirección' }) as HTMLInputElement).value,
     ).toBe('Calle 12 #30');
-    expect(api.get).toHaveBeenCalledWith(
-      '/customers/geography/states/26/municipalities',
-    );
-    expect(api.get).toHaveBeenCalledWith(
-      '/customers/geography/states/26/cities',
-    );
   });
 
   it('offers postal settlements and fills the selected location', async () => {
@@ -228,10 +254,13 @@ describe('CustomerFormModal', () => {
     render(<CustomerFormModal isOpen onClose={vi.fn()} onSaved={vi.fn()} />);
     await user.type(screen.getByRole('textbox', { name: 'Código postal' }), '83000');
     expect(await screen.findByRole('combobox', { name: 'Colonia / asentamiento' })).toBeTruthy();
-    await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Colonia / asentamiento' }),
-      'Centro',
+    await waitFor(() =>
+      expect(screen.getByText('Selecciona una colonia de la lista.')).toBeTruthy(),
     );
+    await user.click(
+      screen.getByRole('button', { name: 'Mostrar opciones de Colonia / asentamiento' }),
+    );
+    await user.click(screen.getByRole('option', { name: 'Centro' }));
     expect((screen.getByRole('combobox', { name: 'Ciudad' }) as HTMLInputElement).value).toBe('Hermosillo');
     expect((screen.getByRole('textbox', { name: 'Estado / provincia' }) as HTMLInputElement).value).toBe('Sonora');
     expect(api.get).toHaveBeenCalledWith('/customers/postal-lookup/83000');
@@ -272,7 +301,7 @@ describe('CustomerFormModal', () => {
       await screen.findByText(/Consulta no disponible/),
     ).toBeTruthy();
     await user.type(
-      screen.getByRole('textbox', { name: 'Colonia / asentamiento' }),
+      screen.getByRole('combobox', { name: 'Colonia / asentamiento' }),
       'Las Palmas',
     );
     await user.type(screen.getByRole('combobox', { name: 'Ciudad' }), 'Hermosillo');
