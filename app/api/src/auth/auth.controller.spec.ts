@@ -137,6 +137,7 @@ describe('AuthController', () => {
     const response = {
       ...authenticatedUser,
       companyTimezone: 'America/Mazatlan',
+      companyName: 'INSAP',
     };
     authServiceMock.getAuthenticatedUserContext.mockResolvedValue(response);
 
