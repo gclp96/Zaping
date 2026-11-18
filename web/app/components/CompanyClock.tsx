@@ -21,7 +21,8 @@ export function formatCompanyDateTime(now: Date, timezone: string) {
       hourCycle: 'h23',
       timeZone: timezone,
     }).format(now);
-    return { date: date.charAt(0).toUpperCase() + date.slice(1), time };
+    const normalizedDate = date.toLocaleLowerCase("es-MX");
+    return { date: normalizedDate.charAt(0).toUpperCase() + normalizedDate.slice(1), time };
   } catch {
     return null;
   }
