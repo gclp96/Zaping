@@ -9,20 +9,24 @@ type CompanyClockProps = {
 
 export function formatCompanyDateTime(now: Date, timezone: string) {
   try {
-    const date = new Intl.DateTimeFormat('es-MX', {
-      weekday: 'short',
+    const parts = new Intl.DateTimeFormat('es-MX', {
+      weekday: 'long',
       day: 'numeric',
-      month: 'short',
+      month: 'long',
+      year: 'numeric',
       timeZone: timezone,
-    }).format(now);
+    }).formatToParts(now);
+    const part = (type: Intl.DateTimeFormatPartTypes) =>
+      parts.find((item) => item.type === type)?.value ?? '';
+    const weekday = part('weekday').toLocaleLowerCase('es-MX');
+    const date = `${weekday.charAt(0).toLocaleUpperCase('es-MX')}${weekday.slice(1)} ${part('day')} de ${part('month').toLocaleLowerCase('es-MX')} de ${part('year')}`;
     const time = new Intl.DateTimeFormat('es-MX', {
       hour: '2-digit',
       minute: '2-digit',
       hourCycle: 'h23',
       timeZone: timezone,
     }).format(now);
-    const normalizedDate = date.toLocaleLowerCase("es-MX");
-    return { date: normalizedDate.charAt(0).toUpperCase() + normalizedDate.slice(1), time };
+    return { date, time };
   } catch {
     return null;
   }
@@ -43,14 +47,14 @@ export default function CompanyClock({ timezone }: CompanyClockProps) {
 
   return (
     <div
-      className="hidden shrink-0 items-center gap-2 border-l border-border pl-4 lg:flex"
+      className="hidden shrink-0 items-center gap-2 border-l border-border pl-4 xl:flex"
       aria-label="Fecha y hora de la empresa"
     >
       <CalendarDays aria-hidden="true" size={18} className="text-text-secondary" />
       <div className="flex flex-col text-xs leading-tight text-text-secondary">
         {formatted ? (
           <>
-            <span>{formatted.date}</span>
+            <span className="whitespace-nowrap">{formatted.date}</span>
             <time dateTime={now?.toISOString()} className="mt-0.5 font-semibold tabular-nums text-text">
               {formatted.time}
             </time>
