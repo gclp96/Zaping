@@ -161,6 +161,48 @@ describe('CustomerFormModal', () => {
     ).toBeNull();
   });
 
+  it('loads state, municipality and city suggestions without restricting manual addresses', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === '/customers/geography/states') {
+        return Promise.resolve({
+          data: [{ id: 26, name: 'Sonora', code: '26' }],
+        } as never);
+      }
+      if (url === '/customers/geography/states/26/municipalities') {
+        return Promise.resolve({
+          data: [{ id: 1, name: 'Hermosillo', code: '030' }],
+        } as never);
+      }
+      if (url === '/customers/geography/states/26/cities') {
+        return Promise.resolve({
+          data: [{ id: 2, name: 'Hermosillo' }],
+        } as never);
+      }
+      return Promise.reject(new Error('Unknown endpoint: ' + url));
+    });
+    render(<CustomerFormModal isOpen onClose={vi.fn()} onSaved={vi.fn()} />);
+    const stateField = await screen.findByRole('combobox', {
+      name: 'Estado / provincia',
+    });
+    await user.selectOptions(stateField, 'Sonora');
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'Hermosillo' })).toBeTruthy();
+    });
+    await user.type(screen.getByRole('textbox', { name: 'Municipio' }), 'Hermosillo');
+    await user.type(screen.getByRole('textbox', { name: 'Ciudad' }), 'Hermosillo');
+    await user.type(screen.getByRole('textbox', { name: 'Dirección' }), 'Calle 12 #30');
+    expect(
+      (screen.getByRole('textbox', { name: 'Dirección' }) as HTMLInputElement).value,
+    ).toBe('Calle 12 #30');
+    expect(api.get).toHaveBeenCalledWith(
+      '/customers/geography/states/26/municipalities',
+    );
+    expect(api.get).toHaveBeenCalledWith(
+      '/customers/geography/states/26/cities',
+    );
+  });
+
   it('offers postal settlements and fills the selected location', async () => {
     const user = userEvent.setup();
     vi.mocked(api.get).mockResolvedValue({
