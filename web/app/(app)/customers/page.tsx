@@ -386,9 +386,9 @@ export default function CustomersPage() {
                 <div
                   role="group"
                   aria-label="Herramientas de clientes"
-                  className="flex flex-col gap-3 rounded-xl border border-border bg-surface px-4 py-3 lg:flex-row lg:items-end lg:justify-between"
+                  className="space-y-3 rounded-xl border border-border bg-surface px-4 py-3"
                 >
-                  <div className="flex min-h-10 shrink-0 items-center gap-2 lg:self-center">
+                  <div className="flex items-center gap-2">
                     <h2 className="text-base font-semibold text-text">
                       Clientes activos
                     </h2>
@@ -397,45 +397,68 @@ export default function CustomersPage() {
                     </span>
                   </div>
                   {customers.length > 0 ? (
-                    <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end lg:justify-end">
-                      <div className="w-full min-w-0 sm:w-80 xl:w-[28rem]">
-                        <Input
-                          type="search"
-                          label="Buscar clientes"
-                          value={search}
-                          placeholder="Nombre, tipo, correo, teléfono o contacto"
-                          startAdornment={<Search aria-hidden="true" size={17} />}
-                          onChange={(event) => {
-                            setSearch(event.target.value);
-                            setPageIndex(0);
-                          }}
-                        />
-                      </div>
-                      {isFiltered ? (
-                        <div className="flex shrink-0 flex-wrap items-center gap-2">
-                          <span
-                            role="status"
-                            aria-live="polite"
-                            className="text-xs font-medium tabular-nums text-text-secondary"
-                          >
-                            {sortedCustomers.length}{' '}
-                            {sortedCustomers.length === 1
-                              ? 'coincidencia'
-                              : 'coincidencias'}
-                          </span>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSearch('');
-                              setPageIndex(0);
-                            }}
-                          >
-                            Limpiar búsqueda
-                          </Button>
-                        </div>
-                      ) : null}
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      <Input
+                        type="search"
+                        label="Nombre"
+                        value={search}
+                        placeholder="Buscar por nombre"
+                        startAdornment={<Search aria-hidden="true" size={17} />}
+                        onChange={(event) => {
+                          setSearch(event.target.value);
+                          setPageIndex(0);
+                        }}
+                      />
+                      <Select
+                        label="Tipo"
+                        value={typeFilter}
+                        placeholder="Todos los tipos"
+                        options={[
+                          ...CUSTOMER_TYPE_OPTIONS,
+                          { value: '__UNCLASSIFIED__', label: 'Por clasificar' },
+                        ]}
+                        onChange={(event) => {
+                          setTypeFilter(event.target.value);
+                          setPageIndex(0);
+                        }}
+                      />
+                      <Select
+                        label="Ubicación"
+                        value={locationFilter}
+                        placeholder="Todas las ubicaciones"
+                        options={locationOptions}
+                        onChange={(event) => {
+                          setLocationFilter(event.target.value);
+                          setPageIndex(0);
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                  {isFiltered ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span
+                        role="status"
+                        aria-live="polite"
+                        className="text-xs font-medium tabular-nums text-text-secondary"
+                      >
+                        {sortedCustomers.length}{' '}
+                        {sortedCustomers.length === 1
+                          ? 'coincidencia'
+                          : 'coincidencias'}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSearch('');
+                          setTypeFilter('');
+                          setLocationFilter('');
+                          setPageIndex(0);
+                        }}
+                      >
+                        Limpiar filtros
+                      </Button>
                     </div>
                   ) : null}
                 </div>
