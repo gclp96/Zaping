@@ -30,7 +30,8 @@ function setRole(role: UserRole) {
       email: 'qa@example.invalid',
       firstName: 'QA',
       lastName: 'Pruebas',
-      companyTimezone: 'America/Hermosillo', companyName: 'QA Company',
+      companyTimezone: 'America/Hermosillo',
+      companyName: 'QA Company',
     },
   });
 }
