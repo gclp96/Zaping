@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Building2, Plus, Search } from 'lucide-react';
 
 import { useAuthenticatedSession } from '@/app/auth-session';
@@ -252,7 +253,15 @@ export default function CustomersPage() {
             <Building2 aria-hidden="true" size={19} />
           </span>
           <div className="min-w-0">
-            <p className="break-words font-semibold text-text">{customer.name}</p>
+            <p className="break-words font-semibold text-text">
+              <Link
+                href={'/customers/' + encodeURIComponent(customer.id)}
+                className="hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                aria-label={'Ver ficha de ' + customer.name}
+              >
+                {customer.name}
+              </Link>
+            </p>
             {customer.contactName?.trim() ? (
               <p className="mt-0.5 truncate text-xs text-text-muted">
                 Contacto: {customer.contactName}
