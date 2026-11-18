@@ -58,6 +58,26 @@ describe('CustomersService', () => {
     service = moduleRef.get<CustomersService>(CustomersService);
   });
 
+  it('normalizes postal lookup without guessing missing data', () => {
+    expect(service.normalizePostalLookup('83000', {
+      data: {
+        state: { name: 'Sonora' },
+        municipality: { name: 'Hermosillo' },
+        city: { name: 'Hermosillo' },
+        settlements: [{ name: 'Centro' }, { name: '5 de Mayo' }],
+      },
+    })).toEqual({
+      code: '83000',
+      state: 'Sonora',
+      municipality: 'Hermosillo',
+      city: 'Hermosillo',
+      settlements: ['Centro', '5 de Mayo'],
+    });
+    expect(service.normalizePostalLookup('00000', {})).toEqual({
+      code: '00000', settlements: [],
+    });
+  });
+
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
