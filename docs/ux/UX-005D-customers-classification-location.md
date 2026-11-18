@@ -39,6 +39,16 @@ Limpiar el catálogo de Clientes y ofrecer exactamente tres filtros visibles: no
 - Antes de activar para clientes comerciales, verificar los términos de servicio de PostalKit y los derechos aplicables al catálogo subyacente; la existencia de un plan pago no sustituye la revisión de licencia.
 - Pendiente: prueba con credencial real en un entorno controlado, evidencia QA de CP múltiple, manual y fallo de proveedor, y revisión de CI. No considerar el autocompletado productivo hasta cerrar estos puntos.
 
+## Ampliación QA — catálogos geográficos mexicanos
+- El formulario ofrece selector de **Estado** con las 32 entidades federativas de PostalKit, incluyendo Ciudad de México.
+- Al seleccionar estado, Zaping consulta **Municipios por estado** y **Ciudades por estado**, presenta sugerencias filtradas y permite escribir manualmente si falta una localidad o la API no responde. No se asume que todas las ciudades de un estado pertenezcan al municipio seleccionado: PostalKit publica su lista de ciudades por estado, no por municipio.
+- Los nuevos endpoints son `GET /customers/geography/states`, `GET /customers/geography/states/:id/municipalities` y `GET /customers/geography/states/:id/cities`. Son autenticados con el mismo JWT/RBAC de Clientes; la clave de PostalKit permanece privada en NestJS.
+- El backend valida el ID numérico del estado y cachea catálogos por una hora para reducir consumo. No incorpora valores parciales o hardcodeados al repositorio.
+- Si el usuario cambia de estado de manera explícita, se limpian municipio, ciudad, CP y colonia previamente seleccionados para impedir una combinación inconsistente. Si el formulario se abre para un cliente histórico, sus valores se conservan.
+- El lookup de CP permanece prioritario: cuando devuelve datos completos, rellena estado, municipio y ciudad, y permite escoger colonia. **Dirección (calle y números) siempre es de captura manual.**
+- Todos los datos geográficos son opcionales. No se cambia el schema Prisma ni se añade migración en esta ampliación.
+- Cierre de QA: comprobar el catálogo completo de estados, relación del municipio con el estado, sugerencias de ciudades por estado, cambio de estado y limpieza de campos dependientes, CP válido, fallback manual y persistencia.
+
 ## Seguridad y compatibilidad
 - Mantener JWT/RBAC ADMIN, MANAGER, SALES actuales. Sin permisos nuevos.
 - Escrituras y lecturas siguen aisladas por Company. Nada de filtros exclusivos en frontend para autorización.
