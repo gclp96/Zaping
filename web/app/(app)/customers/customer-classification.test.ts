@@ -17,7 +17,7 @@ describe('Customer classification and location', () => {
   });
 
   it('never guesses a city or state from the legacy address', () => {
-    const historic = { address: 'Hermosillo, Sonora' };
+    const historic = { address: 'Hermosillo, Sonora', city: undefined };
     expect(customerLocationLabel(historic)).toBe('Sin ubicación');
     expect(customerLocationKey(historic)).toBe('__UNLOCATED__');
   });
