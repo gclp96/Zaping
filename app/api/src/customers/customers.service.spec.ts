@@ -107,10 +107,14 @@ describe('CustomersService', () => {
       data: {
         companyId: 'company-1',
         name: activeCustomer.name,
+        legalName: undefined,
         type: activeCustomer.type,
         email: activeCustomer.email,
         phone: activeCustomer.phone,
         address: undefined,
+        postalCode: undefined,
+        neighborhood: undefined,
+        municipality: undefined,
         city: undefined,
         state: undefined,
         countryCode: undefined,
@@ -144,6 +148,7 @@ describe('CustomersService', () => {
       },
       data: {
         name: updatedCustomer.name,
+        legalName: undefined,
         type: undefined,
         email: undefined,
         phone: undefined,
