@@ -25,6 +25,7 @@ type Props = {
   loading?: boolean;
   hasMore?: boolean;
   onLoadMore?: () => void;
+  loadMoreLabel?: string;
   onChange: (value: string) => void;
   onSelect?: (option: LocationOption) => void;
 };
@@ -52,6 +53,7 @@ export default function CustomerLocationCombobox({
   loading = false,
   hasMore = false,
   onLoadMore,
+  loadMoreLabel = 'Ver más colonias',
   onChange,
   onSelect,
 }: Props) {
@@ -198,7 +200,7 @@ export default function CustomerLocationCombobox({
               onClick={onLoadMore}
               className="w-full border-t border-gray-200 px-3 py-2 text-left text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
             >
-              Ver más colonias
+              {loadMoreLabel}
             </button>
           ) : null}
         </div>
