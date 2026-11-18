@@ -22,6 +22,40 @@ describe('Customer classification and location', () => {
     expect(customerLocationKey(historic)).toBe('__UNLOCATED__');
   });
 
+  it('uses municipality before state when city is unknown, including filters', () => {
+    const acateno = {
+      city: null,
+      municipality: 'Acateno',
+      state: 'Puebla',
+      countryCode: 'MX',
+    };
+    expect(customerLocationLabel(acateno)).toBe('Acateno, Puebla');
+    expect(customerLocationKey(acateno)).toBe('ACATENO|PUEBLA|MX');
+
+    const withoutMunicipality = {
+      city: null,
+      municipality: null,
+      state: 'Puebla',
+      countryCode: 'MX',
+    };
+    expect(customerLocationLabel(withoutMunicipality)).toBe('Puebla');
+    expect(customerLocationKey(withoutMunicipality)).toBe('|PUEBLA|MX');
+
+    const cityWins = {
+      city: 'La Paz',
+      municipality: 'La Paz',
+      state: 'Baja California Sur',
+      countryCode: 'MX',
+    };
+    expect(customerLocationLabel(cityWins)).toBe('La Paz, Baja California Sur');
+    expect(customerLocationKey(cityWins)).toBe('LA_PAZ|BAJA_CALIFORNIA_SUR|MX');
+
+    expect(
+      customerLocationLabel({ municipality: 'Acateno', city: null }),
+    ).toBe('Acateno');
+    expect(customerLocationKey({ municipality: 'Acateno' })).toBe('ACATENO||');
+  });
+
   it('normalizes location filters while displaying proper accents', () => {
     const location = {
       city: 'Ciudad Obregón',
