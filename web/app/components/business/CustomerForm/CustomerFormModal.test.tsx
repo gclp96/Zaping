@@ -187,7 +187,12 @@ describe('CustomerFormModal', () => {
     });
     await user.selectOptions(stateField, 'Sonora');
     await waitFor(() => {
-      expect(screen.getByRole('option', { name: 'Hermosillo' })).toBeTruthy();
+      expect(
+        document.querySelector('#customer-municipalities option[value="Hermosillo"]'),
+      ).not.toBeNull();
+      expect(
+        document.querySelector('#customer-cities option[value="Hermosillo"]'),
+      ).not.toBeNull();
     });
     await user.type(screen.getByRole('textbox', { name: 'Municipio' }), 'Hermosillo');
     await user.type(screen.getByRole('textbox', { name: 'Ciudad' }), 'Hermosillo');
