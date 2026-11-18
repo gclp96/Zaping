@@ -69,6 +69,74 @@ export class CustomersController {
     }
   }
 
+  /**
+   * Geography is read-only and shared by tenants. The provider credential
+   * is never exposed, and only fixed routes with a numeric state ID are used.
+   * Cache catalog responses to limit provider usage during QA.
+   */
+  private readonly geographyCache = new Map<
+    string,
+    {
+      expiresAt: number;
+      values: Array<{ id: number; name: string; code?: string }>;
+    }
+  >();
+
+  private async getGeography(path: string) {
+    const cached = this.geographyCache.get(path);
+    if (cached && cached.expiresAt > Date.now()) return cached.values;
+
+    const key = process.env.POSTALKIT_API_KEY;
+    if (!key) {
+      throw new ServiceUnavailableException('Consulta postal no configurada');
+    }
+
+    try {
+      const response = await fetch('https://api.postalkit.mx/v1/' + path, {
+        headers: { Authorization: 'Bearer ' + key },
+        signal: AbortSignal.timeout(4500),
+      });
+      if (!response.ok) {
+        throw new ServiceUnavailableException(
+          'Catálogo geográfico temporalmente no disponible',
+        );
+      }
+
+      const payload: unknown = await response.json();
+      const values = this.customersService.normalizeGeographyOptions(payload);
+      this.geographyCache.set(path, {
+        values,
+        expiresAt: Date.now() + 60 * 60 * 1000,
+      });
+      return values;
+    } catch {
+      throw new ServiceUnavailableException(
+        'Catálogo geográfico temporalmente no disponible',
+      );
+    }
+  }
+
+  @Get('geography/states')
+  listStates() {
+    return this.getGeography('states');
+  }
+
+  @Get('geography/states/:id/municipalities')
+  listMunicipalities(@Param('id') id: string) {
+    if (!/^\d{1,3}$/.test(id)) {
+      throw new BadRequestException('Estado inválido');
+    }
+    return this.getGeography('states/' + id + '/municipalities');
+  }
+
+  @Get('geography/states/:id/cities')
+  listCities(@Param('id') id: string) {
+    if (!/^\d{1,3}$/.test(id)) {
+      throw new BadRequestException('Estado inválido');
+    }
+    return this.getGeography('states/' + id + '/cities');
+  }
+
   @Get(':id/overview')
   getOverview(@Request() req: any, @Param('id') id: string) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
