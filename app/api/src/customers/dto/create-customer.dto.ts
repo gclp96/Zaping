@@ -1,5 +1,6 @@
 import {
   IsString,
+  IsNotEmpty,
   IsEmail,
   IsOptional,
   IsIn,
@@ -10,6 +11,7 @@ import { CUSTOMER_TYPES } from '../customer-types';
 
 export class CreateCustomerDto {
   @IsString()
+  @IsNotEmpty()
   name!: string;
 
   @IsString()
