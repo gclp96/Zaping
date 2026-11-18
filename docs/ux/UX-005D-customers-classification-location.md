@@ -49,6 +49,14 @@ Limpiar el catálogo de Clientes y ofrecer exactamente tres filtros visibles: no
 - Todos los datos geográficos son opcionales. No se cambia el schema Prisma ni se añade migración en esta ampliación.
 - Cierre de QA: comprobar el catálogo completo de estados, relación del municipio con el estado, sugerencias de ciudades por estado, cambio de estado y limpieza de campos dependientes, CP válido, fallback manual y persistencia.
 
+## Refinamiento visual — buscadores de municipio, ciudad y colonia
+- Sustituir `<datalist>` de Municipio y Ciudad por el componente reutilizable `CustomerLocationCombobox`: búsqueda de texto que ignora acentos, navegación con teclado y lista blanca integrada al modal (máximo 176 px de alto y scroll interno), sin menú nativo fuera de pantalla.
+- Aplicar el mismo componente a Colonia / asentamiento. Cuando hay código postal, utilizar exclusivamente las colonias del CP consultado; cuando no hay CP y se selecciona Estado → Municipio, consultar las colonias mediante el endpoint protegido `GET /customers/geography/states/:stateId/municipalities/:municipalityId/settlements?page=N`.
+- Esta ruta respeta la jerarquía del proveedor, limita el número de página, conserva los IDs de colonias y su CP, cachea por página y devuelve `{ items, hasMore }` sin credenciales. PostalKit pagina 20 colonias por llamada; **no descargar automáticamente todas las páginas**.
+- La lista muestra `Nombre · CP 12345` y `Ver más colonias` cuando corresponde. Al seleccionar colonia, llenar su nombre y CP conservando la distinción de colonias homónimas con diferentes CP. Captura manual disponible para localidades no catalogadas o indisponibilidad del proveedor.
+- El campo Dirección continúa siendo libre. No convertir valores fiscales, código postal comercial o razón social en campos obligatorios.
+- QA requerido: verificar visualmente que el menú no sobresalga del modal y que municipio/colonia puedan escogerse con mouse o teclado; consultar páginas adicionales, desambiguar homónimos, cambiar estado y cancelar consultas anteriores, validar la búsqueda inversa por CP, editar clientes históricos, y persistencia.
+
 ## Seguridad y compatibilidad
 - Mantener JWT/RBAC ADMIN, MANAGER, SALES actuales. Sin permisos nuevos.
 - Escrituras y lecturas siguen aisladas por Company. Nada de filtros exclusivos en frontend para autorización.
