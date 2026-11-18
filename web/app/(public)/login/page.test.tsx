@@ -149,8 +149,9 @@ describe('LoginPage UX-002', () => {
     let resolveLogin: ((value: unknown) => void) | undefined;
     vi.mocked(api.post).mockImplementationOnce(
       () =>
-        new Promise((resolve) => {
-          resolveLogin = resolve;
+        new Promise<Awaited<ReturnType<typeof api.post>>>((resolve) => {
+          resolveLogin = (response) =>
+            resolve(response as Awaited<ReturnType<typeof api.post>>);
         }),
     );
 
