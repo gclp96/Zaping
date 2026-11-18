@@ -18,7 +18,7 @@ const other = '90000000-0000-4000-8000-000000000001';
 function document(id = docA, occurrence = 1) { return { id, companyId: company, supplierId: supplier, type: 'REMISION', series: 'A', number: '123', status: 'ACTIVE', identityOccurrence: occurrence }; }
 function link(id = docA) { return { id: '50000000-0000-4000-8000-000000000001', receiptId: receipt, companyId: company, supplierId: supplier, documentId: id, removedAt: null, document: document(id) }; }
 function role(value: UserRole = 'ADMIN', tenant = company) {
-  vi.mocked(useAuthenticatedSession).mockReturnValue({ status: 'success', retry: vi.fn(), user: { id: 'actor', companyId: tenant, role: value, email: 'qa@example.invalid', firstName: 'QA', lastName: 'QA', companyTimezone: 'America/Hermosillo' } });
+  vi.mocked(useAuthenticatedSession).mockReturnValue({ status: 'success', retry: vi.fn(), user: { id: 'actor', companyId: tenant, role: value, email: 'qa@example.invalid', firstName: 'QA', lastName: 'QA', companyTimezone: 'America/Hermosillo' companyName: 'QA Company', } });
 }
 function view(receiptId = receipt, supplierId = supplier) { return <ReceiptSupplierDocuments receiptId={receiptId} supplierId={supplierId} legacyReference="REMISION · HISTORICAL-123" />; }
 function deferred() { let resolve!: (value: { data: unknown }) => void; let reject!: (error: unknown) => void; const promise = new Promise<{data: unknown}>((yes,no)=>{resolve=yes;reject=no;}); return {resolve,reject,promise}; }
