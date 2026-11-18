@@ -51,6 +51,7 @@ function CustomerFormContent({
   const [customerType, setCustomerType] = useState(
     resolveCustomerType(customer?.type) ?? '',
   );
+  const [typeTouched, setTypeTouched] = useState(false);
   const [email, setEmail] = useState(customer?.email ?? '');
   const [phone, setPhone] = useState(customer?.phone ?? '');
   const [contactName, setContactName] = useState(customer?.contactName ?? '');
@@ -117,7 +118,7 @@ function CustomerFormContent({
 
     const payload = {
       name: name.trim(),
-      type: customerType.trim(),
+      type: customer && !typeTouched ? undefined : customerType.trim(),
       email: email.trim(),
       phone: phone.trim(),
       contactName: normalizeOptionalValue(contactName),
@@ -216,6 +217,7 @@ function CustomerFormContent({
               error={errors.type}
               onChange={(event) => {
                 setCustomerType(event.target.value);
+                setTypeTouched(true);
                 clearFieldError('type');
               }}
             />
