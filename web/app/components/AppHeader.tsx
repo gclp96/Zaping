@@ -73,7 +73,7 @@ export default function AppHeader({
       {mobileNavigationOpen ? null : (
         <div className="flex min-w-0 shrink-0 items-center gap-3 lg:gap-4">
           <div
-            className="hidden min-w-0 max-w-48 items-center gap-2 rounded-ui-md border border-border bg-surface-subtle px-3 py-1.5 md:flex"
+            className="hidden min-w-0 max-w-64 items-center gap-2 rounded-ui-md border border-border bg-surface-subtle px-3 py-1.5 md:flex xl:max-w-72"
             aria-label="Empresa de la sesión"
             title={user.companyName}
           >
