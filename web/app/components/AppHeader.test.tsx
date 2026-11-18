@@ -33,7 +33,9 @@ describe('AppHeader', () => {
     const header = screen.getByRole('banner');
 
     expect(within(header).getByText('Productos')).toBeTruthy();
-    expect(within(header).getByText('INSAP')).toBeTruthy();
+    const company = within(header).getByText('INSAP');
+    expect(company).toBeTruthy();
+    expect(company.classList.contains('truncate')).toBe(false);
     expect(within(header).getByText('Empresa')).toBeTruthy();
     expect(within(header).getByLabelText('Fecha y hora de la empresa')).toBeTruthy();
     expect(within(header).queryByRole('heading', { level: 1 })).toBeNull();
