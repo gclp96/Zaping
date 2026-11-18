@@ -63,7 +63,9 @@ export class CustomersController {
       const body: unknown = await response.json();
       return this.customersService.normalizePostalLookup(code, body);
     } catch {
-      throw new ServiceUnavailableException('Consulta postal temporalmente no disponible');
+      throw new ServiceUnavailableException(
+        'Consulta postal temporalmente no disponible',
+      );
     }
   }
 
