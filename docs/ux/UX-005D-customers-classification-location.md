@@ -27,6 +27,14 @@ Limpiar el catálogo de Clientes y ofrecer exactamente tres filtros visibles: no
 - Asegurar escritura, lectura y actualización de todos los campos nuevos, y compatibilidad con flujos de creación de clientes desde Cotizaciones y otros módulos. Los permisos existentes no se modifican; CRM-001 permanece fuera del alcance.
 - **Esta ampliación está aprobada como especificación y requiere implementación y CI adicional; no se considera completada por actualizar este documento.**
 
+## Integración postal implementada — configuración pendiente
+- La ruta autenticada `GET /customers/postal-lookup/:code` valida cinco dígitos y mantiene JWT/RBAC actual. Su único destino remoto es `https://api.postalkit.mx/v1/postal-codes/{code}`.
+- Configurar `POSTALKIT_API_KEY` **únicamente** en el entorno del backend NestJS. No agregarla a variables `NEXT_PUBLIC_*`, commits, archivos de pruebas ni respuestas de API.
+- El proveedor solo se consulta desde el backend. Se normalizan estado, municipio, ciudad y nombres de asentamientos para mostrar un selector de colonia; el usuario siempre puede editar el domicilio manualmente.
+- Sin clave configurada, datos ausentes o caída de red, la consulta devuelve un error controlado y el formulario permite continuar manualmente. La alta no depende de la disponibilidad postal.
+- Antes de activar para clientes comerciales, verificar los términos de servicio de PostalKit y los derechos aplicables al catálogo subyacente; la existencia de un plan pago no sustituye la revisión de licencia.
+- Pendiente: prueba con credencial real en un entorno controlado, evidencia QA de CP múltiple, manual y fallo de proveedor, y revisión de CI. No considerar el autocompletado productivo hasta cerrar estos puntos.
+
 ## Seguridad y compatibilidad
 - Mantener JWT/RBAC ADMIN, MANAGER, SALES actuales. Sin permisos nuevos.
 - Escrituras y lecturas siguen aisladas por Company. Nada de filtros exclusivos en frontend para autorización.
