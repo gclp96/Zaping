@@ -87,6 +87,7 @@ function configureApiMocks() {
           lastName: 'Test',
           role: 'ADMIN',
           companyTimezone: 'America/Hermosillo',
+          companyName: 'QA Company',
         },
       } as never;
     }
@@ -161,6 +162,7 @@ describe('AuthenticatedAppLayout', () => {
     expect(
       screen.getByRole('button', { name: 'Cuenta de Admin Test' }),
     ).toBeTruthy();
+    expect(within(screen.getByRole('banner')).getByText('QA Company')).toBeTruthy();
 
     const menuButton = screen.getByLabelText('Abrir navegación');
     expect(menuButton.getAttribute('aria-expanded')).toBe('false');
