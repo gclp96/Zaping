@@ -89,6 +89,36 @@ describe('CustomerFormModal', () => {
     }
   });
 
+  it('keeps save and cancel actions outside the scrollable form content', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(
+      <CustomerFormModal isOpen onClose={onClose} onSaved={vi.fn()} />,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo cliente' });
+    const body = dialog.querySelector('[data-modal-body]');
+    const footer = dialog.querySelector('[data-modal-footer]');
+    const form = body?.querySelector('form');
+    const submit = within(footer as HTMLElement).getByRole('button', {
+      name: 'Registrar cliente',
+    }) as HTMLButtonElement;
+
+    expect(body).not.toBeNull();
+    expect(footer).not.toBeNull();
+    expect(form).not.toBeNull();
+    expect(footer?.contains(submit)).toBe(true);
+    expect(body?.contains(submit)).toBe(false);
+    expect(submit.form).toBe(form);
+    expect(submit.type).toBe('submit');
+
+    await user.click(submit);
+    expect(
+      screen.getByText('El nombre del cliente es obligatorio.'),
+    ).toBeTruthy();
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
   it('focuses the first invalid field and shows inline errors without calling the API', async () => {
     const user = userEvent.setup();
     render(
