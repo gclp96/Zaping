@@ -14,7 +14,7 @@ import { api } from '@/services/api';
 import CustomerFormModal from './CustomerFormModal';
 
 vi.mock('@/services/api', () => ({
-  api: { post: vi.fn(), patch: vi.fn() },
+  api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
 }));
 
 vi.mock('@/services/errors', () => ({
@@ -145,6 +145,28 @@ describe('CustomerFormModal', () => {
     expect(
       screen.queryByText('El nombre del cliente es obligatorio.'),
     ).toBeNull();
+  });
+
+  it('offers postal settlements and fills the selected location', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        state: 'Sonora',
+        municipality: 'Hermosillo',
+        city: 'Hermosillo',
+        settlements: ['Centro', '5 de Mayo'],
+      },
+    } as never);
+    render(<CustomerFormModal isOpen onClose={vi.fn()} onSaved={vi.fn()} />);
+    await user.type(screen.getByRole('textbox', { name: 'Código postal' }), '83000');
+    expect(await screen.findByRole('combobox', { name: 'Colonia / asentamiento' })).toBeTruthy();
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Colonia / asentamiento' }),
+      'Centro',
+    );
+    expect((screen.getByRole('textbox', { name: 'Ciudad' }) as HTMLInputElement).value).toBe('Hermosillo');
+    expect((screen.getByRole('textbox', { name: 'Estado / provincia' }) as HTMLInputElement).value).toBe('Sonora');
+    expect(api.get).toHaveBeenCalledWith('/customers/postal-lookup/83000');
   });
 
   it('creates a customer with only name and type', async () => {
