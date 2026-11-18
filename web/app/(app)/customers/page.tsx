@@ -34,10 +34,14 @@ import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 type Customer = {
   id: string;
   name: string;
+  legalName?: string | null;
   type: string;
-  email: string;
-  phone: string;
+  email: string | null;
+  phone: string | null;
   address?: string | null;
+  postalCode?: string | null;
+  neighborhood?: string | null;
+  municipality?: string | null;
   city?: string | null;
   state?: string | null;
   countryCode?: string | null;
