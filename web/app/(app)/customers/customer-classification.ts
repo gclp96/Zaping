@@ -11,6 +11,7 @@ export const CUSTOMER_TYPE_OPTIONS = [
 export type CustomerType = (typeof CUSTOMER_TYPE_OPTIONS)[number]['value'];
 
 export type CustomerLocation = {
+  municipality?: string | null;
   city?: string | null;
   state?: string | null;
   countryCode?: string | null;
@@ -61,18 +62,20 @@ export function customerTypeLabel(value?: string | null): string {
 
 export function customerLocationLabel(customer: CustomerLocation): string {
   const city = customer.city?.trim();
+  const municipality = customer.municipality?.trim();
   const state = customer.state?.trim();
   const code = customer.countryCode?.trim().toUpperCase();
-  if (!city && !state) return 'Sin ubicación';
-  const main = [city, state].filter(Boolean).join(', ');
+  if (!city && !municipality && !state) return 'Sin ubicación';
+  const main = [city || municipality, state].filter(Boolean).join(', ');
   return code && code !== 'MX' ? main + ' (' + code + ')' : main;
 }
 
 export function customerLocationKey(customer: CustomerLocation): string {
   const city = customer.city?.trim();
+  const municipality = customer.municipality?.trim();
   const state = customer.state?.trim();
-  if (!city && !state) return '__UNLOCATED__';
-  return [city ?? '', state ?? '', customer.countryCode ?? '']
+  if (!city && !municipality && !state) return '__UNLOCATED__';
+  return [city || municipality || '', state ?? '', customer.countryCode ?? '']
     .map(normalize)
     .join('|');
 }
