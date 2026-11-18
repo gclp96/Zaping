@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
+import { Building2, ContactRound, MapPin } from 'lucide-react';
 
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
@@ -22,16 +23,11 @@ type FormErrors = {
 type CustomerFormContentProps = {
   customer: CustomerFormCustomer | null;
   onClose: () => void;
-  onSaved: (
-    customer: CustomerFormCustomer,
-  ) => void | Promise<void>;
+  onSaved: (customer: CustomerFormCustomer) => void | Promise<void>;
 };
 
-function normalizeOptionalValue(
-  value: string,
-): string | undefined {
+function normalizeOptionalValue(value: string): string | undefined {
   const trimmedValue = value.trim();
-
   return trimmedValue || undefined;
 }
 
@@ -40,134 +36,91 @@ function CustomerFormContent({
   onClose,
   onSaved,
 }: CustomerFormContentProps) {
-  const [name, setName] = useState(
-    customer?.name ?? '',
-  );
-
-  const [customerType, setCustomerType] =
-    useState(customer?.type ?? '');
-
-  const [email, setEmail] = useState(
-    customer?.email ?? '',
-  );
-
-  const [phone, setPhone] = useState(
-    customer?.phone ?? '',
-  );
-
-  const [contactName, setContactName] =
-    useState(customer?.contactName ?? '');
-
-  const [address, setAddress] = useState(
-    customer?.address ?? '',
-  );
-
-  const [notes, setNotes] = useState(
-    customer?.notes ?? '',
-  );
-
-  const [errors, setErrors] =
-    useState<FormErrors>({});
-
-  const [formError, setFormError] =
-    useState('');
-
-  const [saving, setSaving] =
-    useState(false);
-
+  const [name, setName] = useState(customer?.name ?? '');
+  const [customerType, setCustomerType] = useState(customer?.type ?? '');
+  const [email, setEmail] = useState(customer?.email ?? '');
+  const [phone, setPhone] = useState(customer?.phone ?? '');
+  const [contactName, setContactName] = useState(customer?.contactName ?? '');
+  const [address, setAddress] = useState(customer?.address ?? '');
+  const [notes, setNotes] = useState(customer?.notes ?? '');
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [formError, setFormError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const submittingRef = useRef(false);
   const editing = Boolean(customer);
+
+  function clearFieldError(field: keyof FormErrors) {
+    setErrors((current) => ({ ...current, [field]: undefined }));
+    setFormError('');
+  }
 
   function validateForm(): boolean {
     const nextErrors: FormErrors = {};
-
     const trimmedName = name.trim();
-    const trimmedType =
-      customerType.trim();
+    const trimmedType = customerType.trim();
     const trimmedEmail = email.trim();
     const trimmedPhone = phone.trim();
 
     if (!trimmedName) {
-      nextErrors.name =
-        'El nombre del cliente es obligatorio.';
+      nextErrors.name = 'El nombre del cliente es obligatorio.';
     }
-
     if (!trimmedType) {
-      nextErrors.type =
-        'El tipo de cliente es obligatorio.';
+      nextErrors.type = 'El tipo de cliente es obligatorio.';
     }
-
     if (!trimmedEmail) {
-      nextErrors.email =
-        'El correo electrónico es obligatorio.';
-    } else if (
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-        trimmedEmail,
-      )
-    ) {
-      nextErrors.email =
-        'Ingresa un correo electrónico válido.';
+      nextErrors.email = 'El correo electrónico es obligatorio.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      nextErrors.email = 'Ingresa un correo electrónico válido.';
     }
-
     if (!trimmedPhone) {
-      nextErrors.phone =
-        'El teléfono es obligatorio.';
+      nextErrors.phone = 'El teléfono es obligatorio.';
     }
 
     setErrors(nextErrors);
 
-    return (
-      Object.keys(nextErrors).length === 0
-    );
+    const firstInvalidField = (Object.keys(nextErrors) as (keyof FormErrors)[])[0];
+    if (firstInvalidField) {
+      formRef.current
+        ?.querySelector<HTMLInputElement>('[name="' + firstInvalidField + '"]')
+        ?.focus();
+      return false;
+    }
+
+    return true;
   }
 
   function handleClose() {
-    if (saving) {
-      return;
-    }
-
-    onClose();
+    if (!submittingRef.current) onClose();
   }
 
   async function handleSave() {
-    setFormError('');
+    if (submittingRef.current) return;
 
-    if (!validateForm()) {
-      return;
-    }
+    setFormError('');
+    if (!validateForm()) return;
 
     const payload = {
       name: name.trim(),
       type: customerType.trim(),
       email: email.trim(),
       phone: phone.trim(),
-
-      contactName:
-        normalizeOptionalValue(
-          contactName,
-        ),
-
-      address:
-        normalizeOptionalValue(address),
-
-      notes:
-        normalizeOptionalValue(notes),
+      contactName: normalizeOptionalValue(contactName),
+      address: normalizeOptionalValue(address),
+      notes: normalizeOptionalValue(notes),
     };
 
+    submittingRef.current = true;
+    setSaving(true);
     try {
-      setSaving(true);
-
       const response = customer
         ? await api.patch<CustomerFormCustomer>(
-            `/customers/${customer.id}`,
+            '/customers/' + customer.id,
             payload,
           )
-        : await api.post<CustomerFormCustomer>(
-            '/customers',
-            payload,
-          );
+        : await api.post<CustomerFormCustomer>('/customers', payload);
 
       await onSaved(response.data);
-
       onClose();
     } catch (error) {
       setFormError(
@@ -179,151 +132,171 @@ function CustomerFormContent({
         ),
       );
     } finally {
+      submittingRef.current = false;
       setSaving(false);
     }
   }
 
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void handleSave();
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2">
-        <Input
-          label="Nombre"
-          value={name}
-          required
-          disabled={saving}
-          error={errors.name}
-          onChange={(event) => {
-            setName(event.target.value);
-
-            if (errors.name) {
-              setErrors((current) => ({
-                ...current,
-                name: undefined,
-              }));
-            }
-          }}
-        />
-
-        <Input
-          label="Tipo"
-          value={customerType}
-          required
-          disabled={saving}
-          error={errors.type}
-          helperText="Ej. Hospital, clínica, distribuidor o particular."
-          onChange={(event) => {
-            setCustomerType(
-              event.target.value,
-            );
-
-            if (errors.type) {
-              setErrors((current) => ({
-                ...current,
-                type: undefined,
-              }));
-            }
-          }}
-        />
-
-        <Input
-          label="Email"
-          type="email"
-          value={email}
-          required
-          disabled={saving}
-          error={errors.email}
-          onChange={(event) => {
-            setEmail(event.target.value);
-
-            if (errors.email) {
-              setErrors((current) => ({
-                ...current,
-                email: undefined,
-              }));
-            }
-          }}
-        />
-
-        <Input
-          label="Teléfono"
-          type="tel"
-          value={phone}
-          required
-          disabled={saving}
-          error={errors.phone}
-          onChange={(event) => {
-            setPhone(event.target.value);
-
-            if (errors.phone) {
-              setErrors((current) => ({
-                ...current,
-                phone: undefined,
-              }));
-            }
-          }}
-        />
+    <form ref={formRef} onSubmit={handleSubmit} noValidate className="space-y-6">
+      <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700">
+          <Building2 aria-hidden="true" size={20} />
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-text">
+            {editing ? 'Actualiza los datos del cliente' : 'Datos del nuevo cliente'}
+          </p>
+          <p className="mt-1 text-sm leading-5 text-text-secondary">
+            Los campos marcados con * son obligatorios. Los demás se pueden
+            completar después.
+          </p>
+        </div>
       </div>
 
-      <div className="border-t border-gray-200 pt-5">
-        <h3 className="mb-4 text-sm font-semibold text-gray-900">
-          Información adicional
-        </h3>
-
-        <div className="space-y-4">
+      <section aria-labelledby="customer-general-heading" className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Building2 aria-hidden="true" size={18} className="text-text-muted" />
+          <h3 id="customer-general-heading" className="font-semibold text-text">
+            Datos generales
+          </h3>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
           <Input
-            label="Contacto"
-            value={contactName}
+            name="name"
+            label="Nombre"
+            placeholder="Nombre comercial o razón social"
+            value={name}
+            required
             disabled={saving}
-            onChange={(event) =>
-              setContactName(
-                event.target.value,
-              )
-            }
+            error={errors.name}
+            onChange={(event) => {
+              setName(event.target.value);
+              clearFieldError('name');
+            }}
           />
-
           <Input
-            label="Dirección"
-            value={address}
+            name="type"
+            label="Tipo"
+            placeholder="Ej. Hospital, clínica o distribuidor"
+            helperText="Escribe el tipo de cliente."
+            value={customerType}
+            required
             disabled={saving}
-            onChange={(event) =>
-              setAddress(
-                event.target.value,
-              )
-            }
+            error={errors.type}
+            onChange={(event) => {
+              setCustomerType(event.target.value);
+              clearFieldError('type');
+            }}
           />
+        </div>
+      </section>
 
-          <div className="flex flex-col gap-2">
-            <label
-              htmlFor="customer-notes"
-              className="text-sm font-medium text-gray-700"
-            >
-              Notas
-            </label>
-
-            <textarea
-              id="customer-notes"
-              value={notes}
-              rows={3}
+      <section
+        aria-labelledby="customer-contact-heading"
+        className="space-y-4 border-t border-border pt-5"
+      >
+        <div className="flex items-center gap-2">
+          <ContactRound aria-hidden="true" size={18} className="text-text-muted" />
+          <h3 id="customer-contact-heading" className="font-semibold text-text">
+            Información de contacto
+          </h3>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            name="email"
+            label="Email"
+            type="email"
+            autoComplete="email"
+            placeholder="correo@empresa.com"
+            value={email}
+            required
+            disabled={saving}
+            error={errors.email}
+            onChange={(event) => {
+              setEmail(event.target.value);
+              clearFieldError('email');
+            }}
+          />
+          <Input
+            name="phone"
+            label="Teléfono"
+            type="tel"
+            autoComplete="tel"
+            placeholder="Teléfono de contacto"
+            value={phone}
+            required
+            disabled={saving}
+            error={errors.phone}
+            onChange={(event) => {
+              setPhone(event.target.value);
+              clearFieldError('phone');
+            }}
+          />
+          <div className="sm:col-span-2">
+            <Input
+              name="contactName"
+              label="Contacto"
+              placeholder="Persona de contacto (opcional)"
+              value={contactName}
               disabled={saving}
-              className={[
-                'w-full rounded-lg border border-gray-300 bg-white px-3 py-3',
-                'text-sm text-gray-900 outline-none',
-                'focus:border-blue-500 focus:ring-2 focus:ring-blue-100',
-                saving
-                  ? 'cursor-not-allowed bg-gray-100'
-                  : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              onChange={(event) =>
-                setNotes(
-                  event.target.value,
-                )
-              }
+              onChange={(event) => {
+                setContactName(event.target.value);
+                setFormError('');
+              }}
             />
           </div>
         </div>
-      </div>
+      </section>
+
+      <section
+        aria-labelledby="customer-additional-heading"
+        className="space-y-4 border-t border-border pt-5"
+      >
+        <div className="flex items-center gap-2">
+          <MapPin aria-hidden="true" size={18} className="text-text-muted" />
+          <h3 id="customer-additional-heading" className="font-semibold text-text">
+            Información adicional
+            <span className="ml-2 text-sm font-normal text-text-muted">
+              (opcional)
+            </span>
+          </h3>
+        </div>
+        <Input
+          name="address"
+          label="Dirección"
+          placeholder="Domicilio o dirección comercial"
+          value={address}
+          disabled={saving}
+          onChange={(event) => {
+            setAddress(event.target.value);
+            setFormError('');
+          }}
+        />
+        <div className="space-y-2">
+          <label htmlFor="customer-notes" className="block font-medium text-gray-700">
+            Notas
+          </label>
+          <textarea
+            id="customer-notes"
+            name="notes"
+            value={notes}
+            rows={3}
+            disabled={saving}
+            placeholder="Comentarios para el seguimiento interno del cliente"
+            className="w-full resize-y rounded-lg border border-gray-300 bg-white p-3 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100"
+            onChange={(event) => {
+              setNotes(event.target.value);
+              setFormError('');
+            }}
+          />
+        </div>
+      </section>
 
       {formError ? (
         <div
@@ -334,31 +307,27 @@ function CustomerFormContent({
         </div>
       ) : null}
 
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+      <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
         <Button
+          type="button"
           variant="outline"
+          className="w-full sm:w-auto"
           disabled={saving}
           onClick={handleClose}
         >
           Cancelar
         </Button>
-
         <Button
+          type="submit"
+          className="w-full sm:w-auto"
           loading={saving}
-          loadingText={
-            editing
-              ? 'Actualizando...'
-              : 'Registrando...'
-          }
+          loadingText={editing ? 'Actualizando...' : 'Registrando...'}
           disabled={saving}
-          onClick={handleSave}
         >
-          {editing
-            ? 'Guardar cambios'
-            : 'Registrar cliente'}
+          {editing ? 'Guardar cambios' : 'Registrar cliente'}
         </Button>
       </div>
-    </div>
+    </form>
   );
 }
 
@@ -372,11 +341,8 @@ export default function CustomerFormModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={
-        customer
-          ? 'Editar cliente'
-          : 'Nuevo cliente'
-      }
+      title={customer ? 'Editar cliente' : 'Nuevo cliente'}
+      description="Formulario de datos generales y contacto del cliente."
     >
       {isOpen ? (
         <CustomerFormContent
