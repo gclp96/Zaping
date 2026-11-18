@@ -127,7 +127,7 @@ describe('CustomerDetailPage', () => {
     }).closest('section');
     expect(quoteSection).not.toBeNull();
     expect(within(quoteSection as HTMLElement).getByText('Aprobada')).toBeTruthy();
-    expect(within(quoteSection as HTMLElement).getByText('Mostrando los 1 registros más recientes.')).toBeTruthy();
+    expect(within(quoteSection as HTMLElement).getByText('Mostrando 1 de 8 registros.')).toBeTruthy();
   });
 
   it('does not call customer overview for a role without commercial access', async () => {
@@ -225,16 +225,16 @@ describe('CustomerDetailPage', () => {
   it('formats dates using company timezone', () => {
     expect(
       formatCustomerDocumentDate(
-        '2026-11-18T04:30:00.000Z',
+        '2026-11-18T06:30:00.000Z',
         'America/Hermosillo',
       ),
     ).toContain('17');
     expect(
       formatCustomerDocumentDate(
-        '2026-11-18T04:30:00.000Z',
+        '2026-11-18T06:30:00.000Z',
         'America/Mexico_City',
       ),
-    ).toContain('17');
+    ).toContain('18');
     expect(formatCustomerDocumentDate('invalid', 'UTC')).toBe(
       'Fecha no disponible',
     );
