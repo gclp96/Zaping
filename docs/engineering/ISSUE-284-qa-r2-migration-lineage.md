@@ -36,7 +36,7 @@ prueba. No desplegar ni restaurar ninguna migración del PR #272 en main.
 
 ## Paso 1 — Auditar QA existente (solo lectura)
 
-Desde la raíz de `main` o de la rama de este PR, con Docker QA activo:
+Desde la raíz de la rama de este PR (o `main` **después** de integrar el PR), con Docker QA activo:
 
 ```powershell
 node scripts/qa/audit-zaping-files-r2-history.cjs
