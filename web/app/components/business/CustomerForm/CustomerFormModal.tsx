@@ -160,7 +160,14 @@ function CustomerFormContent({
   )?.id;
 
   useEffect(() => {
-    settlementContextRef.current = String(selectedStateId) + ':' + String(selectedMunicipalityId);
+    settlementContextRef.current =
+      String(selectedStateId) +
+      ':' +
+      String(selectedMunicipalityId) +
+      ':' +
+      postalCode +
+      ':' +
+      String(postalMatches.length);
     setSettlementOptions([]);
     setSettlementPage(0);
     setSettlementHasMore(false);
