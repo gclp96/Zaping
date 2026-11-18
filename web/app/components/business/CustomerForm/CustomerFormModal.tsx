@@ -12,11 +12,14 @@ import Button from '../../ui/Button';
 import Input from '../../ui/Input';
 import Modal from '../../ui/Modal';
 import Select from '../../ui/Select';
+import CustomerLocationCombobox, { type LocationOption } from './CustomerLocationCombobox';
 
 import type {
   CustomerFormCustomer,
   CustomerFormModalProps,
 } from './CustomerForm.types';
+
+type SettlementOption = { id: number; name: string; postalCode: string | null };
 
 type GeographyOption = {
   id: number;
@@ -79,6 +82,10 @@ function CustomerFormContent({
     GeographyOption[]
   >([]);
   const [cityOptions, setCityOptions] = useState<GeographyOption[]>([]);
+  const [settlementOptions, setSettlementOptions] = useState<SettlementOption[]>([]);
+  const [settlementPage, setSettlementPage] = useState(0);
+  const [settlementHasMore, setSettlementHasMore] = useState(false);
+  const [settlementLoading, setSettlementLoading] = useState(false);
   const [geographyStatus, setGeographyStatus] = useState('');
   const [notes, setNotes] = useState(customer?.notes ?? '');
   const [errors, setErrors] = useState<FormErrors>({});
@@ -146,6 +153,103 @@ function CustomerFormContent({
       cancelled = true;
     };
   }, [selectedStateId]);
+
+  const selectedMunicipalityId = municipalityOptions.find(
+    (option) => option.name === municipality,
+  )?.id;
+
+  useEffect(() => {
+    setSettlementOptions([]);
+    setSettlementPage(0);
+    setSettlementHasMore(false);
+    if (
+      !selectedStateId ||
+      !selectedMunicipalityId ||
+      postalMatches.length > 0 ||
+      /^\\d{5}$/.test(postalCode)
+    ) {
+      setSettlementLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSettlementLoading(true);
+    void api
+      .get<{ items: SettlementOption[]; hasMore: boolean }>(
+        '/customers/geography/states/' +
+          selectedStateId +
+          '/municipalities/' +
+          selectedMunicipalityId +
+          '/settlements?page=1',
+      )
+      .then(({ data }) => {
+        if (cancelled) return;
+        setSettlementOptions(Array.isArray(data.items) ? data.items : []);
+        setSettlementHasMore(data.hasMore === true);
+        setSettlementPage(1);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setGeographyStatus(
+            'No fue posible cargar las colonias. Puedes escribirlas manualmente.',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSettlementLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedStateId, selectedMunicipalityId, postalCode, postalMatches.length]);
+
+  function loadMoreSettlements() {
+    if (
+      !selectedStateId ||
+      !selectedMunicipalityId ||
+      !settlementHasMore ||
+      settlementLoading
+    ) {
+      return;
+    }
+    setSettlementLoading(true);
+    const page = settlementPage + 1;
+    void api
+      .get<{ items: SettlementOption[]; hasMore: boolean }>(
+        '/customers/geography/states/' +
+          selectedStateId +
+          '/municipalities/' +
+          selectedMunicipalityId +
+          '/settlements?page=' +
+          page,
+      )
+      .then(({ data }) => {
+        setSettlementOptions((current) => [
+          ...current,
+          ...(Array.isArray(data.items) ? data.items : []),
+        ]);
+        setSettlementHasMore(data.hasMore === true);
+        setSettlementPage(page);
+      })
+      .catch(() => {
+        setGeographyStatus('No fue posible cargar más colonias.');
+      })
+      .finally(() => setSettlementLoading(false));
+  }
+
+  const neighborhoodSuggestions: LocationOption[] = postalMatches.length
+    ? postalMatches.map((value, index) => ({
+        key: 'postal-' + index,
+        value,
+        label: value,
+      }))
+    : settlementOptions.map((item) => ({
+        key: 'settlement-' + item.id,
+        value: item.name,
+        label: item.postalCode
+          ? item.name + ' · CP ' + item.postalCode
+          : item.name,
+        postalCode: item.postalCode,
+      }));
 
   useEffect(() => {
     if (!postalLookupRequested || !/^\d{5}$/.test(postalCode) || countryCode.toUpperCase() !== 'MX') {
@@ -450,40 +554,36 @@ function CustomerFormContent({
             }}
           />
           <div className="space-y-1">
-            {postalMatches.length ? (
-              <>
-                <label htmlFor="customer-neighborhood" className="block font-medium text-gray-700">
-                  Colonia / asentamiento
-                </label>
-                <select
-                  id="customer-neighborhood"
-                  name="neighborhood"
-                  value={neighborhood}
-                  disabled={saving}
-                  onChange={(event) => {
-                    setNeighborhood(event.target.value);
-                  }}
-                  className="w-full rounded-lg border border-gray-300 bg-white p-3 text-sm"
-                >
-                  <option value="">Selecciona una colonia</option>
-                  {postalMatches.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-              </>
-            ) : (
-              <Input
-                name="neighborhoodManual"
-                label="Colonia / asentamiento"
-                value={neighborhood}
-                disabled={saving}
-                onChange={(event) => setNeighborhood(event.target.value)}
-              />
-            )}
-            {postalStatus ? <p role="status" className="text-xs text-text-muted">{postalStatus}</p> : null}
-            {postalLoading && countryCode.toUpperCase() === 'MX' && /^\d{5}$/.test(postalCode) ? <p className="text-xs text-text-muted">Buscando código postal...</p> : null}
+            <CustomerLocationCombobox
+              name="neighborhood"
+              label="Colonia / asentamiento"
+              placeholder="Busca o escribe la colonia"
+              value={neighborhood}
+              options={neighborhoodSuggestions}
+              disabled={saving}
+              loading={settlementLoading}
+              hasMore={postalMatches.length === 0 && settlementHasMore}
+              onLoadMore={loadMoreSettlements}
+              onChange={(value) => setNeighborhood(value)}
+              onSelect={(option) => {
+                setNeighborhood(option.value);
+                if (option.postalCode) {
+                  setPostalCode(option.postalCode);
+                  setPostalLookupRequested(false);
+                  setPostalStatus('');
+                }
+              }}
+            />
+            {postalStatus ? (
+              <p role="status" className="text-xs text-text-muted">
+                {postalStatus}
+              </p>
+            ) : null}
+            {postalLoading && /^\d{5}$/.test(postalCode) ? (
+              <p className="text-xs text-text-muted">
+                Buscando código postal...
+              </p>
+            ) : null}
           </div>
           {stateOptions.length ? (
             <Select
@@ -530,42 +630,44 @@ function CustomerFormContent({
               }}
             />
           )}
-          <div>
-            <Input
-              name="municipality"
-              label="Municipio"
-              placeholder="Selecciona o escribe el municipio"
-              list="customer-municipalities"
-              value={municipality}
-              maxLength={120}
-              disabled={saving}
-              onChange={(event) => setMunicipality(event.target.value)}
-            />
-            <datalist id="customer-municipalities">
-              {municipalityOptions.map((option) => (
-                <option key={option.id} value={option.name} />
-              ))}
-            </datalist>
-          </div>
+          <CustomerLocationCombobox
+            name="municipality"
+            label="Municipio"
+            placeholder="Busca o escribe el municipio"
+            value={municipality}
+            options={municipalityOptions.map((option) => ({
+              key: 'municipality-' + option.id,
+              value: option.name,
+              label: option.name,
+            }))}
+            disabled={saving}
+            onChange={(value) => {
+              setMunicipality(value);
+              setCity('');
+              setNeighborhood('');
+              setPostalCode('');
+              setPostalMatches([]);
+              setPostalStatus('');
+              setPostalLookupRequested(false);
+            }}
+          />
           <div className="sm:col-span-2">
-            <Input
+            <CustomerLocationCombobox
               name="city"
               label="Ciudad"
-              placeholder="Selecciona o escribe la ciudad"
-              list="customer-cities"
+              placeholder="Busca o escribe la ciudad"
               value={city}
-              maxLength={120}
+              options={cityOptions.map((option) => ({
+                key: 'city-' + option.id,
+                value: option.name,
+                label: option.name,
+              }))}
               disabled={saving}
-              onChange={(event) => {
-                setCity(event.target.value);
+              onChange={(value) => {
+                setCity(value);
                 setFormError('');
               }}
             />
-            <datalist id="customer-cities">
-              {cityOptions.map((option) => (
-                <option key={option.id} value={option.name} />
-              ))}
-            </datalist>
           </div>
         </div>
         {geographyStatus ? (
