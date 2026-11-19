@@ -7,6 +7,7 @@ import Select, {
 } from '../../ui/Select';
 
 import type { SupplierSelectorProps } from './SupplierSelector.types';
+import SupplierSearchCombobox from './SupplierSearchCombobox';
 
 export default function SupplierSelector({
   options,
@@ -20,6 +21,7 @@ export default function SupplierSelector({
   required = false,
   error,
   helperText,
+  searchable = false,
 }: SupplierSelectorProps) {
   const selectOptions: SelectOption[] = options.map((supplier) => ({
     value: supplier.id,
@@ -49,6 +51,24 @@ export default function SupplierSelector({
     }
 
     return placeholder;
+  }
+
+  if (searchable) {
+    return (
+      <SupplierSearchCombobox
+        options={options}
+        value={value}
+        onChange={onChange}
+        label={label}
+        name={name}
+        placeholder={placeholder}
+        loading={loading}
+        disabled={disabled}
+        required={required}
+        error={error}
+        helperText={helperText}
+      />
+    );
   }
 
   return (
