@@ -8,6 +8,7 @@ export interface AuthenticatedUser {
   firstName: string;
   lastName: string;
   role: UserRole;
+  canAdjustPurchaseUnitCost?: boolean;
 }
 
 export interface AuthenticatedSession extends AuthenticatedUser {
