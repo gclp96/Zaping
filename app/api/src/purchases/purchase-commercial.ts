@@ -140,7 +140,8 @@ export function buildPurchaseCommercialSnapshot(
     terms: {
       paymentTerms: purchase.paymentTerms ?? null,
       paymentMethod: purchase.paymentMethod ?? null,
-      paymentDueDate: purchase.paymentDueDate?.toISOString().slice(0, 10) ?? null,
+      paymentDueDate:
+        purchase.paymentDueDate?.toISOString().slice(0, 10) ?? null,
       expectedDeliveryDate:
         purchase.expectedDeliveryDate?.toISOString().slice(0, 10) ?? null,
       buyerName: purchase.buyerName ?? null,
