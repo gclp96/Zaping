@@ -37,7 +37,15 @@ const createReceiptResponseInclude = {
   },
   items: {
     include: {
-      product: true,
+      // The receipt response only exposes these catalog fields. Selecting all
+      // Product columns couples receipt replay to future catalog migrations.
+      product: {
+        select: {
+          id: true,
+          sku: true,
+          name: true,
+        },
+      },
       batch: true,
     },
   },
