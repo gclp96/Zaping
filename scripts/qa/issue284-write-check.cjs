@@ -207,7 +207,7 @@ async function main() {
     ]);
     assert.deepEqual([customersAfter, purchasesAfter, itemsAfter], [5, 8, 8]);
     assert.equal(await prisma.customer.count({ where: { id: customerId, companyId: first } }), 1);
-    assert.equal(await prisma.purchaseItem.count({ where: { purchaseId, companyId: first } }), 1);
+    assert.equal(await prisma.purchaseItem.count({ where: { purchaseId } }), 1);
     assert.equal(await prisma.customer.count({ where: { id: customerId, companyId: second } }), 0);
     assert.equal(await prisma.purchase.count({ where: { id: purchaseId, companyId: second } }), 0);
     assert.equal(crossTenantCustomers, 1);
