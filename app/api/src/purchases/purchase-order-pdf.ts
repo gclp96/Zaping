@@ -235,7 +235,16 @@ export function renderPurchaseOrderPdf(
     doc.rect(left, y, width, 28).fill(LIGHT);
     textAt('SKU', x.sku, y + 8, w.sku, 8.5, true);
     textAt('Producto / descripción', x.product, y + 8, w.product, 8.5, true);
-    textAt('Cant./unid.', x.quantity, y + 8, w.quantity, 7.5, true, TEXT, 'right');
+    textAt(
+      'Cant./unid.',
+      x.quantity,
+      y + 8,
+      w.quantity,
+      7.5,
+      true,
+      TEXT,
+      'right',
+    );
     textAt('Costo unit.', x.cost, y + 8, w.cost, 8, true, TEXT, 'right');
     textAt('Desc.', x.discount, y + 8, w.discount, 8, true, TEXT, 'right');
     textAt('Importe', x.amount, y + 8, w.amount, 8, true, TEXT, 'right');
@@ -260,7 +269,12 @@ export function renderPurchaseOrderPdf(
       width: w.quantity,
       lineGap: 1.5,
     });
-    const rowHeight = Math.max(33, nameHeight + 15, skuHeight + 15, quantityHeight + 15);
+    const rowHeight = Math.max(
+      33,
+      nameHeight + 15,
+      skuHeight + 15,
+      quantityHeight + 15,
+    );
     ensureRoom(rowHeight + 9, true);
 
     const rowY = y + 7;
