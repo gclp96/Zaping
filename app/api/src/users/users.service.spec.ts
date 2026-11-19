@@ -159,8 +159,11 @@ describe('UsersService', () => {
   it('permite otorgar permiso de costo al encargado WAREHOUSE sin cambiar el rol', async () => {
     prismaMock.user.findUnique.mockResolvedValue(null);
     prismaMock.user.create.mockResolvedValue({
-      ...safeUser, role: UserRole.WAREHOUSE, canAdjustPurchaseUnitCost: true,
+      ...safeUser,
+      role: UserRole.WAREHOUSE,
+      canAdjustPurchaseUnitCost: true,
     });
+
     await service.create(companyId, {
       firstName: 'Comprador',
       lastName: 'Zaping',
@@ -169,17 +172,23 @@ describe('UsersService', () => {
       role: UserRole.WAREHOUSE,
       canAdjustPurchaseUnitCost: true,
     });
-    expect(prismaMock.user.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        role: UserRole.WAREHOUSE,
-        canAdjustPurchaseUnitCost: true,
-      }),
-    }));
+
+    const call = prismaMock.user.create.mock.calls[0] as [
+      {
+        data: {
+          role: UserRole;
+          canAdjustPurchaseUnitCost: boolean;
+        };
+      },
+    ];
+    expect(call[0].data.role).toBe(UserRole.WAREHOUSE);
+    expect(call[0].data.canAdjustPurchaseUnitCost).toBe(true);
   });
 
   it('no concede el permiso especial a roles ajenos a WAREHOUSE', async () => {
     prismaMock.user.findUnique.mockResolvedValue(null);
     prismaMock.user.create.mockResolvedValue(safeUser);
+
     await service.create(companyId, {
       firstName: 'Vendedor',
       lastName: 'Zaping',
@@ -188,9 +197,15 @@ describe('UsersService', () => {
       role: UserRole.SALES,
       canAdjustPurchaseUnitCost: true,
     });
-    expect(prismaMock.user.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ canAdjustPurchaseUnitCost: false }),
-    }));
+
+    const call = prismaMock.user.create.mock.calls[0] as [
+      {
+        data: {
+          canAdjustPurchaseUnitCost: boolean;
+        };
+      },
+    ];
+    expect(call[0].data.canAdjustPurchaseUnitCost).toBe(false);
   });
 
   it('rejects duplicate emails on create', async () => {
