@@ -21,12 +21,17 @@ describe('CompanyCommercialSettingsController', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('requires auth + roles and restricts updates to ADMIN', () => {
-    expect(Reflect.getMetadata(
-      GUARDS_METADATA,
-      CompanyCommercialSettingsController,
-    )).toEqual([JwtAuthGuard, RolesGuard]);
-    const get = CompanyCommercialSettingsController.prototype.findOwn;
-    const patch = CompanyCommercialSettingsController.prototype.updateOwnCommercial;
+    expect(
+      Reflect.getMetadata(GUARDS_METADATA, CompanyCommercialSettingsController),
+    ).toEqual([JwtAuthGuard, RolesGuard]);
+    const get = Object.getOwnPropertyDescriptor(
+      CompanyCommercialSettingsController.prototype,
+      'findOwn',
+    )?.value as object;
+    const patch = Object.getOwnPropertyDescriptor(
+      CompanyCommercialSettingsController.prototype,
+      'updateOwnCommercial',
+    )?.value as object;
     expect(Reflect.getMetadata('roles', get)).toEqual([
       UserRole.ADMIN,
       UserRole.MANAGER,
@@ -37,7 +42,7 @@ describe('CompanyCommercialSettingsController', () => {
   it('uses the authenticated tenant and never accepts a company ID in body', () => {
     const req = { user: { companyId } } as AuthenticatedRequest;
     const dto = { fiscalAddress: 'Calle fiscal 1' };
-    controller.updateOwnCommercial(req, dto);
+    void controller.updateOwnCommercial(req, dto);
     expect(updateOwnCommercial).toHaveBeenCalledWith(companyId, dto);
   });
 });
