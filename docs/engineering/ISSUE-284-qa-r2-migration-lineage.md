@@ -582,6 +582,51 @@ guardar evidencia de migrate status, health y login real, revisar en
 PR, entonces confirmar autoría/aprobación del merge. Conservar backup
 y base original como recuperación histórica; documentar R2 experimental.
 
+## Paso 2j — Resultado del cutover local (PASS de aceptación, 19/nov/2026)
+
+**Estado reportado por el usuario, no inferido a partir del CI:** tras el
+cambio autorizado de la API de QA local a
+'zaping_qa_official_candidate_v1', confirmó explícitamente **PASS**
+en las tres comprobaciones finales: base activa, login con credenciales
+existentes y consultas de módulos. No se proporcionaron contraseñas,
+tokens ni el contenido de .qa/api.env.
+
+Evidencia previa comprobable de capturas del mismo ciclo:
+- 'npx prisma migrate status' ejecutado desde API informó datasource
+  'zaping_qa_official_candidate_v1', **54 migraciones oficiales** y
+  'Database schema is up to date!'.
+- La primera llamada de Windows a /health/ready devolvió un error de
+  conexión durante/tras el arranque. **No** se aprobó ese resultado.
+- Posteriormente NestJS registró arranque satisfactorio, health interno
+  HTTP 200, curl.exe desde Windows HTTP/1.1 200 OK y
+  Invoke-RestMethod desde Windows PASS.
+- 'issue284-api-active-db-check.cjs --candidate': usuario marcó
+  **PASS**. Login real y consultas de módulos: **PASS reportado**.
+- CI del commit de implementación del corte '159e9a5348c39544918e26bf8545c517c716c0fe':
+  4/4 PASS (API, Web, Agents, Historical Upgrade).
+
+**Interpretación:** gate funcional poscorte PASÓ; no implica que el PR
+se haya fusionado ni que el Issue se haya cerrado. La aplicación
+web/QA puede usar ya la candidata; el script de rollback permanece
+disponible, pero no debe utilizarse después de nuevas escrituras sin
+comprobar y reconciliar diferencias.
+
+**Decisión de conservación:** la BD QA original 'zaping_qa' (historial
+de 55 migraciones con la R2 experimental, y filas R2 1/1/3), su volumen
+y el respaldo histórico restaurable continúan siendo evidencia.
+Las tres tablas experimentales y sus datos no forman parte de la
+candidata oficial. El dump de PostgreSQL no respalda binarios externos
+en Cloudflare R2; no se ha acreditado disponibilidad de ese objeto
+histórico y debe documentarse como limitación o seguimiento de Zaping Files.
+No borrar bases, volúmenes, copias ni archivos privados de configuración
+en el cierre de este ticket.
+
+**Antes de cerrar #284:** revisar diff del PR #285 y que sus scripts no
+afecten servicios de producto; confirmar CI PASS del HEAD final, poner
+PR Ready for Review, realizar merge autorizado, comprobar que la QA
+activa sigue apuntando a la candidata con status/migraciones oficiales
+y documentar commit de merge. Solo entonces marcar Done y cerrar #284.
+
 ## Paso 3 — Corte real de QA: gate humano pendiente
 
 **No forma parte de este PR.** No basta con un rehearsal verde para cambiar
@@ -628,8 +673,7 @@ la base que usan QA ADMIN/SALES/etc. Se requiere:
 - [x] Preflight read-only de corte aprobado por usuario (37/37 unit y 57 huellas PASS).
 - [x] Candidata oficial creada y verificada en PostgreSQL QA, sin cambiar conexiones (PASS local, 19/nov/2026).
 - [x] Verificar conectividad read-only desde contenedor API operativo a candidata (PASS local, 19/nov/2026).
-- [ ] Ejecutar cutover reversible API de QA con pausa de escritores y confirmar login real.
-- [ ] Política de preservación de datos y autorización de corte definidas.
-- [ ] Corte hacia BD QA de `main` completado y pruebas de regresión PASS.
-- [ ] Cerrar issue #284 solo después de comprobar que la QA activa no posee
-      migraciones aplicadas ausentes de las fuentes oficiales.
+- [x] Cutover reversible de API QA realizado; login real y consultas PASS reportados por usuario (19/nov/2026).
+- [x] Autorización explícita de corte y preservación de QA original, volumen y respaldo documentadas; binario R2 histórico sin verificar, seguimiento separado.
+- [x] Corte a nueva QA de 54 migraciones oficiales completado; status/health PASS y login/consultas PASS reportados.
+- [ ] Revisión final del diff, CI del HEAD, merge autorizado y evidencia posmerge; entonces cerrar Issue #284.
