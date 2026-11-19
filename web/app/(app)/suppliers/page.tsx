@@ -30,6 +30,10 @@ import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 type Supplier = {
   id: string;
   name: string;
+  legalName?: string | null;
+  rfc?: string | null;
+  fiscalAddress?: string | null;
+  supplierCode?: string | null;
   email?: string | null;
   phone?: string | null;
   address?: string | null;
@@ -40,6 +44,7 @@ type Supplier = {
 type SupplierFormErrors = {
   name?: string;
   email?: string;
+  rfc?: string;
 };
 
 const DEFAULT_PAGE_SIZE = 25;
@@ -64,6 +69,10 @@ function supplierMatchesSearch(supplier: Supplier, search: string): boolean {
 
   return [
     supplier.name,
+    supplier.legalName,
+    supplier.rfc,
+    supplier.supplierCode,
+    supplier.fiscalAddress,
     supplier.contactName,
     supplier.email,
     supplier.phone,
@@ -125,6 +134,10 @@ export default function SuppliersPage() {
   const [formErrors, setFormErrors] = useState<SupplierFormErrors>({});
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [name, setName] = useState('');
+  const [legalName, setLegalName] = useState('');
+  const [rfc, setRfc] = useState('');
+  const [fiscalAddress, setFiscalAddress] = useState('');
+  const [supplierCode, setSupplierCode] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
@@ -184,6 +197,10 @@ export default function SuppliersPage() {
 
   function resetSupplierForm() {
     setName('');
+    setLegalName('');
+    setRfc('');
+    setFiscalAddress('');
+    setSupplierCode('');
     setEmail('');
     setPhone('');
     setAddress('');
@@ -202,6 +219,10 @@ export default function SuppliersPage() {
   function openEditModal(supplier: Supplier) {
     setEditingSupplier(supplier);
     setName(supplier.name);
+    setLegalName(supplier.legalName || '');
+    setRfc(supplier.rfc || '');
+    setFiscalAddress(supplier.fiscalAddress || '');
+    setSupplierCode(supplier.supplierCode || '');
     setEmail(supplier.email || '');
     setPhone(supplier.phone || '');
     setAddress(supplier.address || '');
@@ -225,6 +246,7 @@ export default function SuppliersPage() {
   async function handleSaveSupplier() {
     const trimmedName = name.trim();
     const trimmedEmail = email.trim();
+    const normalizedRfc = rfc.trim().toUpperCase();
     const nextErrors: SupplierFormErrors = {};
 
     setFormError('');
@@ -237,6 +259,10 @@ export default function SuppliersPage() {
       nextErrors.email = 'Ingresa un correo electrónico válido.';
     }
 
+    if (normalizedRfc && !/^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(normalizedRfc)) {
+      nextErrors.rfc = 'Ingresa un RFC válido de 12 o 13 caracteres.';
+    }
+
     setFormErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
@@ -245,6 +271,16 @@ export default function SuppliersPage() {
 
     const payload = {
       name: trimmedName,
+      ...(normalizeOptionalValue(legalName) && {
+        legalName: normalizeOptionalValue(legalName),
+      }),
+      ...(normalizedRfc && { rfc: normalizedRfc }),
+      ...(normalizeOptionalValue(fiscalAddress) && {
+        fiscalAddress: normalizeOptionalValue(fiscalAddress),
+      }),
+      ...(normalizeOptionalValue(supplierCode) && {
+        supplierCode: normalizeOptionalValue(supplierCode),
+      }),
       email: normalizeOptionalValue(email),
       phone: normalizeOptionalValue(phone),
       address: normalizeOptionalValue(address),
@@ -523,6 +559,28 @@ export default function SuppliersPage() {
               }}
             />
             <Input
+              label="Razón social"
+              value={legalName}
+              disabled={saving}
+              onChange={(event) => setLegalName(event.target.value)}
+            />
+            <Input
+              label="RFC"
+              value={rfc}
+              disabled={saving}
+              error={formErrors.rfc}
+              onChange={(event) => {
+                setRfc(event.target.value.toUpperCase());
+                setFormErrors((current) => ({ ...current, rfc: undefined }));
+              }}
+            />
+            <Input
+              label="Código de proveedor"
+              value={supplierCode}
+              disabled={saving}
+              onChange={(event) => setSupplierCode(event.target.value)}
+            />
+            <Input
               label="Nombre de contacto"
               value={contactName}
               disabled={saving}
@@ -553,6 +611,12 @@ export default function SuppliersPage() {
             value={address}
             disabled={saving}
             onChange={(event) => setAddress(event.target.value)}
+          />
+          <Input
+            label="Domicilio fiscal completo"
+            value={fiscalAddress}
+            disabled={saving}
+            onChange={(event) => setFiscalAddress(event.target.value)}
           />
 
           <div className="flex flex-col gap-2">
