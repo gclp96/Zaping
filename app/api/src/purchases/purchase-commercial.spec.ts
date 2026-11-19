@@ -59,14 +59,16 @@ describe('purchase commercial snapshot', () => {
         paymentDueDate: '2026-12-17',
         expectedDeliveryDate: '2026-11-17',
       },
-      items: [{
-        sku: 'INS-1',
-        name: 'Instrumental',
-        unitCost: 9.1111,
-        listUnitCost: 10.1234,
-        discountPercent: 10,
-        unitOfMeasure: 'pzas.',
-      }],
+      items: [
+        {
+          sku: 'INS-1',
+          name: 'Instrumental',
+          unitCost: 9.1111,
+          listUnitCost: 10.1234,
+          discountPercent: 10,
+          unitOfMeasure: 'pzas.',
+        },
+      ],
     });
     purchase.supplier.name = 'Nombre actualizado';
     purchase.items[0].product.name = 'Producto editado';
