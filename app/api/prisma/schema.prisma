@@ -418,6 +418,13 @@ model Purchase {
   iva      Float
   total    Float
 
+  paymentTerms         String?
+  paymentMethod        String?
+  paymentDueDate       DateTime? @db.Date
+  expectedDeliveryDate DateTime? @db.Date
+  buyerName            String?
+  commercialSnapshot   Json?
+
   status    PurchaseStatus @default(DRAFT)
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
@@ -533,6 +540,8 @@ model Company {
   rfc                                   String                                          @unique
   email                                 String?
   phone                                 String?
+  fiscalAddress                        String?
+  placeOfIssue                         String?
   language                              String                                          @default("es")
   timezone                              String                                          @default("America/Hermosillo")
   createdAt                             DateTime                                        @default(now())
@@ -1348,6 +1357,10 @@ model Supplier {
   companyId String
 
   name        String
+  legalName   String?
+  rfc         String?
+  fiscalAddress String?
+  supplierCode String?
   email       String?
   phone       String?
   address     String?
