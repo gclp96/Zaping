@@ -345,6 +345,62 @@ bases, NO copia datos, NO modifica secretos, API/Web ni migraciones.
   QA únicamente a la candidata en una ventana con rollback definido.
   No tocar zapping_dev, producción, R2 externo ni tokens publicados.
 
+## Paso 2g — Candidata oficial separada en PostgreSQL QA (preparación OPT-IN)
+
+**Estado:** código preparado en PR Draft #285; no se ha ejecutado en el
+entorno local del usuario. El preflight read-only sí finalizó PASS local:
+37/37 tests, 55 migraciones de QA operativa vs 54 de v3,
+huellas coincidentes en las 57 tablas/110 registros y candidato ausente.
+
+Script guardado: scripts/qa/issue284-prepare-qa-candidate.cjs
+Nombre destino NUEVO: zaping_qa_official_candidate_v1
+Origen EXACTO: zaping_issue284_transfer_trial_v3, proyecto Docker aislado
+Destino: PostgreSQL del proyecto Docker zaping-local-qa, BD NUEVA solamente
+
+El proceso:
+1. Reejecuta preflight de lectura y comprueba ambas identidades Docker.
+2. Rechaza nombre candidato existente y cualquier desviación QA/v3.
+3. Crea un dump CUSTOM COMPLETO de v3 (esquema, 54 migraciones, datos);
+   revisa 58 TABLE DATA esperadas, prohibición de ZapingFile* y SHA-256.
+4. Copia el dump temporalmente por el host hacia el contenedor PostgreSQL
+   operativo sin exponer puertos ni cambiar URLs, secretos o .qa/api.env.
+5. **Solo después de superar las comprobaciones**, crea la BD NUEVA
+   con createdb -T template0. No sobrescribe zaping_qa.
+6. Restaura solo en la BD nueva con pg_restore --single-transaction y
+   --exit-on-error, sin cambiar triggers/FKs.
+7. Compara 54 migraciones, 0 R2, los 110 registros y las huellas de las
+   57 tablas contra v3; verifica nuevamente que la original no cambió.
+8. Elimina solo archivos temporales de transferencia, no bases, volúmenes,
+   respaldos históricos ni el proyecto de ensayo.
+
+**Precondiciones antes de autorizar la ejecución:** CI 4/4 PASS en SHA actual,
+copia local del backup pre-cutover verificada/restaurada (PASS),
+preflight read-only actualizado PASS; se deben suspender las escrituras en
+QA durante la transferencia/corte para evitar divergencia y confirmar
+que no existen cambios externos pendientes. El preparador exige una opción
+explícita: --prepare-candidate-v1. Ejecutarlo una sola vez.
+
+~~~powershell
+cd C:\dev\zaping
+git pull --ff-only origin fix/issue-284-qa-migration-lineage-audit-20261118
+node --test scripts/qa/*.test.cjs
+node scripts/qa/issue284-cutover-preflight.cjs
+
+# SOLO tras aprobar explícitamente la preparación de la BD nueva:
+node scripts/qa/issue284-prepare-qa-candidate.cjs --prepare-candidate-v1
+~~~
+
+**HOLD después del PASS:** la candidata NO queda activa. No se altera
+DATABASE_URL, API/Web, JWT ni Zaping Files R2. Posteriormente verificar
+continuidad de credenciales operativas, conexión privada de la API y
+un rollback de configuración preparado antes de autorizar el corte.
+
+**Si falla:** detenerse; si la BD candidata llegó a crearse, conservarla
+sin reintentar ni borrarla. Revisar evidencia y preparar otro nombre
+versionado solo tras diagnóstico. Un rollback hacia la base anterior no
+soluciona su divergencia histórica de Prisma, únicamente permite restaurar
+la disponibilidad si falla el corte.
+
 ## Paso 3 — Corte real de QA: gate humano pendiente
 
 **No forma parte de este PR.** No basta con un rehearsal verde para cambiar
@@ -387,7 +443,9 @@ la base que usan QA ADMIN/SALES/etc. Se requiere:
 - [x] Smoke funcional API aislada: 48 checks JWT/RBAC, tenant A/B, Clientes, Compras, Recepciones y Healthcare (salida local PASS).
 - [x] Login real sintético y escritura mínima verificados en copia aislada (salida local PASS; no continuidad de secretos operativos).
 - [x] Respaldo QA actualizado restaurado en Docker de ensayo y recuentos verificados.
-- [ ] Preflight read-only de corte en host local (57 huellas/identidades).
+- [x] Preflight read-only de corte en host local (57 huellas/identidades, 19/nov/2026 PASS).
+- [x] Preflight read-only de corte aprobado por usuario (37/37 unit y 57 huellas PASS).
+- [ ] Candidata oficial creada y verificada en PostgreSQL QA, sin cambiar conexiones.
 - [ ] Política de preservación de datos y autorización de corte definidas.
 - [ ] Corte hacia BD QA de `main` completado y pruebas de regresión PASS.
 - [ ] Cerrar issue #284 solo después de comprobar que la QA activa no posee
