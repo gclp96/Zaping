@@ -18,6 +18,7 @@ const safeUserSelect = {
   firstName: true,
   lastName: true,
   role: true,
+  canAdjustPurchaseUnitCost: true,
   isActive: true,
   createdAt: true,
   updatedAt: true,
@@ -70,6 +71,7 @@ export class UsersService {
         email: dto.email,
         passwordHash,
         role: dto.role,
+        canAdjustPurchaseUnitCost: dto.canAdjustPurchaseUnitCost ?? false,
       },
       select: safeUserSelect,
     });
@@ -119,6 +121,9 @@ export class UsersService {
     if (dto.email !== undefined) data.email = dto.email;
     if (dto.role !== undefined) data.role = dto.role;
     if (dto.isActive !== undefined) data.isActive = dto.isActive;
+    if (dto.canAdjustPurchaseUnitCost !== undefined) {
+      data.canAdjustPurchaseUnitCost = dto.canAdjustPurchaseUnitCost;
+    }
 
     if (Object.keys(data).length === 0) {
       return currentUser;
