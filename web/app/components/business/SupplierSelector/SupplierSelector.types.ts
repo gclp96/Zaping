@@ -17,4 +17,5 @@ export interface SupplierSelectorProps {
     required?: boolean;
     error?: string;
     helperText?: string;
+    searchable?: boolean;
 }

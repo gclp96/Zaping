@@ -222,6 +222,7 @@ export default function PurchaseFormModal({
             options={suppliers}
             value={supplierId}
             onChange={onSupplierChange}
+            searchable={workspaceEnabled}
             required
             error={supplierError}
             helperText="Proveedor que surtirá la orden de compra."
