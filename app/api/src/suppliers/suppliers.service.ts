@@ -57,6 +57,14 @@ export class SuppliersService {
       data: {
         companyId,
         name: dto.name,
+        ...(dto.legalName !== undefined && { legalName: dto.legalName }),
+        ...(dto.rfc !== undefined && { rfc: dto.rfc }),
+        ...(dto.fiscalAddress !== undefined && {
+          fiscalAddress: dto.fiscalAddress,
+        }),
+        ...(dto.supplierCode !== undefined && {
+          supplierCode: dto.supplierCode,
+        }),
         email: dto.email,
         phone: dto.phone,
         address: dto.address,
@@ -70,6 +78,14 @@ export class SuppliersService {
     const supplier = await this.findOne(companyId, supplierId);
     const data = {
       name: dto.name,
+      ...(dto.legalName !== undefined && { legalName: dto.legalName }),
+      ...(dto.rfc !== undefined && { rfc: dto.rfc }),
+      ...(dto.fiscalAddress !== undefined && {
+        fiscalAddress: dto.fiscalAddress,
+      }),
+      ...(dto.supplierCode !== undefined && {
+        supplierCode: dto.supplierCode,
+      }),
       email: dto.email,
       phone: dto.phone,
       address: dto.address,
