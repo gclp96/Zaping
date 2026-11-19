@@ -71,7 +71,7 @@ export class UsersService {
         email: dto.email,
         passwordHash,
         role: dto.role,
-        canAdjustPurchaseUnitCost: dto.canAdjustPurchaseUnitCost ?? false,
+        canAdjustPurchaseUnitCost: dto.role === UserRole.WAREHOUSE && dto.canAdjustPurchaseUnitCost === true,
       },
       select: safeUserSelect,
     });
@@ -121,7 +121,9 @@ export class UsersService {
     if (dto.email !== undefined) data.email = dto.email;
     if (dto.role !== undefined) data.role = dto.role;
     if (dto.isActive !== undefined) data.isActive = dto.isActive;
-    if (dto.canAdjustPurchaseUnitCost !== undefined) {
+    if (finalRole !== UserRole.WAREHOUSE) {
+      data.canAdjustPurchaseUnitCost = false;
+    } else if (dto.canAdjustPurchaseUnitCost !== undefined) {
       data.canAdjustPurchaseUnitCost = dto.canAdjustPurchaseUnitCost;
     }
 
