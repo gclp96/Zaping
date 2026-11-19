@@ -42,6 +42,11 @@ export class CreateProductDto {
   @IsOptional()
   barcode?: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  unitOfMeasure?: string;
+
   @Type(() => Number)
   @IsNumber()
   @Min(0)
