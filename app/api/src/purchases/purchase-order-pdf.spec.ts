@@ -94,8 +94,6 @@ describe('purchase order PDF', () => {
     );
     const pdf = await result;
     const raw = pdf.toString('latin1');
-    expect((raw.match(/\/Type\s*\/Page\b/g) ?? []).length).toBeGreaterThan(
-      1,
-    );
+    expect((raw.match(/\/Type\s*\/Page\b/g) ?? []).length).toBeGreaterThan(1);
   });
 });
