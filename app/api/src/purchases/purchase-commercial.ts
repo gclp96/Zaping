@@ -73,9 +73,11 @@ export type PurchaseCommercialSource = {
   buyerName?: string | null;
   items: Array<{
     productId: string;
-    product: { name: string; sku: string };
+    product: { name: string; sku: string; unitOfMeasure?: string | null };
     quantity: number;
     price: number;
+    listUnitCost?: number | null;
+    discountPercent?: number;
     subtotal: number;
   }>;
 };
@@ -111,6 +113,9 @@ export type PurchaseCommercialSnapshotV1 = {
     name: string;
     quantity: number;
     unitCost: number;
+    unitOfMeasure?: string | null;
+    listUnitCost?: number | null;
+    discountPercent?: number;
     subtotal: number;
   }>;
 };
@@ -152,6 +157,9 @@ export function buildPurchaseCommercialSnapshot(
       name: item.product.name,
       quantity: item.quantity,
       unitCost: item.price,
+      unitOfMeasure: item.product.unitOfMeasure?.trim() || null,
+      listUnitCost: item.listUnitCost ?? null,
+      discountPercent: item.discountPercent ?? 0,
       subtotal: item.subtotal,
     })),
   };

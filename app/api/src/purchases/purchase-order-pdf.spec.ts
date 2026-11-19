@@ -128,6 +128,54 @@ describe('purchase order PDF', () => {
     }
   });
 
+  it('muestra unidad real, descuento y costo bruto, pero importe neto', async () => {
+    const written = jest.spyOn(PDFDocument.prototype, 'text');
+    const stream = new PassThrough();
+    stream.resume();
+    const completed = new Promise<void>((resolve, reject) => {
+      stream.on('end', resolve);
+      stream.on('error', reject);
+    });
+    const response = Object.assign(stream, {
+      setHeader: jest.fn(),
+    }) as unknown as Response;
+
+    try {
+      renderPurchaseOrderPdf(
+        {
+          ...base,
+          subtotal: 769.5,
+          iva: 123.12,
+          total: 892.62,
+          items: [
+            {
+              ...base.items[0],
+              product: {
+                sku: 'INS-1',
+                name: 'Equipo de prueba',
+                unitOfMeasure: 'pzas.',
+              },
+              quantity: 10,
+              price: 76.95,
+              listUnitCost: 85.5,
+              discountPercent: 10,
+              subtotal: 769.5,
+            },
+          ],
+        },
+        response,
+      );
+      await completed;
+      const displayed = written.mock.calls.map(([value]) => String(value));
+      expect(displayed).toContain('10 pzas.');
+      expect(displayed).toContain('10.00%');
+      expect(displayed).toContain('$85.5000');
+      expect(displayed).toContain('$769.50');
+    } finally {
+      written.mockRestore();
+    }
+  });
+
   it('prints multiple pages with long purchase lines', async () => {
     const stream = new PassThrough();
     const chunks: Buffer[] = [];

@@ -444,6 +444,8 @@ const {
   itemQuantityErrors,
   itemUnitCostDrafts,
   itemUnitCostErrors,
+  itemDiscountDrafts,
+  itemDiscountErrors,
   itemsError,
 
   subtotal,
@@ -462,6 +464,7 @@ const {
   handleAddProduct,
   handleItemQuantityChange,
   handleItemUnitCostChange,
+  handleItemDiscountChange,
   handleRemoveItem,
   handleCreatePurchase,
 } = usePurchaseForm({
@@ -1313,6 +1316,8 @@ async function loadPageData() {
         itemQuantityErrors={itemQuantityErrors}
         itemUnitCostDrafts={itemUnitCostDrafts}
         itemUnitCostErrors={itemUnitCostErrors}
+        itemDiscountDrafts={itemDiscountDrafts}
+        itemDiscountErrors={itemDiscountErrors}
         canAdjustUnitCost={canApprove || Boolean(sessionState.status === 'success' && sessionState.user.canAdjustPurchaseUnitCost)}
         itemsError={itemsError}
         subtotal={subtotal}
@@ -1333,6 +1338,7 @@ async function loadPageData() {
           handleItemQuantityChange
         }
         onItemUnitCostChange={handleItemUnitCostChange}
+        onItemDiscountChange={handleItemDiscountChange}
         />
       <PurchaseReceiptModal
         isOpen={purchaseToReceive !== null || createdReceipt !== null}

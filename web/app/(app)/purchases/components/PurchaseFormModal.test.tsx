@@ -330,6 +330,46 @@ describe('PurchaseFormModal', () => {
     expect(screen.getAllByText('$100.00').length).toBeGreaterThan(0);
   });
 
+  it('muestra y valida descuentos por partida en desktop y móvil', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const onItemDiscountChange = vi.fn();
+    renderModal({
+      canAdjustUnitCost: true,
+      onItemDiscountChange,
+      items: [{
+        ...item,
+        unitOfMeasure: 'pzas.',
+        baseUnitCost: 85.5,
+        unitCost: 76.95,
+        discountPercent: 10,
+      }],
+      itemDiscountDrafts: { 'product-1': '10' },
+    });
+    const table = screen.getByTestId('purchase-form-items-table');
+    expect(within(table).getByText(/pzas./i)).toBeTruthy();
+    const discount = within(table).getByRole('spinbutton', {
+      name: 'Descuento de Producto médico',
+    });
+    fireEvent.change(discount, { target: { value: '12.50' } });
+    expect(onItemDiscountChange).toHaveBeenCalledWith('product-1', '12.50');
+    const mobile = screen.getByTestId('purchase-form-mobile-items');
+    expect(within(mobile).getByRole('spinbutton', {
+      name: 'Descuento de Producto médico',
+    })).toBeTruthy();
+  });
+
+  it('desactiva guardar si el descuento es inválido', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    renderModal({
+      canAdjustUnitCost: true,
+      itemDiscountDrafts: { 'product-1': '110' },
+      itemDiscountErrors: { 'product-1': 'Descuento inválido' },
+    });
+    const footer = screen.getByTestId('purchase-form-footer');
+    const save = within(footer).getByRole('button', { name: 'Crear compra' });
+    expect((save as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('bloquea guardar cuando se ingresa un costo inválido', () => {
     vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
     renderModal({

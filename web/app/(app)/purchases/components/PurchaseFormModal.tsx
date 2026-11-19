@@ -38,6 +38,8 @@ type PurchaseFormModalProps = {
   itemQuantityErrors: Record<string, string>;
   itemUnitCostDrafts?: Record<string, string>;
   itemUnitCostErrors?: Record<string, string>;
+  itemDiscountDrafts?: Record<string, string>;
+  itemDiscountErrors?: Record<string, string>;
   canAdjustUnitCost?: boolean;
   itemsError: string;
 
@@ -61,6 +63,7 @@ type PurchaseFormModalProps = {
     value: string,
   ) => void;
   onItemUnitCostChange?: (productId: string, value: string) => void;
+  onItemDiscountChange?: (productId: string, value: string) => void;
 };
 
 function getItemSubtotal(item: PurchaseFormItem): number {
@@ -89,6 +92,8 @@ export default function PurchaseFormModal({
   itemQuantityErrors,
   itemUnitCostDrafts = {},
   itemUnitCostErrors = {},
+  itemDiscountDrafts = {},
+  itemDiscountErrors = {},
   canAdjustUnitCost = false,
   itemsError,
   subtotal,
@@ -105,6 +110,7 @@ export default function PurchaseFormModal({
   onQuantityChange,
   onItemQuantityChange,
   onItemUnitCostChange,
+  onItemDiscountChange,
 }: PurchaseFormModalProps) {
   // PUR-UX-02C: create and DRAFT edit use the same visual workspace.
   // Edit eligibility and POST/PATCH behavior stay in the purchase hook.
@@ -173,7 +179,7 @@ export default function PurchaseFormModal({
           type="button"
           loading={saving}
           loadingText={editing ? 'Guardando cambios...' : 'Guardando...'}
-          disabled={saving || !supplierId || items.length === 0 || Object.keys(itemUnitCostErrors).length > 0}
+          disabled={saving || !supplierId || items.length === 0 || Object.keys(itemUnitCostErrors).length > 0 || Object.keys(itemDiscountErrors).length > 0}
           className="w-full sm:min-w-40 sm:w-auto"
           onClick={onSubmit}
         >
@@ -395,7 +401,10 @@ export default function PurchaseFormModal({
                         Cantidad
                       </th>
                       <th className="px-3 py-2 text-right" scope="col">
-                        Costo
+                        Costo unitario
+                      </th>
+                      <th className="px-3 py-2 text-right" scope="col">
+                        Descuento (%)
                       </th>
                       <th className="px-3 py-2 text-right" scope="col">
                         Subtotal
@@ -418,6 +427,7 @@ export default function PurchaseFormModal({
                           </p>
                           <p className="mt-1 text-xs text-gray-500">
                             {item.sku}
+                            {item.unitOfMeasure ? ` · ${item.unitOfMeasure}` : ''}
                           </p>
                         </td>
 
@@ -444,12 +454,30 @@ export default function PurchaseFormModal({
                             <MoneyInput
                               id={`purchase-item-unit-cost-${item.productId}-table`}
                               aria-label={`Costo unitario de ${item.name}`}
-                              value={itemUnitCostDrafts[item.productId] ?? String(item.unitCost)}
+                              value={itemUnitCostDrafts[item.productId] ?? String(item.baseUnitCost ?? item.unitCost)}
                               maxDecimals={4}
                               error={itemUnitCostErrors[item.productId]}
                               onValueChange={(value) => onItemUnitCostChange?.(item.productId, value)}
                             />
-                          ) : formatMoney(item.unitCost)}
+                          ) : formatMoney(item.baseUnitCost ?? item.unitCost)}
+                        </td>
+
+                        <td className="min-w-28 px-3 py-3 text-right">
+                          {workspaceEnabled && canAdjustUnitCost ? (
+                            <Input
+                              id={`purchase-item-discount-${item.productId}-table`}
+                              aria-label={`Descuento de ${item.name}`}
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={0.01}
+                              value={itemDiscountDrafts[item.productId] ?? String(item.discountPercent ?? 0)}
+                              error={itemDiscountErrors[item.productId]}
+                              onChange={(event) => onItemDiscountChange?.(item.productId, event.target.value)}
+                            />
+                          ) : (item.discountPercent ?? 0) > 0
+                            ? `${(item.discountPercent ?? 0).toFixed(2)}%`
+                            : '—'}
                         </td>
 
                         <td className="px-3 py-3 text-right font-medium text-gray-900">
@@ -499,6 +527,7 @@ export default function PurchaseFormModal({
                           </h4>
                           <p className="mt-1 text-xs text-gray-500">
                             SKU: {item.sku}
+                            {item.unitOfMeasure ? ` · ${item.unitOfMeasure}` : ''}
                           </p>
                         </div>
 
@@ -521,7 +550,7 @@ export default function PurchaseFormModal({
                             <MoneyInput
                               id={`purchase-item-unit-cost-${item.productId}-mobile`}
                               label={`Costo unitario de ${item.name}`}
-                              value={itemUnitCostDrafts[item.productId] ?? String(item.unitCost)}
+                              value={itemUnitCostDrafts[item.productId] ?? String(item.baseUnitCost ?? item.unitCost)}
                               maxDecimals={4}
                               error={itemUnitCostErrors[item.productId]}
                               onValueChange={(value) => onItemUnitCostChange?.(item.productId, value)}
@@ -530,7 +559,31 @@ export default function PurchaseFormModal({
                             <>
                               <dt className="text-gray-500">Costo</dt>
                               <dd className="mt-1 font-medium text-gray-900">
-                                {formatMoney(item.unitCost)}
+                                {formatMoney(item.baseUnitCost ?? item.unitCost)}
+                              </dd>
+                            </>
+                          )}
+                        </div>
+                        <div>
+                          {workspaceEnabled && canAdjustUnitCost ? (
+                            <Input
+                              id={`purchase-item-discount-${item.productId}-mobile`}
+                              label={`Descuento de ${item.name}`}
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={0.01}
+                              value={itemDiscountDrafts[item.productId] ?? String(item.discountPercent ?? 0)}
+                              error={itemDiscountErrors[item.productId]}
+                              onChange={(event) => onItemDiscountChange?.(item.productId, event.target.value)}
+                            />
+                          ) : (
+                            <>
+                              <dt className="text-gray-500">Descuento</dt>
+                              <dd className="mt-1 font-medium text-gray-900">
+                                {(item.discountPercent ?? 0) > 0
+                                  ? `${(item.discountPercent ?? 0).toFixed(2)}%`
+                                  : 'No aplica'}
                               </dd>
                             </>
                           )}
