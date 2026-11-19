@@ -37,7 +37,10 @@ describe('CreatePurchaseItemDto — negotiated cost', () => {
   it.each([0, 10, 12.34, 100])(
     'acepta descuento válido %s por ciento',
     async (discountPercent) => {
-      const dto = plainToInstance(CreatePurchaseItemDto, { ...base, discountPercent });
+      const dto = plainToInstance(CreatePurchaseItemDto, {
+        ...base,
+        discountPercent,
+      });
       expect(await validate(dto)).toHaveLength(0);
     },
   );
@@ -45,9 +48,14 @@ describe('CreatePurchaseItemDto — negotiated cost', () => {
   it.each([-1, 100.01, 1.234, Number.POSITIVE_INFINITY, '10', null])(
     'rechaza descuento inválido %s',
     async (discountPercent) => {
-      const dto = plainToInstance(CreatePurchaseItemDto, { ...base, discountPercent });
+      const dto = plainToInstance(CreatePurchaseItemDto, {
+        ...base,
+        discountPercent,
+      });
       expect(
-        (await validate(dto)).some((error) => error.property === 'discountPercent'),
+        (await validate(dto)).some(
+          (error) => error.property === 'discountPercent',
+        ),
       ).toBe(true);
     },
   );
