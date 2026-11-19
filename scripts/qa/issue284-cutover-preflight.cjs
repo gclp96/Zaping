@@ -108,7 +108,7 @@ function fingerprintSql(name) {
 }
 function allFingerprintsQuery(names) {
   assert.equal(names.length, 57, 'STOP: unexpected official table inventory');
-  return names.map(fingerprintSql).join(' UNION ALL ') + ';';
+  return 'SELECT * FROM (' + names.map(fingerprintSql).join(' UNION ALL ') + ') AS fp ORDER BY 1;';
 }
 function verifyTableFingerprints(sourceOutput, targetOutput) {
   const lines = sourceOutput.split(/\r?\n/).filter(Boolean);
