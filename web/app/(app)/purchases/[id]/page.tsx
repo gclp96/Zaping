@@ -241,6 +241,8 @@ function usePurchase360(purchaseId: string) {
     notFound,
     forbidden,
     currentUserRole,
+    delegatedCostEditing: sessionState.status === 'success' &&
+      sessionState.user.canAdjustPurchaseUnitCost === true,
     receipts,
     receiptsLoading,
     receiptsError,
@@ -275,9 +277,11 @@ export default function Purchase360Page() {
     loadReceipts,
     loadMovements,
     currentUserRole,
+    delegatedCostEditing,
   } = usePurchase360(id);
   const canEdit = canEditPurchases(currentUserRole);
   const canApprove = canApprovePurchases(currentUserRole);
+  const canAdjustUnitCost = canApprove || delegatedCostEditing;
   const sessionForbidsAccess = Boolean(
     currentUserRole && !hasRole(currentUserRole, WAREHOUSE_ROLES),
   );
@@ -352,10 +356,7 @@ export default function Purchase360Page() {
   } = usePurchaseForm({
     products,
     onPurchaseSaved: reloadPurchase360,
-    canAdjustUnitCost: canApprove || Boolean(
-      sessionState.status === 'success' &&
-      sessionState.user.canAdjustPurchaseUnitCost,
-    ),
+    canAdjustUnitCost,
   });
 
   const {
@@ -799,10 +800,7 @@ export default function Purchase360Page() {
         itemQuantityErrors={itemQuantityErrors}
         itemUnitCostDrafts={itemUnitCostDrafts}
         itemUnitCostErrors={itemUnitCostErrors}
-        canAdjustUnitCost={canApprove || Boolean(
-          sessionState.status === 'success' &&
-          sessionState.user.canAdjustPurchaseUnitCost
-        )}
+        canAdjustUnitCost={canAdjustUnitCost}
         itemsError={itemsError}
         subtotal={subtotal}
         iva={iva}
