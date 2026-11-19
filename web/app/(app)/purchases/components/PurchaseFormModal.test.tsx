@@ -277,6 +277,42 @@ describe('PurchaseFormModal', () => {
     expect(onSubmit).toHaveBeenCalledOnce();
   });
 
+  it('permite ajustar el costo en desktop y móvil solo a usuarios autorizados', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const onItemUnitCostChange = vi.fn();
+    const view = renderModal({
+      canAdjustUnitCost: true,
+      onItemUnitCostChange,
+      itemUnitCostDrafts: { 'product-1': '12.3456' },
+    });
+    const table = screen.getByTestId('purchase-form-items-table');
+    const input = within(table).getByRole('textbox', {
+      name: 'Costo unitario de Producto médico',
+    }) as HTMLInputElement;
+    expect(input.value).toBe('12.3456');
+    fireEvent.change(input, { target: { value: '13.2222' } });
+    expect(onItemUnitCostChange).toHaveBeenCalledWith('product-1', '13.2222');
+    const mobile = screen.getByTestId('purchase-form-mobile-items');
+    expect(within(mobile).getByRole('textbox', {
+      name: 'Costo unitario de Producto médico',
+    })).toBeTruthy();
+    view.unmount();
+    renderModal({ canAdjustUnitCost: false });
+    expect(screen.queryByRole('textbox', { name: 'Costo unitario de Producto médico' })).toBeNull();
+    expect(screen.getAllByText('$100.00').length).toBeGreaterThan(0);
+  });
+
+  it('bloquea guardar cuando se ingresa un costo inválido', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    renderModal({
+      canAdjustUnitCost: true,
+      itemUnitCostDrafts: { 'product-1': '' },
+      itemUnitCostErrors: { 'product-1': 'Costo inválido' },
+    });
+    const footer = screen.getByTestId('purchase-form-footer');
+    expect((within(footer).getByRole('button', { name: 'Crear compra' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('abre la confirmación solo si el borrador editado tiene cambios', () => {
     vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
     const onClose = vi.fn();
