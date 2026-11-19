@@ -71,7 +71,9 @@ export class UsersService {
         email: dto.email,
         passwordHash,
         role: dto.role,
-        canAdjustPurchaseUnitCost: dto.role === UserRole.WAREHOUSE && dto.canAdjustPurchaseUnitCost === true,
+        canAdjustPurchaseUnitCost:
+          dto.role === UserRole.WAREHOUSE &&
+          dto.canAdjustPurchaseUnitCost === true,
       },
       select: safeUserSelect,
     });
