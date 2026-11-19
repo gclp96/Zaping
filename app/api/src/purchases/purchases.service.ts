@@ -374,8 +374,9 @@ export class PurchasesService {
           );
         }
 
-        const existingLineCost =
-          purchase.items?.find((line) => line.productId === product.id)?.price;
+        const existingLineCost = purchase.items?.find(
+          (line) => line.productId === product.id,
+        )?.price;
         const unitCost = this.resolvePurchaseItemUnitCost(
           item.unitCost,
           existingLineCost ?? product.cost,
@@ -642,8 +643,10 @@ export class PurchasesService {
       return fallbackCost;
     }
 
-    const roleAllowsEdit = actorRole === UserRole.ADMIN || actorRole === UserRole.MANAGER;
-    const delegatedBuyer = actorRole === UserRole.WAREHOUSE && actorCanAdjustPurchaseUnitCost;
+    const roleAllowsEdit =
+      actorRole === UserRole.ADMIN || actorRole === UserRole.MANAGER;
+    const delegatedBuyer =
+      actorRole === UserRole.WAREHOUSE && actorCanAdjustPurchaseUnitCost;
 
     if (!roleAllowsEdit && !delegatedBuyer) {
       throw new ForbiddenException(
