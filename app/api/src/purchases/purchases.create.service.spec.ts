@@ -6,6 +6,7 @@ import { Reflector } from '@nestjs/core';
 import { UserRole } from '@prisma/client';
 import { RolesGuard } from '../auth/guards/roles.guards';
 import { PurchasesController } from './purchases.controller';
+import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 
 describe('PurchasesService — annual folio creation', () => {
   const folios = { allocateNextAvailableFolio: jest.fn() };
@@ -76,27 +77,35 @@ describe('PurchasesService — annual folio creation', () => {
     );
   });
   it('persists a negotiated line cost without mutating the product catalog', async () => {
-    await service.create('company-a', {
-      ...dto,
-      items: [{ productId: 'product-a', quantity: 2, unitCost: 11.2345 }],
-    }, UserRole.ADMIN);
-    expect(tx.purchase.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          subtotal: 22.47,
-          iva: 3.6,
-          total: 26.07,
-          items: {
-            create: [{
+    await service.create(
+      'company-a',
+      {
+        ...dto,
+        items: [{ productId: 'product-a', quantity: 2, unitCost: 11.2345 }],
+      },
+      UserRole.ADMIN,
+    );
+
+    expect(tx.purchase.create).toHaveBeenCalledWith({
+      data: {
+        companyId: 'company-a',
+        supplierId: 'supplier-a',
+        folio: 'OC-26-00001',
+        subtotal: 22.47,
+        iva: 3.6,
+        total: 26.07,
+        items: {
+          create: [
+            {
               productId: 'product-a',
               quantity: 2,
               price: 11.2345,
               subtotal: 22.47,
-            }],
-          },
-        }),
-      }),
-    );
+            },
+          ],
+        },
+      },
+    });
     expect(tx.product.findMany).toHaveBeenCalledTimes(1);
   });
 
@@ -106,9 +115,16 @@ describe('PurchasesService — annual folio creation', () => {
       [-1, UserRole.ADMIN],
       [1.23456, UserRole.MANAGER],
     ] as const) {
-      await expect(service.create('company-a', {
-        ...dto, items: [{ productId: 'product-a', quantity: 2, unitCost }],
-      }, role)).rejects.toThrow();
+      await expect(
+        service.create(
+          'company-a',
+          {
+            ...dto,
+            items: [{ productId: 'product-a', quantity: 2, unitCost }],
+          },
+          role,
+        ),
+      ).rejects.toThrow();
     }
     expect(folios.allocateNextAvailableFolio).not.toHaveBeenCalled();
     expect(tx.purchase.create).not.toHaveBeenCalled();
@@ -168,7 +184,10 @@ describe('Purchase creation authorization contract', () => {
       items: [{ productId: 'product-a', quantity: 1 }],
       companyId: 'company-foreign',
     };
-    void controller.create({ user: { companyId: 'company-a' } }, dto);
+    void controller.create(
+      { user: { companyId: 'company-a' } } as AuthenticatedRequest,
+      dto,
+    );
     expect(create).toHaveBeenCalledWith('company-a', dto, undefined, false);
   });
 });
