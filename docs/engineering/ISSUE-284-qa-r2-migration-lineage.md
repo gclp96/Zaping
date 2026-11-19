@@ -290,6 +290,61 @@ Previo a la autorización de cambio de QA:
   recuperación temporal, NO reconciliación de su migración R2.
 - Este PR NO realiza el corte ni la reversión.
 
+## Paso 2f — Respaldo operativo RESTAURADO y preflight de corte (19/nov/2026)
+
+**Evidencia local del usuario — PASS:** backup de QA operativa
+'zaping_qa_pre_issue284_cutover_20261119_005304.dump', **481726 bytes**,
+SHA-256 de la copia local coincidente con el archivo del contenedor,
+TOC legible mediante pg_restore --list, restauración exitosa en el proyecto
+aislado 'zaping-issue284-rehearsal' bajo la base independiente
+'zaping_issue284_backup_restore_trial_v1'. Consultas de solo lectura
+confirmaron: **54 migraciones oficiales + 1 R2 histórica = 55**, 2 empresas,
+5 usuarios, 14 productos, 7 compras, 5 recepciones, 5 cotizaciones,
+3 ventas, 5 casos Healthcare, **110 filas oficiales** y registros
+históricos R2 **1/1/3**. Ninguna configuración o DB operativa fue alterada.
+
+La prueba de escritura indispensable también terminó PASS en la **copia
+descartable** 'zaping_issue284_write_trial_v1': 31/31 unit tests,
+contraseñas sintéticas/login, cliente POST/PATCH, compra POST, RBAC,
+cross-tenant 403/404, recuentos finales 5 clientes y 8 compras/partidas.
+NO reutilizar esta copia para poblar candidata (contiene escritura de prueba).
+
+**Siguiente paso: SOLO lectura**. Se añadió el preflight de corte:
+'scripts/qa/issue284-cutover-preflight.cjs'. Compara identidad exacta de
+ambos proyectos Docker y sus usuarios/base, **55 vs 54 migraciones** con
+única R2 histórica extra, ausencia/presencia de las 3 tablas R2,
+**57 tablas oficiales** y sus recuentos+huellas MD5 de cada fila (v3
+versus QA operativa), total 110, registros R2 1/1/3 y **ausencia**
+del nombre candidato 'zaping_qa_official_candidate_v1' en el proyecto
+operativo. Todos los SELECT usan PGOPTIONS con sesiones read-only.
+
+~~~powershell
+cd C:\dev\zaping
+git pull --ff-only origin fix/issue-284-qa-migration-lineage-audit-20261118
+node --test scripts/qa/*.test.cjs
+node scripts/qa/issue284-cutover-preflight.cjs
+~~~
+
+Esperado: 3 líneas PASS y 1 HOLD. Si falla, NO avanzar. Puede indicar
+cambios reales después del respaldo o discrepancias en la identidad
+de entornos: documentar antes de crear una candidata. El script NO crea
+bases, NO copia datos, NO modifica secretos, API/Web ni migraciones.
+
+**Diseño del paso POSTERIOR, sujeto a autorización expresa:**
+- Pausar escritores QA y proteger/restaurar el respaldo actualizado.
+- Crear una BD nueva exclusivamente dentro del PostgreSQL operativo:
+  'zaping_qa_official_candidate_v1', sin sobrescribir 'zaping_qa'.
+- Copiar SOLO los 57 objetos/tablas oficiales y sus 110 filas desde
+  la v3 inmutable con transporte revisado, preservar constraints/triggers,
+  y garantizar 54 migraciones oficiales y 0 R2 en la candidata.
+  No trasladar el historial experimental ni el objeto R2 (soft-deleted,
+  NOT_SCANNED) a la candidata. Guardar su evidencia en la original/dump.
+- Validar claves/secretos de acceso, login real, integridad, endpoints,
+  multiempresa y conectividad de API/Web antes de cambiar DATABASE_URL.
+- Tras consentimiento explícito, ajustar configuración privada de
+  QA únicamente a la candidata en una ventana con rollback definido.
+  No tocar zapping_dev, producción, R2 externo ni tokens publicados.
+
 ## Paso 3 — Corte real de QA: gate humano pendiente
 
 **No forma parte de este PR.** No basta con un rehearsal verde para cambiar
@@ -329,8 +384,10 @@ la base que usan QA ADMIN/SALES/etc. Se requiere:
 - [x] Ensayo limpio PostgreSQL 16 completado: 54 migraciones, 0 R2; `migrate status` y `validate` PASS.
 - [x] Respaldo restaurado verificado, 5 consultas de integridad sin huérfanos, inventario 110+5 y equivalencia estructural documentada.
 - [x] Transferencia a la sexta BD de ensayo v3: 110 filas oficiales, huellas coincidentes, 54 migraciones, 0 R2.
-- [ ] Smoke funcional API aislada: JWT/RBAC, tenant A/B, Clientes, Compras, Recepciones y Healthcare.
-- [ ] Login real y escritura mínima verificados en la copia nueva (pendiente local).
+- [x] Smoke funcional API aislada: 48 checks JWT/RBAC, tenant A/B, Clientes, Compras, Recepciones y Healthcare (salida local PASS).
+- [x] Login real sintético y escritura mínima verificados en copia aislada (salida local PASS; no continuidad de secretos operativos).
+- [x] Respaldo QA actualizado restaurado en Docker de ensayo y recuentos verificados.
+- [ ] Preflight read-only de corte en host local (57 huellas/identidades).
 - [ ] Política de preservación de datos y autorización de corte definidas.
 - [ ] Corte hacia BD QA de `main` completado y pruebas de regresión PASS.
 - [ ] Cerrar issue #284 solo después de comprobar que la QA activa no posee
