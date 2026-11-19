@@ -31,6 +31,7 @@ describe('JwtStrategy', () => {
     firstName: 'Current',
     lastName: 'User',
     role: UserRole.MANAGER,
+    canAdjustPurchaseUnitCost: false,
     authVersion: 0,
   };
 
@@ -41,6 +42,7 @@ describe('JwtStrategy', () => {
     firstName: dbUser.firstName,
     lastName: dbUser.lastName,
     role: dbUser.role,
+    canAdjustPurchaseUnitCost: dbUser.canAdjustPurchaseUnitCost,
   };
 
   beforeEach(() => {
@@ -80,6 +82,7 @@ describe('JwtStrategy', () => {
         firstName: true,
         lastName: true,
         role: true,
+        canAdjustPurchaseUnitCost: true,
         authVersion: true,
       },
     });
@@ -195,6 +198,7 @@ describe('JwtStrategy', () => {
         firstName: true,
         lastName: true,
         role: true,
+        canAdjustPurchaseUnitCost: true,
         authVersion: true,
       },
     });
@@ -223,6 +227,7 @@ describe('JwtStrategy', () => {
         firstName: true,
         lastName: true,
         role: true,
+        canAdjustPurchaseUnitCost: true,
         authVersion: true,
       },
     });
