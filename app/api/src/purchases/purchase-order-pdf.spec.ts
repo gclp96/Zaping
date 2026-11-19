@@ -62,6 +62,8 @@ describe('purchase order PDF', () => {
     const pdf = await result;
     expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
     expect(pdf.length).toBeGreaterThan(1500);
+    const pageMarkers = pdf.toString('latin1').match(/\/Type\s*\/Page\b/g);
+    expect(pageMarkers).toHaveLength(1);
     expect(headers['Content-Type']).toBe('application/pdf');
     expect(headers['Content-Disposition']).toContain('OC-26-00003');
   });
