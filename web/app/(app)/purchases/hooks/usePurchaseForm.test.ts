@@ -222,6 +222,9 @@ describe('usePurchaseForm', () => {
         name: 'Producto médico',
         quantity: '3',
         unitCost: 100,
+        baseUnitCost: 100,
+        discountPercent: 0,
+        unitOfMeasure: null,
       },
     ]);
 
@@ -261,6 +264,9 @@ describe('usePurchaseForm', () => {
         name: 'Producto médico',
         quantity: '10',
         unitCost: 100,
+        baseUnitCost: 100,
+        discountPercent: 0,
+        unitOfMeasure: null,
       },
     ]);
 
@@ -447,6 +453,60 @@ describe('usePurchaseForm', () => {
     act(() => result.current.handleAddProduct());
     act(() => result.current.handleItemUnitCostChange('product-1', '1'));
     expect(result.current.items[0].unitCost).toBe(100);
+  });
+
+  it('calcula descuento de compra con costo neto y envía bruto y porcentaje', async () => {
+    const { result } = setupHook(true);
+    vi.mocked(api.post).mockResolvedValue({ data: { id: 'new-2' } } as never);
+    act(() => result.current.openCreateModal());
+    act(() => {
+      result.current.handleSupplierChange('supplier-1');
+      result.current.handleSelectedProductChange('product-1');
+      result.current.handleFormQuantityChange('10');
+    });
+    act(() => result.current.handleAddProduct());
+    act(() => result.current.handleItemUnitCostChange('product-1', '85.5'));
+    act(() => result.current.handleItemDiscountChange('product-1', '10'));
+    expect(result.current.items[0].unitCost).toBe(76.95);
+    expect(result.current.items[0].baseUnitCost).toBe(85.5);
+    expect(result.current.subtotal).toBe(769.5);
+    expect(result.current.iva).toBe(123.12);
+    expect(result.current.total).toBe(892.62);
+
+    await act(async () => { await result.current.handleCreatePurchase(); });
+    expect(api.post).toHaveBeenCalledWith('/purchases', {
+      supplierId: 'supplier-1',
+      items: [{
+        productId: 'product-1',
+        quantity: 10,
+        unitCost: 85.5,
+        discountPercent: 10,
+      }],
+    });
+    expect(product.cost).toBe(100);
+  });
+
+  it('bloquea descuentos inválidos y protege rol no autorizado', async () => {
+    const { result } = setupHook(true);
+    act(() => result.current.openCreateModal());
+    act(() => {
+      result.current.handleSupplierChange('supplier-1');
+      result.current.handleSelectedProductChange('product-1');
+    });
+    act(() => result.current.handleAddProduct());
+    act(() => result.current.handleItemDiscountChange('product-1', '120'));
+    expect(result.current.itemDiscountErrors['product-1']).toBeTruthy();
+    await act(async () => { await result.current.handleCreatePurchase(); });
+    expect(api.post).not.toHaveBeenCalled();
+    act(() => result.current.handleItemDiscountChange('product-1', '0'));
+    expect(result.current.itemDiscountErrors).toEqual({});
+
+    const unauthorized = setupHook(false);
+    act(() => unauthorized.result.current.openCreateModal());
+    act(() => unauthorized.result.current.handleSelectedProductChange('product-1'));
+    act(() => unauthorized.result.current.handleAddProduct());
+    act(() => unauthorized.result.current.handleItemDiscountChange('product-1', '10'));
+    expect(unauthorized.result.current.items[0].discountPercent).toBe(0);
   });
 
   it('actualiza una compra en borrador mediante PATCH', async () => {
