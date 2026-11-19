@@ -616,8 +616,7 @@ export class PurchasesService {
       const frozen = await tx.purchase.updateMany({
         where: { id: purchaseId, companyId, status: 'CONFIRMED' },
         data: {
-          commercialSnapshot:
-            commercialSnapshot as unknown as Prisma.InputJsonValue,
+          commercialSnapshot: commercialSnapshot as Prisma.InputJsonValue,
         },
       });
       if (frozen.count !== 1) {
