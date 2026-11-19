@@ -88,6 +88,41 @@ No usar `docker compose down -v` por defecto: conservar la evidencia de
 rehearsal hasta revisión. Tampoco ejecutar comandos sobre otro proyecto
 Compose por inferencia de nombres.
 
+## Paso 2b — Transferencia de datos oficiales a una CUARTA base desechable
+
+**Verificaciones realizadas en QA local el 18/nov/2026, según resultados compartidos:**
+
+- El rehearsal limpio tiene **54 migraciones**, `prisma migrate status` y `validate` PASS, **0 migraciones R2**.
+- Respaldo de QA realizado en formato `pg_dump -Fc`; SHA-256 cotejado. Restauración de prueba completa en `zaping_issue284_restore_check` PASS.
+- En el respaldo restaurado, las tres tablas R2 mantienen **1 archivo / 1 vínculo / 3 eventos** y cinco consultas de relaciones por empresa reportaron **0 huérfanos**. El archivo está eliminado lógicamente, estado `NOT_SCANNED`, tamaño 2369 bytes; no debe reactivarse.
+- Inventario: 22 tablas oficiales con **110 filas**, 3 tablas experimentales R2 con 5 filas. Datos en **ambas** empresas, incluyendo escenarios de Healthcare.
+- Las definiciones de columnas, tipos, nullabilidad y defaults coinciden. Se compararon 699 objetos estructurales por BD; únicamente difiere la representación de `SupplierDocumentAttachment_mime_check`: la restaurada convierte cada elemento del arreglo `['application/pdf','image/jpeg']` a `text`; la limpia convierte todo el arreglo a `text[]`. Son **equivalentes** para esos literales; no modificar constraints.
+
+**Procedimiento previsto (aún no ejecutado):**
+
+Desde la raíz de la rama de este PR, con los tres controles de rehearsal ya realizados:
+
+```powershell
+node --test scripts/qa/*.test.cjs
+node scripts/qa/rehearse-issue284-official-data.cjs
+```
+
+El script se detiene salvo que:
+- El contenedor pertenezca al proyecto Docker `zaping-issue284-rehearsal`.
+- La base limpia de rehearsal `zaping_qa` contenga exactamente 54 migraciones terminadas, ninguna R2 y **0 empresas**.
+- La BD destino `zaping_issue284_transfer_trial` **NO exista**.
+
+Después:
+1. Obtiene del esquema **limpio** la lista permitida de tablas y secuencias, excluyendo `_prisma_migrations` y las 3 tablas R2.
+2. Exporta únicamente esos datos desde `zaping_issue284_restore_check` con `pg_dump --data-only -Fc --table`. Inspecciona la lista del archive para confirmar que no contiene el historial ni tablas R2.
+3. **Clona** el esquema limpio con `createdb -T zaping_qa` a una nueva base `zaping_issue284_transfer_trial` *en el mismo Docker aislado*; no reemplaza ni modifica las otras dos bases.
+4. Ejecuta `pg_restore --data-only --single-transaction --exit-on-error`, **sin desactivar triggers ni FKs**. Si falla una dependencia FK, la transacción de importación se revierte y el script **se detiene**: no usar `--disable-triggers` como bypass.
+5. Comprueba exactamente 54 migraciones oficiales y 0 R2, compara recuentos y huellas de todas las tablas oficiales contra el respaldo restaurado, y exige **110 filas** idénticas.
+
+**Si falla:** mantener la cuarta BD creada para investigar, sin borrar volúmenes ni datos; identificar la dependencia que impide la importación y diseñar un orden de carga explícito en el rehearsal. **Un fallo no autoriza deshabilitar restricciones ni modificar QA operativa.**
+
+**Si pasa:** todavía falta asegurar funcionalidad por roles, configuración de usuario y sesiones, y validar las referencias al almacenamiento externo R2 (el dump no contiene el objeto binario) antes del corte de QA. Un ensayo verde **no** cambia ninguna conexión de API/Web.
+
 ## Paso 3 — Corte real de QA: gate humano pendiente
 
 **No forma parte de este PR.** No basta con un rehearsal verde para cambiar
@@ -123,8 +158,10 @@ la base que usan QA ADMIN/SALES/etc. Se requiere:
 - [x] Identificado que los tres modelos R2 no existen en `main`.
 - [x] Auditor read-only y pruebas puras, sin operaciones DDL/DML.
 - [x] Proyecto Docker de rehearsal separado y sin puertos expuestos.
-- [ ] Auditor ejecutado contra la QA local actual; revisar conteos/alertas.
-- [ ] Ensayo limpio PostgreSQL 16 completado con `migrate status` en verde.
+- [x] Auditor ejecutado en QA local; una migración R2 huérfana, 1/1/3 registros, checksum verificado.
+- [x] Ensayo limpio PostgreSQL 16 completado: 54 migraciones, 0 R2; `migrate status` y `validate` PASS.
+- [x] Respaldo restaurado verificado, 5 consultas de integridad sin huérfanos, inventario 110+5 y equivalencia estructural documentada.
+- [ ] Ensayo de transferencia a cuarta BD con 110 filas oficiales y hashes coincidentes.
 - [ ] Política de preservación de datos y autorización de corte definidas.
 - [ ] Corte hacia BD QA de `main` completado y pruebas de regresión PASS.
 - [ ] Cerrar issue #284 solo después de comprobar que la QA activa no posee
