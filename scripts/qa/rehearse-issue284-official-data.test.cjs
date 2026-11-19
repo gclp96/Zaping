@@ -7,6 +7,7 @@ const {
   listFromSql,
   officialTableNames,
   countAndFingerprintSql,
+  restoreWithQualifiedSearchPath,
 } = require('./rehearse-issue284-official-data.cjs');
 
 test('double-quotes only validated PostgreSQL identifiers', () => {
@@ -43,4 +44,43 @@ test('fingerprint query only references a validated table name', () => {
   assert.match(sql, /COUNT\(\*\)/);
   assert.match(sql, /string_agg/);
   assert.doesNotMatch(sql, /DELETE|UPDATE|INSERT/);
+});
+
+test('sets public search_path only after recognized pg_restore header', () => {
+  const script = [
+    '-- PostgreSQL database dump',
+    "SELECT pg_catalog.set_config('search_path', '', false);",
+    'COPY public."Company" ("id") FROM stdin;',
+    'abc',
+    '\\.',
+    '',
+  ].join('\n');
+  const patched = restoreWithQualifiedSearchPath(script);
+  assert.equal(
+    patched,
+    script.replace(
+      "SELECT pg_catalog.set_config('search_path', '', false);",
+      "SELECT pg_catalog.set_config('search_path', '', false);\nSET search_path = pg_catalog, public;",
+    ),
+  );
+  assert.equal((patched.match(/SET search_path = pg_catalog, public;/g) || []).length, 1);
+  assert.match(patched, /COPY public\."Company"/);
+  assert.match(patched, /abc\n/);
+  assert.doesNotMatch(patched, /disable-triggers|session_replication_role/i);
+});
+
+test('refuses missing or unexpected pg_restore search_path statements', () => {
+  assert.throws(
+    () => restoreWithQualifiedSearchPath('COPY public."Company" FROM stdin;\n\\.'),
+    /unexpected pg_restore search_path/,
+  );
+  const reset = "SELECT pg_catalog.set_config('search_path', '', false);";
+  assert.throws(
+    () => restoreWithQualifiedSearchPath(reset + '\n' + reset),
+    /unexpected pg_restore search_path/,
+  );
+  assert.throws(
+    () => restoreWithQualifiedSearchPath(reset + '\nSET search_path = public;'),
+    /unexpected pg_restore search_path/,
+  );
 });
