@@ -141,25 +141,30 @@ describe('purchase order PDF', () => {
     }) as unknown as Response;
 
     try {
-      renderPurchaseOrderPdf({
-        ...base,
-        subtotal: 769.5,
-        iva: 123.12,
-        total: 892.62,
-        items: [{
-          ...base.items[0],
-          product: {
-            sku: 'INS-1',
-            name: 'Equipo de prueba',
-            unitOfMeasure: 'pzas.',
-          },
-          quantity: 10,
-          price: 76.95,
-          listUnitCost: 85.5,
-          discountPercent: 10,
+      renderPurchaseOrderPdf(
+        {
+          ...base,
           subtotal: 769.5,
-        }],
-      }, response);
+          iva: 123.12,
+          total: 892.62,
+          items: [
+            {
+              ...base.items[0],
+              product: {
+                sku: 'INS-1',
+                name: 'Equipo de prueba',
+                unitOfMeasure: 'pzas.',
+              },
+              quantity: 10,
+              price: 76.95,
+              listUnitCost: 85.5,
+              discountPercent: 10,
+              subtotal: 769.5,
+            },
+          ],
+        },
+        response,
+      );
       await completed;
       const displayed = written.mock.calls.map(([value]) => String(value));
       expect(displayed).toContain('10 pzas.');
