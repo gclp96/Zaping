@@ -616,7 +616,7 @@ export class PurchasesService {
       const frozen = await tx.purchase.updateMany({
         where: { id: purchaseId, companyId, status: 'CONFIRMED' },
         data: {
-          commercialSnapshot: commercialSnapshot as Prisma.InputJsonValue,
+          commercialSnapshot,
         },
       });
       if (frozen.count !== 1) {
@@ -743,5 +743,4 @@ export class PurchasesService {
 
     renderPurchaseOrderPdf(purchase, res);
   }
-
 }
