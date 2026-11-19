@@ -17,6 +17,28 @@ export class CreateSupplierDto {
   name!: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  legalName?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/, {
+    message: 'El RFC del proveedor debe tener 12 o 13 caracteres válidos',
+  })
+  rfc?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  fiscalAddress?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  supplierCode?: string;
+
+  @IsOptional()
   @IsEmail()
   email?: string;
 
