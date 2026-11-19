@@ -132,10 +132,27 @@ export function renderPurchaseOrderPdf(
   }
 
   const rightHeaderX = right - 214;
-  textAt('ORDEN DE COMPRA', right - 236, headerY - 2, 236, 18, true, TEXT, 'right');
+  textAt(
+    'ORDEN DE COMPRA',
+    right - 236,
+    headerY - 2,
+    236,
+    18,
+    true,
+    TEXT,
+    'right',
+  );
   let folioY =
-    textAt(purchase.folio, rightHeaderX, headerY + 31, 214, 12, true, BLUE, 'right') +
-    4;
+    textAt(
+      purchase.folio,
+      rightHeaderX,
+      headerY + 31,
+      214,
+      12,
+      true,
+      BLUE,
+      'right',
+    ) + 4;
   folioY =
     textAt(
       `Fecha: ${issued}`,
