@@ -746,6 +746,18 @@ describe('ProductsPage', () => {
     expect(payload).not.toHaveProperty('stock');
   });
 
+  it('permite capturar pzas. como unidad explícita del producto', async () => {
+    const user = await openCreateProductModal();
+    fillRequiredProductFields();
+    const unitField = screen.getByRole('textbox', { name: 'Unidad de medida' });
+    await user.type(unitField, 'pzas.');
+    await user.click(screen.getByRole('button', { name: /^guardar$/i }));
+    expect(api.post).toHaveBeenCalledWith(
+      '/products',
+      expect.objectContaining({ unitOfMeasure: 'pzas.' }),
+    );
+  });
+
   it('resetea tracking a defaults al volver a crear', async () => {
     const user = await openCreateProductModal();
 
