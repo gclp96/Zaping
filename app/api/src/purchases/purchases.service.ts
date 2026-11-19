@@ -6,7 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 
-import { UserRole } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 
 import PDFDocument from 'pdfkit';
 import { Response } from 'express';
@@ -15,6 +15,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto';
 import { PurchasesFolioService } from './purchases-folio.service';
+import {
+  buildPurchaseCommercialSnapshot,
+  parsePurchaseCalendarDate,
+} from './purchase-commercial';
 
 type PurchaseWithReceiptItems = {
   items: Array<{
@@ -128,6 +132,23 @@ export class PurchasesService {
           subtotal,
           iva,
           total,
+          ...(dto.paymentTerms !== undefined && {
+            paymentTerms: dto.paymentTerms,
+          }),
+          ...(dto.paymentMethod !== undefined && {
+            paymentMethod: dto.paymentMethod,
+          }),
+          ...(dto.paymentDueDate !== undefined && {
+            paymentDueDate: parsePurchaseCalendarDate(dto.paymentDueDate),
+          }),
+          ...(dto.expectedDeliveryDate !== undefined && {
+            expectedDeliveryDate: parsePurchaseCalendarDate(
+              dto.expectedDeliveryDate,
+            ),
+          }),
+          ...(dto.buyerName !== undefined && {
+            buyerName: dto.buyerName,
+          }),
           items: {
             create: purchaseItems,
           },
@@ -409,6 +430,23 @@ export class PurchasesService {
           subtotal,
           iva,
           total,
+          ...(dto.paymentTerms !== undefined && {
+            paymentTerms: dto.paymentTerms,
+          }),
+          ...(dto.paymentMethod !== undefined && {
+            paymentMethod: dto.paymentMethod,
+          }),
+          ...(dto.paymentDueDate !== undefined && {
+            paymentDueDate: parsePurchaseCalendarDate(dto.paymentDueDate),
+          }),
+          ...(dto.expectedDeliveryDate !== undefined && {
+            expectedDeliveryDate: parsePurchaseCalendarDate(
+              dto.expectedDeliveryDate,
+            ),
+          }),
+          ...(dto.buyerName !== undefined && {
+            buyerName: dto.buyerName,
+          }),
         },
       });
 
@@ -552,6 +590,7 @@ export class PurchasesService {
           companyId,
         },
         include: {
+          company: true,
           supplier: true,
           items: {
             include: {
@@ -571,7 +610,21 @@ export class PurchasesService {
         );
       }
 
-      return purchase;
+      // The snapshot and status transition are in the same DB transaction.
+      // Later edits to Company, Supplier or Product cannot rewrite this PDF.
+      const commercialSnapshot = buildPurchaseCommercialSnapshot(purchase);
+      const frozen = await tx.purchase.updateMany({
+        where: { id: purchaseId, companyId, status: 'CONFIRMED' },
+        data: {
+          commercialSnapshot:
+            commercialSnapshot as unknown as Prisma.InputJsonValue,
+        },
+      });
+      if (frozen.count !== 1) {
+        throw new ConflictException('No fue posible congelar la compra');
+      }
+
+      return { ...purchase, commercialSnapshot };
     });
   }
 
