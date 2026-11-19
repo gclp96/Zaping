@@ -12,19 +12,26 @@ const base = {
 
 describe('CreatePurchaseItemDto — negotiated cost', () => {
   it('keeps legacy requests valid without a cost', async () => {
-    expect(await validate(plainToInstance(CreatePurchaseItemDto, base))).toHaveLength(0);
+    expect(
+      await validate(plainToInstance(CreatePurchaseItemDto, base)),
+    ).toHaveLength(0);
   });
 
-  it.each([0, 12.34, 123.4567])('accepts non-negative negotiated price %s', async (unitCost) => {
-    const dto = plainToInstance(CreatePurchaseItemDto, { ...base, unitCost });
-    expect(await validate(dto)).toHaveLength(0);
-  });
+  it.each([0, 12.34, 123.4567])(
+    'accepts non-negative negotiated price %s',
+    async (unitCost) => {
+      const dto = plainToInstance(CreatePurchaseItemDto, { ...base, unitCost });
+      expect(await validate(dto)).toHaveLength(0);
+    },
+  );
 
   it.each([-1, 12.34567, Number.POSITIVE_INFINITY, '12.34', null])(
     'rejects invalid price %s',
     async (unitCost) => {
       const dto = plainToInstance(CreatePurchaseItemDto, { ...base, unitCost });
-      expect((await validate(dto)).some((error) => error.property === 'unitCost')).toBe(true);
+      expect(
+        (await validate(dto)).some((error) => error.property === 'unitCost'),
+      ).toBe(true);
     },
   );
 });
