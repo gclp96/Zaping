@@ -75,6 +75,45 @@ describe('PurchasesService — annual folio creation', () => {
       }),
     );
   });
+  it('persists a negotiated line cost without mutating the product catalog', async () => {
+    await service.create('company-a', {
+      ...dto,
+      items: [{ productId: 'product-a', quantity: 2, unitCost: 11.2345 }],
+    }, UserRole.ADMIN);
+    expect(tx.purchase.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          subtotal: 22.47,
+          iva: 3.6,
+          total: 26.07,
+          items: {
+            create: [{
+              productId: 'product-a',
+              quantity: 2,
+              price: 11.2345,
+              subtotal: 22.47,
+            }],
+          },
+        }),
+      }),
+    );
+    expect(tx.product.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects unauthorized or malformed cost changes before allocation', async () => {
+    for (const [unitCost, role] of [
+      [11, UserRole.WAREHOUSE],
+      [-1, UserRole.ADMIN],
+      [1.23456, UserRole.MANAGER],
+    ] as const) {
+      await expect(service.create('company-a', {
+        ...dto, items: [{ productId: 'product-a', quantity: 2, unitCost }],
+      }, role)).rejects.toThrow();
+    }
+    expect(folios.allocateNextAvailableFolio).not.toHaveBeenCalled();
+    expect(tx.purchase.create).not.toHaveBeenCalled();
+  });
+
   it.each(['supplier', 'product', 'duplicate'])(
     'rejects invalid %s without allocating',
     async (invalid) => {
@@ -130,6 +169,6 @@ describe('Purchase creation authorization contract', () => {
       companyId: 'company-foreign',
     };
     void controller.create({ user: { companyId: 'company-a' } }, dto);
-    expect(create).toHaveBeenCalledWith('company-a', dto);
+    expect(create).toHaveBeenCalledWith('company-a', dto, undefined);
   });
 });
