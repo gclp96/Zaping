@@ -1,0 +1,95 @@
+import { PassThrough } from 'node:stream';
+import { Response } from 'express';
+
+import { renderPurchaseOrderPdf } from './purchase-order-pdf';
+
+describe('purchase order PDF', () => {
+  const base = {
+    folio: 'OC-26-00003',
+    status: 'CONFIRMED',
+    createdAt: new Date('2026-11-18T00:43:35.000Z'),
+    company: {
+      name: 'Empresa de prueba',
+      tradeName: 'Empresa QA',
+      rfc: 'EMI010101AAA',
+      fiscalAddress: 'Calle 100, Hermosillo',
+      placeOfIssue: 'Hermosillo, Sonora',
+      timezone: 'America/Hermosillo',
+      currency: 'MXN',
+    },
+    supplier: {
+      name: 'Proveedor QA',
+      legalName: 'Proveedor Legal S.A. de C.V.',
+      rfc: 'PRL010101AAA',
+      fiscalAddress: 'Calle 200, Monterrey',
+      supplierCode: '177',
+    },
+    paymentTerms: 'Crédito 30 días',
+    paymentMethod: 'Transferencia electrónica',
+    paymentDueDate: new Date('2026-12-17T00:00:00.000Z'),
+    expectedDeliveryDate: new Date('2026-11-17T00:00:00.000Z'),
+    buyerName: 'Comprador QA',
+    subtotal: 100,
+    iva: 16,
+    total: 116,
+    items: [{
+      productId: 'product-1',
+      product: { sku: 'INS-1', name: 'Equipo de prueba' },
+      quantity: 10,
+      price: 10,
+      subtotal: 100,
+    }],
+  };
+
+  it('returns a valid PDF stream with download headers', async () => {
+    const stream = new PassThrough();
+    const chunks: Buffer[] = [];
+    const headers: Record<string, string> = {};
+    stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+    const result = new Promise<Buffer>((resolve, reject) => {
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+      stream.on('error', reject);
+    });
+    const response = Object.assign(stream, {
+      setHeader: (name: string, value: string) => {
+        headers[name] = value;
+      },
+    }) as unknown as Response;
+
+    renderPurchaseOrderPdf(base, response);
+    const pdf = await result;
+    expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+    expect(pdf.length).toBeGreaterThan(1500);
+    expect(headers['Content-Type']).toBe('application/pdf');
+    expect(headers['Content-Disposition']).toContain('OC-26-00003');
+  });
+
+  it('prints multiple pages with long purchase lines', async () => {
+    const stream = new PassThrough();
+    const chunks: Buffer[] = [];
+    stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+    const result = new Promise<Buffer>((resolve, reject) => {
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+      stream.on('error', reject);
+    });
+    const response = Object.assign(stream, {
+      setHeader: jest.fn(),
+    }) as unknown as Response;
+
+    renderPurchaseOrderPdf({
+      ...base,
+      items: Array.from({ length: 60 }, (_, i) => ({
+        ...base.items[0],
+        productId: `product-${i}`,
+        product: {
+          sku: `SKU-${i}`,
+          name: `Producto ${i}: artículo con descripción comercial suficientemente larga`,
+        },
+      })),
+    }, response);
+    const pdf = await result;
+    const raw = pdf.toString('latin1');
+    expect((raw.match(/\/Type\s*\/Page\b/g) ?? []).length)
+      .toBeGreaterThan(1);
+  });
+});
