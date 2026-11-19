@@ -1,4 +1,5 @@
 import { PassThrough } from 'node:stream';
+import PDFDocument from 'pdfkit';
 import { Response } from 'express';
 
 import { renderPurchaseOrderPdf } from './purchase-order-pdf';
@@ -66,6 +67,59 @@ describe('purchase order PDF', () => {
     expect(pageMarkers).toHaveLength(1);
     expect(headers['Content-Type']).toBe('application/pdf');
     expect(headers['Content-Disposition']).toContain('OC-26-00003');
+  });
+
+  it('renders issuer legal identity, issue place and explicit commercial placeholders', async () => {
+    const written = jest.spyOn(PDFDocument.prototype, 'text');
+    const stream = new PassThrough();
+    const chunks: Buffer[] = [];
+    stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+    const completed = new Promise<void>((resolve, reject) => {
+      stream.on('end', resolve);
+      stream.on('error', reject);
+    });
+    const response = Object.assign(stream, {
+      setHeader: jest.fn(),
+    }) as unknown as Response;
+
+    try {
+      renderPurchaseOrderPdf(
+        {
+          ...base,
+          status: 'DRAFT',
+          company: {
+            ...base.company,
+            name: 'RAZÓN SOCIAL DE LA EMPRESA EMISORA S.A. DE C.V.',
+          },
+          paymentTerms: null,
+          paymentMethod: null,
+          paymentDueDate: null,
+          expectedDeliveryDate: null,
+          buyerName: null,
+        },
+        response,
+      );
+      await completed;
+      const displayed = written.mock.calls.map(([value]) => String(value));
+
+      expect(displayed).toContain('RAZÓN SOCIAL DE LA EMPRESA EMISORA S.A. DE C.V.');
+      expect(displayed).toContain('Lugar de expedición: Hermosillo, Sonora');
+      expect(displayed).toContain('Condiciones de pago: No aplica');
+      expect(displayed).toContain('Método de pago: No aplica');
+      expect(displayed).toContain('Fecha de pago: No aplica');
+      expect(displayed).toContain('Entrega comprometida: No aplica');
+      expect(displayed).toContain('Comprador: No aplica');
+      expect(displayed).toContain('Documento generado por Zaping ERP');
+      expect(displayed).not.toContain('ZAPING');
+      expect(displayed.some((value) => value.startsWith('Estado:'))).toBe(false);
+
+      const issuePlaceIndex = displayed.indexOf('Lugar de expedición: Hermosillo, Sonora');
+      const termsTitleIndex = displayed.indexOf('CONDICIONES COMERCIALES');
+      expect(issuePlaceIndex).toBeGreaterThanOrEqual(0);
+      expect(issuePlaceIndex).toBeLessThan(termsTitleIndex);
+    } finally {
+      written.mockRestore();
+    }
   });
 
   it('prints multiple pages with long purchase lines', async () => {
