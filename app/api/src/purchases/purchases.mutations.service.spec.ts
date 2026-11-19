@@ -181,6 +181,22 @@ describe('PurchasesService — tenant-safe mutations', () => {
     });
   });
 
+  it('permite al responsable de Compras delegado ajustar costos sin concederle aprobación', async () => {
+    transactionClient.purchase.findFirst
+      .mockResolvedValueOnce({
+        id: purchaseId,
+        status: PurchaseStatus.DRAFT,
+        items: [{ productId, price: 100 }],
+      })
+      .mockResolvedValueOnce({ id: purchaseId, status: PurchaseStatus.DRAFT });
+    await service.update(companyId, purchaseId, {
+      ...updateDto, items: [{ productId, quantity: 2, unitCost: 43.125 }],
+    }, UserRole.WAREHOUSE, true);
+    expect(transactionClient.purchaseItem.createMany).toHaveBeenCalledWith({
+      data: [{ purchaseId, productId, quantity: 2, price: 43.125, subtotal: 86.25 }],
+    });
+  });
+
   it('rechaza modificaciones de costo de un usuario de almacén sin mutación final', async () => {
     transactionClient.purchase.findFirst.mockResolvedValue({
       id: purchaseId, status: PurchaseStatus.DRAFT,
