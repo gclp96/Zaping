@@ -24,7 +24,10 @@ export function formatPurchaseCalendarDate(
   value: Date | string | null | undefined,
 ): string | null {
   if (!value) return null;
-  const date = value instanceof Date ? value.toISOString().slice(0, 10) : value.slice(0, 10);
+  const date =
+    value instanceof Date
+      ? value.toISOString().slice(0, 10)
+      : value.slice(0, 10);
   const [year, month, day] = date.split('-');
   return `${day}/${month}/${year}`;
 }
@@ -37,7 +40,8 @@ export function formatPurchaseIssueDate(date: Date, timezone: string): string {
     day: '2-digit',
   });
   const parts = formatter.formatToParts(date);
-  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? '';
+  const part = (type: string) =>
+    parts.find((item) => item.type === type)?.value ?? '';
   return `${part('day')}/${part('month')}/${part('year')}`;
 }
 
@@ -130,9 +134,7 @@ export function buildPurchaseCommercialSnapshot(
       legalName: purchase.supplier.legalName ?? null,
       rfc: purchase.supplier.rfc ?? null,
       fiscalAddress:
-        purchase.supplier.fiscalAddress ||
-        purchase.supplier.address ||
-        null,
+        purchase.supplier.fiscalAddress || purchase.supplier.address || null,
       code: purchase.supplier.supplierCode ?? null,
     },
     terms: {
