@@ -30,13 +30,15 @@ describe('purchase commercial snapshot', () => {
     paymentDueDate: new Date('2026-12-17T00:00:00.000Z'),
     expectedDeliveryDate: new Date('2026-11-17T00:00:00.000Z'),
     buyerName: 'Comprador',
-    items: [{
-      productId: 'product-1',
-      product: { name: 'Instrumental', sku: 'INS-1' },
-      quantity: 2,
-      price: 10.1234,
-      subtotal: 20.25,
-    }],
+    items: [
+      {
+        productId: 'product-1',
+        product: { name: 'Instrumental', sku: 'INS-1' },
+        quantity: 2,
+        price: 10.1234,
+        subtotal: 20.25,
+      },
+    ],
   };
 
   it('snapshots fiscal identity, terms and product description at confirmation', () => {
@@ -64,12 +66,15 @@ describe('purchase commercial snapshot', () => {
   });
 
   it('formats issue timezone separately from calendar DATE fields', () => {
-    expect(formatPurchaseIssueDate(purchase.createdAt, 'America/Hermosillo'))
-      .toBe('17/11/2026');
-    expect(formatPurchaseCalendarDate(purchase.paymentDueDate))
-      .toBe('17/12/2026');
-    expect(parsePurchaseCalendarDate('2026-12-17')?.toISOString())
-      .toBe('2026-12-17T00:00:00.000Z');
+    expect(
+      formatPurchaseIssueDate(purchase.createdAt, 'America/Hermosillo'),
+    ).toBe('17/11/2026');
+    expect(formatPurchaseCalendarDate(purchase.paymentDueDate)).toBe(
+      '17/12/2026',
+    );
+    expect(parsePurchaseCalendarDate('2026-12-17')?.toISOString()).toBe(
+      '2026-12-17T00:00:00.000Z',
+    );
   });
 
   it.each(['2026-02-30', '2026-13-01', '2026-11-00', '11/17/2026'])(
