@@ -88,7 +88,7 @@ No usar `docker compose down -v` por defecto: conservar la evidencia de
 rehearsal hasta revisión. Tampoco ejecutar comandos sobre otro proyecto
 Compose por inferencia de nombres.
 
-## Paso 2b — Transferencia de datos oficiales a una CUARTA base desechable
+## Paso 2b — Transferencia de datos oficiales a base de ensayo versionada
 
 **Verificaciones realizadas en QA local el 18/nov/2026, según resultados compartidos:**
 
@@ -98,7 +98,27 @@ Compose por inferencia de nombres.
 - Inventario: 22 tablas oficiales con **110 filas**, 3 tablas experimentales R2 con 5 filas. Datos en **ambas** empresas, incluyendo escenarios de Healthcare.
 - Las definiciones de columnas, tipos, nullabilidad y defaults coinciden. Se compararon 699 objetos estructurales por BD; únicamente difiere la representación de `SupplierDocumentAttachment_mime_check`: la restaurada convierte cada elemento del arreglo `['application/pdf','image/jpeg']` a `text`; la limpia convierte todo el arreglo a `text[]`. Son **equivalentes** para esos literales; no modificar constraints.
 
-**Procedimiento previsto (aún no ejecutado):**
+**Primer intento ejecutado (18/nov/2026):** 8/8 pruebas PASS; el script creó
+`zaping_issue284_transfer_trial` (cuarta base), pero `pg_restore --single-transaction`
+falló al hacer `COMMIT` con `relation "EquipmentAsset" does not exist`.
+Una consulta posterior confirmó que la tabla `public."EquipmentAsset"` sí existe,
+las 54 migraciones siguen aplicadas y la importación dejó **0 empresas** (rollback).
+El origen es una función diferida de custodia de equipos
+(`public.equipment_custody_assert_asset`): referencia tablas
+`"EquipmentAsset"` y `"EquipmentAssetCustody"` sin `public.`. El dump
+configura `search_path` vacío; el fallo ocurre al ejecutar la función.
+No se modificaron funciones, triggers, restricciones ni la base QA operativa.
+
+**Corrección del ensayo:** para el siguiente intento usar una **nueva quinta base**
+`zaping_issue284_transfer_trial_v2`; se conserva la cuarta como evidencia.
+El script conserva el archivo exportado `pg_dump -Fc`, obtiene el SQL
+`pg_restore --data-only` y **solo si reconoce exactamente un encabezado
+de `search_path` vacío**, añade `SET search_path = pg_catalog, public;`
+para esa sesión. Importa mediante `psql --single-transaction -v ON_ERROR_STOP=1`
+con los triggers y las FKs activados. No altera migraciones oficiales,
+definiciones de funciones, constraints ni el esquema permanente.
+
+**Procedimiento corregido (aún no ejecutado en QA local):**
 
 Desde la raíz de la rama de este PR, con los tres controles de rehearsal ya realizados:
 
@@ -110,16 +130,16 @@ node scripts/qa/rehearse-issue284-official-data.cjs
 El script se detiene salvo que:
 - El contenedor pertenezca al proyecto Docker `zaping-issue284-rehearsal`.
 - La base limpia de rehearsal `zaping_qa` contenga exactamente 54 migraciones terminadas, ninguna R2 y **0 empresas**.
-- La BD destino `zaping_issue284_transfer_trial` **NO exista**.
+- La BD destino `zaping_issue284_transfer_trial_v2` **NO exista**.
 
 Después:
 1. Obtiene del esquema **limpio** la lista permitida de tablas y secuencias, excluyendo `_prisma_migrations` y las 3 tablas R2.
 2. Exporta únicamente esos datos desde `zaping_issue284_restore_check` con `pg_dump --data-only -Fc --table`. Inspecciona la lista del archive para confirmar que no contiene el historial ni tablas R2.
-3. **Clona** el esquema limpio con `createdb -T zaping_qa` a una nueva base `zaping_issue284_transfer_trial` *en el mismo Docker aislado*; no reemplaza ni modifica las otras dos bases.
-4. Ejecuta `pg_restore --data-only --single-transaction --exit-on-error`, **sin desactivar triggers ni FKs**. Si falla una dependencia FK, la transacción de importación se revierte y el script **se detiene**: no usar `--disable-triggers` como bypass.
+3. **Clona** el esquema limpio con `createdb -T zaping_qa` a la quinta base `zaping_issue284_transfer_trial_v2` *en el Docker aislado*. La cuarta base fallida permanece intacta.
+4. Reproduce `pg_restore --data-only` a SQL; valida de forma estricta el encabezado `search_path`; solo en el SQL importado añade un `search_path` temporal seguro para que las funciones diferidas existentes resuelvan el esquema `public`. Ejecuta `psql --single-transaction -v ON_ERROR_STOP=1`, **sin desactivar triggers ni FKs**. Si falla una dependencia FK u otra verificación, se revierte toda la importación. No usar `--disable-triggers` como bypass.
 5. Comprueba exactamente 54 migraciones oficiales y 0 R2, compara recuentos y huellas de todas las tablas oficiales contra el respaldo restaurado, y exige **110 filas** idénticas.
 
-**Si falla:** mantener la cuarta BD creada para investigar, sin borrar volúmenes ni datos; identificar la dependencia que impide la importación y diseñar un orden de carga explícito en el rehearsal. **Un fallo no autoriza deshabilitar restricciones ni modificar QA operativa.**
+**Si falla:** conservar la quinta base y todas las bases anteriores, sin borrar volúmenes ni datos; revisar el error y ajustar el ensayo en una base nueva, sin repetir destructivamente. **Un fallo no autoriza deshabilitar restricciones ni modificar QA operativa.**
 
 **Si pasa:** todavía falta asegurar funcionalidad por roles, configuración de usuario y sesiones, y validar las referencias al almacenamiento externo R2 (el dump no contiene el objeto binario) antes del corte de QA. Un ensayo verde **no** cambia ninguna conexión de API/Web.
 
