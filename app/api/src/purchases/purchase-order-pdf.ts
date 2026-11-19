@@ -25,15 +25,6 @@ const BLUE = '#155EEF';
 const RULE = '#D5DCE6';
 const LIGHT = '#F3F6FB';
 
-function statusLabel(status: string): string {
-  if (status === 'DRAFT') return 'Borrador';
-  if (status === 'CONFIRMED') return 'Confirmada';
-  if (status === 'PARTIALLY_RECEIVED') return 'Recibida parcialmente';
-  if (status === 'RECEIVED') return 'Recibida';
-  if (status === 'CANCELLED') return 'Cancelada';
-  return status;
-}
-
 function clean(value?: string | null): string | null {
   return value?.trim() || null;
 }
@@ -127,45 +118,63 @@ export function renderPurchaseOrderPdf(
     if (withTableHeader) drawTableHeader();
   }
 
-  // Emisor y folio: se conserva la identidad comercial de cada empresa.
-  textAt('ZAPING', left, y, 150, 10, true, BLUE);
-  textAt('ORDEN DE COMPRA', right - 237, y - 3, 237, 18, true, TEXT, 'right');
-  y += 23;
-  textAt(issuer.legalName, left, y, 345, 12, true);
+  // The company legal name is the document's primary identity.
+  // Zaping branding remains only in the footer.
+  const headerY = y;
+  textAt(issuer.legalName, left, headerY, 300, 16, true, TEXT);
   const companyLines = [
     issuer.rfc && `RFC: ${issuer.rfc}`,
     clean(issuer.fiscalAddress),
   ].filter((value): value is string => Boolean(value));
-  let companyY = doc.y + 3;
+  let companyY = doc.y + 5;
   for (const value of companyLines) {
-    companyY = textAt(value, left, companyY, 333, 8, false, MUTED) + 2;
+    companyY = textAt(value, left, companyY, 300, 8.5, false, MUTED) + 3;
   }
 
+  const rightHeaderX = right - 214;
+  textAt(
+    'ORDEN DE COMPRA',
+    right - 236,
+    headerY - 2,
+    236,
+    18,
+    true,
+    TEXT,
+    'right',
+  );
   let folioY =
-    textAt(purchase.folio, right - 205, y + 3, 205, 12, true, BLUE, 'right') +
-    3;
+    textAt(
+      purchase.folio,
+      rightHeaderX,
+      headerY + 31,
+      214,
+      12,
+      true,
+      BLUE,
+      'right',
+    ) + 4;
   folioY =
     textAt(
       `Fecha: ${issued}`,
-      right - 205,
+      rightHeaderX,
       folioY,
-      205,
+      214,
       9,
       false,
       MUTED,
       'right',
-    ) + 2;
+    ) + 3;
   folioY = textAt(
-    `Estado: ${statusLabel(purchase.status)}`,
-    right - 205,
+    `Lugar de expedición: ${clean(issuer.placeOfIssue) || 'No aplica'}`,
+    rightHeaderX,
     folioY,
-    205,
-    9,
+    214,
+    8.5,
     false,
     MUTED,
     'right',
   );
-  y = Math.max(companyY, folioY) + 13;
+  y = Math.max(companyY, folioY) + 16;
   line(y);
   y += 15;
 
@@ -188,17 +197,12 @@ export function renderPurchaseOrderPdf(
   }
 
   const termLines = [
-    terms.paymentTerms ? `Pago: ${terms.paymentTerms}` : null,
-    terms.paymentMethod ? `Método: ${terms.paymentMethod}` : null,
-    terms.paymentDueDate
-      ? `Fecha de pago: ${formatPurchaseCalendarDate(terms.paymentDueDate)}`
-      : null,
-    terms.expectedDeliveryDate
-      ? `Entrega: ${formatPurchaseCalendarDate(terms.expectedDeliveryDate)}`
-      : null,
-    terms.buyerName ? `Comprador: ${terms.buyerName}` : null,
-    issuer.placeOfIssue ? `Lugar de expedición: ${issuer.placeOfIssue}` : null,
-  ].filter((value): value is string => Boolean(value));
+    `Condiciones de pago: ${clean(terms.paymentTerms) || 'No aplica'}`,
+    `Método de pago: ${clean(terms.paymentMethod) || 'No aplica'}`,
+    `Fecha de pago: ${formatPurchaseCalendarDate(terms.paymentDueDate) || 'No aplica'}`,
+    `Entrega comprometida: ${formatPurchaseCalendarDate(terms.expectedDeliveryDate) || 'No aplica'}`,
+    `Comprador: ${clean(terms.buyerName) || 'No aplica'}`,
+  ];
   let termsY = y;
   for (const value of termLines) {
     termsY = textAt(value, left + 263, termsY, 253, 8.5, false, MUTED) + 4;
