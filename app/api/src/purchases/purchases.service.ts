@@ -372,7 +372,7 @@ export class PurchasesService {
         }
 
         const existingLineCost =
-          purchase.items.find((line) => line.productId === product.id)?.price;
+          purchase.items?.find((line) => line.productId === product.id)?.price;
         const unitCost = this.resolvePurchaseItemUnitCost(
           item.unitCost,
           existingLineCost ?? product.cost,
