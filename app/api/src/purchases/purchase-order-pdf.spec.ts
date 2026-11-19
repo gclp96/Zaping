@@ -89,7 +89,8 @@ describe('purchase order PDF', () => {
           status: 'DRAFT',
           company: {
             ...base.company,
-            name: 'RAZÓN SOCIAL DE LA EMPRESA EMISORA S.A. DE C.V.',
+            name:
+            'RAZÓN SOCIAL DE LA EMPRESA EMISORA S.A. DE C.V.',
           },
           paymentTerms: null,
           paymentMethod: null,
@@ -102,7 +103,9 @@ describe('purchase order PDF', () => {
       await completed;
       const displayed = written.mock.calls.map(([value]) => String(value));
 
-      expect(displayed).toContain('RAZÓN SOCIAL DE LA EMPRESA EMISORA S.A. DE C.V.');
+      expect(displayed).toContain(
+        'RAZÓN SOCIAL DE LA EMPRESA EMISORA S.A. DE C.V.',
+      );
       expect(displayed).toContain('Lugar de expedición: Hermosillo, Sonora');
       expect(displayed).toContain('Condiciones de pago: No aplica');
       expect(displayed).toContain('Método de pago: No aplica');
@@ -111,9 +114,13 @@ describe('purchase order PDF', () => {
       expect(displayed).toContain('Comprador: No aplica');
       expect(displayed).toContain('Documento generado por Zaping ERP');
       expect(displayed).not.toContain('ZAPING');
-      expect(displayed.some((value) => value.startsWith('Estado:'))).toBe(false);
+      expect(displayed.some((value) => value.startsWith('Estado:'))).toBe(
+        false,
+      );
 
-      const issuePlaceIndex = displayed.indexOf('Lugar de expedición: Hermosillo, Sonora');
+      const issuePlaceIndex = displayed.indexOf(
+        'Lugar de expedición: Hermosillo, Sonora',
+      );
       const termsTitleIndex = displayed.indexOf('CONDICIONES COMERCIALES');
       expect(issuePlaceIndex).toBeGreaterThanOrEqual(0);
       expect(issuePlaceIndex).toBeLessThan(termsTitleIndex);
