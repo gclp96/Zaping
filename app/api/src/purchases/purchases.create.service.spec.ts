@@ -113,6 +113,90 @@ describe('PurchasesService — annual folio creation', () => {
     expect(tx.product.findMany).toHaveBeenCalledTimes(1);
   });
 
+  it('guarda descuento real usando precio unitario neto para Recepciones', async () => {
+    await service.create(
+      'company-a',
+      {
+        ...dto,
+        items: [
+          {
+            productId: 'product-a',
+            quantity: 10,
+            unitCost: 85.5,
+            discountPercent: 10,
+          },
+        ],
+      },
+      UserRole.ADMIN,
+    );
+    expect(tx.purchase.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          subtotal: 769.5,
+          iva: 123.12,
+          total: 892.62,
+          items: {
+            create: [
+              {
+                productId: 'product-a',
+                quantity: 10,
+                listUnitCost: 85.5,
+                discountPercent: 10,
+                price: 76.95,
+                subtotal: 769.5,
+              },
+            ],
+          },
+        }),
+      }),
+    );
+  });
+
+  it('prohíbe descuentos explícitos a WAREHOUSE no delegado', async () => {
+    await expect(
+      service.create(
+        'company-a',
+        {
+          ...dto,
+          items: [{ productId: 'product-a', quantity: 2, discountPercent: 10 }],
+        },
+        UserRole.WAREHOUSE,
+      ),
+    ).rejects.toThrow('No tienes permiso para modificar descuentos de compra');
+    expect(tx.purchase.create).not.toHaveBeenCalled();
+  });
+
+  it('permite el descuento a comprador WAREHOUSE delegado', async () => {
+    await service.create(
+      'company-a',
+      {
+        ...dto,
+        items: [{ productId: 'product-a', quantity: 2, discountPercent: 5 }],
+      },
+      UserRole.WAREHOUSE,
+      true,
+    );
+    expect(tx.purchase.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          subtotal: 190,
+          items: {
+            create: [
+              {
+                productId: 'product-a',
+                quantity: 2,
+                listUnitCost: 100,
+                discountPercent: 5,
+                price: 95,
+                subtotal: 190,
+              },
+            ],
+          },
+        }),
+      }),
+    );
+  });
+
   it('rejects unauthorized or malformed cost changes before allocation', async () => {
     for (const [unitCost, role] of [
       [11, UserRole.WAREHOUSE],
