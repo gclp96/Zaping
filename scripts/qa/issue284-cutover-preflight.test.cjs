@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const {
   officialCountsQuery, coreCountsQuery, assertSnapshot,
+  fingerprintSql, allFingerprintsQuery, verifyTableFingerprints,
   CANDIDATE, OFFICIAL_TABLES,
 } = require('./issue284-cutover-preflight.cjs');
 
@@ -37,4 +38,26 @@ test('preflight is read-only and never invokes DB writes or Compose up', () => {
   assert.doesNotMatch(source, /\bcreatedb\b|\bdropdb\b|migrate deploy|docker compose up/);
   assert.doesNotMatch(source, /execFileSync\([^,]+,\s*\[[^\]]*'rm'/);
   assert.match(source, /NO database created/);
+});
+
+test('fingerprint SQL is deterministic, includes all 57 tables and never R2', () => {
+  assert.match(fingerprintSql('EquipmentAsset'), /FROM public\."EquipmentAsset" t/);
+  const names = Array.from({ length: 57 }, (_, i) => 'Table' + i);
+  const query = allFingerprintsQuery(names);
+  assert.match(query, /ORDER BY 1;$/);
+  assert.equal((query.match(/COALESCE\(md5/g) || []).length, 57);
+  assert.doesNotMatch(query, /ZapingFile|_prisma_migrations/);
+  assert.throws(() => allFingerprintsQuery(names.slice(1)), /STOP:/);
+  assert.throws(() => fingerprintSql('bad;DROP'), /AssertionError|match/);
+});
+
+test('fingerprints reject even same-count modifications or incomplete inventories', () => {
+  const a = Array.from({ length: 57 }, (_, i) => 'Table' + i + '|0|' + 'a'.repeat(32));
+  a[0] = 'Table0|110|' + 'b'.repeat(32);
+  const source = a.join('\n');
+  assert.doesNotThrow(() => verifyTableFingerprints(source, source));
+  const changed = a.slice();
+  changed[0] = 'Table0|110|' + 'c'.repeat(32);
+  assert.throws(() => verifyTableFingerprints(source, changed.join('\n')), /STOP:/);
+  assert.throws(() => verifyTableFingerprints(a.slice(1).join('\n'), source), /STOP:/);
 });
