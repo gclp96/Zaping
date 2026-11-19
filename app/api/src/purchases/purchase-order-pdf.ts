@@ -199,20 +199,29 @@ export function renderPurchaseOrderPdf(
 
   const x = {
     sku: left + 8,
-    product: left + 96,
-    quantity: left + 327,
-    cost: left + 378,
-    amount: left + 455,
+    product: left + 81,
+    quantity: left + 271,
+    cost: left + 337,
+    discount: left + 413,
+    amount: left + 468,
   };
-  const w = { sku: 79, product: 226, quantity: 48, cost: 75, amount: 63 };
+  const w = {
+    sku: 71,
+    product: 185,
+    quantity: 64,
+    cost: 75,
+    discount: 50,
+    amount: 54,
+  };
 
   function drawTableHeader() {
     doc.rect(left, y, width, 28).fill(LIGHT);
     textAt('SKU', x.sku, y + 8, w.sku, 8.5, true);
     textAt('Producto / descripción', x.product, y + 8, w.product, 8.5, true);
-    textAt('Cant.', x.quantity, y + 8, w.quantity, 8.5, true, TEXT, 'right');
-    textAt('Costo unit.', x.cost, y + 8, w.cost, 8.5, true, TEXT, 'right');
-    textAt('Importe', x.amount, y + 8, w.amount, 8.5, true, TEXT, 'right');
+    textAt('Cant./unid.', x.quantity, y + 8, w.quantity, 7.5, true, TEXT, 'right');
+    textAt('Costo unit.', x.cost, y + 8, w.cost, 8, true, TEXT, 'right');
+    textAt('Desc.', x.discount, y + 8, w.discount, 8, true, TEXT, 'right');
+    textAt('Importe', x.amount, y + 8, w.amount, 8, true, TEXT, 'right');
     y += 30;
   }
 
@@ -227,14 +236,21 @@ export function renderPurchaseOrderPdf(
       width: w.sku,
       lineGap: 1.5,
     });
-    const rowHeight = Math.max(33, nameHeight + 15, skuHeight + 15);
+    const quantityLabel = item.unitOfMeasure?.trim()
+      ? `${item.quantity} ${item.unitOfMeasure.trim()}`
+      : String(item.quantity);
+    const quantityHeight = doc.heightOfString(quantityLabel, {
+      width: w.quantity,
+      lineGap: 1.5,
+    });
+    const rowHeight = Math.max(33, nameHeight + 15, skuHeight + 15, quantityHeight + 15);
     ensureRoom(rowHeight + 9, true);
 
     const rowY = y + 7;
     textAt(item.sku, x.sku, rowY, w.sku, 8, false, MUTED);
     textAt(item.name, x.product, rowY, w.product, 8.5);
     textAt(
-      String(item.quantity),
+      quantityLabel,
       x.quantity,
       rowY,
       w.quantity,
@@ -244,13 +260,24 @@ export function renderPurchaseOrderPdf(
       'right',
     );
     textAt(
-      money(item.unitCost, currency, 4),
+      money(item.listUnitCost ?? item.unitCost, currency, 4),
       x.cost,
       rowY,
       w.cost,
       8.5,
       false,
       TEXT,
+      'right',
+    );
+    const discount = item.discountPercent ?? 0;
+    textAt(
+      discount > 0 ? `${discount.toFixed(2)}%` : '—',
+      x.discount,
+      rowY,
+      w.discount,
+      8,
+      false,
+      MUTED,
       'right',
     );
     textAt(
