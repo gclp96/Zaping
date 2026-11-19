@@ -341,11 +341,11 @@ export function renderPurchaseOrderPdf(
   const pageRange = doc.bufferedPageRange();
   for (let index = 0; index < pageRange.count; index += 1) {
     doc.switchToPage(pageRange.start + index);
-    doc.moveTo(left, 740).lineTo(right, 740).strokeColor(RULE).stroke();
+    doc.moveTo(left, 726).lineTo(right, 726).strokeColor(RULE).stroke();
     textAt(
       'Documento generado por Zaping ERP',
       left,
-      748,
+      733,
       315,
       7.5,
       false,
@@ -354,7 +354,7 @@ export function renderPurchaseOrderPdf(
     textAt(
       `Página ${index + 1} de ${pageRange.count}`,
       right - 145,
-      748,
+      733,
       145,
       7.5,
       false,
