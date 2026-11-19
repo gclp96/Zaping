@@ -48,19 +48,24 @@ describe('purchase approval freezes commercial PDF identity', () => {
       paymentMethod: 'Transferencia electrónica',
       paymentDueDate: new Date('2026-12-17T00:00:00.000Z'),
       expectedDeliveryDate: new Date('2026-11-17T00:00:00.000Z'),
-      items: [{
-        productId: 'product-1',
-        product: { sku: 'INS-1', name: 'Instrumento médico' },
-        quantity: 2,
-        price: 11.2345,
-        subtotal: 22.47,
-      }],
+      items: [
+        {
+          productId: 'product-1',
+          product: { sku: 'INS-1', name: 'Instrumento médico' },
+          quantity: 2,
+          price: 11.2345,
+          subtotal: 22.47,
+        },
+      ],
     };
     tx.purchase.findFirst.mockResolvedValue(purchase);
     const result = await service.approve('company-a', 'purchase-1');
 
     expect(tx.purchase.updateMany).toHaveBeenCalledTimes(2);
-    expect(tx.purchase.updateMany.mock.calls[0][0]).toEqual({
+    const calls = tx.purchase.updateMany.mock.calls as unknown as Array<
+      [unknown]
+    >;
+    expect(calls[0][0]).toEqual({
       where: {
         id: 'purchase-1',
         companyId: 'company-a',
@@ -69,7 +74,7 @@ describe('purchase approval freezes commercial PDF identity', () => {
       data: { status: 'CONFIRMED' },
     });
 
-    const frozen = tx.purchase.updateMany.mock.calls[1][0] as {
+    const frozen = calls[1][0] as {
       where: { status: string; companyId: string };
       data: {
         commercialSnapshot: {
@@ -84,17 +89,18 @@ describe('purchase approval freezes commercial PDF identity', () => {
       companyId: 'company-a',
       status: 'CONFIRMED',
     });
-    expect(frozen.data.commercialSnapshot.issuer.legalName).toBe('Empresa Legal');
-    expect(frozen.data.commercialSnapshot.supplier.rfc).toBe('HME091016DQ8');
-    expect(frozen.data.commercialSnapshot.terms.paymentDueDate)
-      .toBe('2026-12-17');
-    expect(frozen.data.commercialSnapshot.items[0].name)
-      .toBe('Instrumento médico');
-    expect(frozen.data.commercialSnapshot.items[0].unitCost)
-      .toBe(11.2345);
-    expect(result.commercialSnapshot).toEqual(
-      frozen.data.commercialSnapshot,
+    expect(frozen.data.commercialSnapshot.issuer.legalName).toBe(
+      'Empresa Legal',
     );
+    expect(frozen.data.commercialSnapshot.supplier.rfc).toBe('HME091016DQ8');
+    expect(frozen.data.commercialSnapshot.terms.paymentDueDate).toBe(
+      '2026-12-17',
+    );
+    expect(frozen.data.commercialSnapshot.items[0].name).toBe(
+      'Instrumento médico',
+    );
+    expect(frozen.data.commercialSnapshot.items[0].unitCost).toBe(11.2345);
+    expect(result.commercialSnapshot).toEqual(frozen.data.commercialSnapshot);
   });
 
   it('rejects a purchase without lines before freezing a document', async () => {
@@ -103,8 +109,9 @@ describe('purchase approval freezes commercial PDF identity', () => {
       supplier: { name: 'Proveedor' },
       company: { name: 'Empresa' },
     });
-    await expect(service.approve('company-a', 'purchase-1'))
-      .rejects.toThrow('No se puede confirmar una compra sin productos');
+    await expect(service.approve('company-a', 'purchase-1')).rejects.toThrow(
+      'No se puede confirmar una compra sin productos',
+    );
     expect(tx.purchase.updateMany).toHaveBeenCalledTimes(1);
   });
 });
