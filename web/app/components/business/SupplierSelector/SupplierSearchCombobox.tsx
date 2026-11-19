@@ -61,12 +61,13 @@ export default function SupplierSearchCombobox({
   }
 
   return (
-    <div className="relative flex w-full flex-col gap-2">
+    <div className="flex w-full flex-col gap-2">
       <label htmlFor={inputId} className="text-sm font-medium text-gray-700">
         {label}
         {required ? <span aria-hidden="true" className="ml-1 text-red-500">*</span> : null}
       </label>
       <input type="hidden" name={name} value={value} />
+      <div className="relative">
       <input
         ref={inputRef}
         id={inputId}
@@ -112,7 +113,7 @@ export default function SupplierSearchCombobox({
           } else if (event.key === 'ArrowDown') {
             event.preventDefault();
             if (!open) beginSearch();
-            else setActiveIndex((index) => Math.min(filtered.length - 1, index + 1));
+            else setActiveIndex((index) => Math.min(Math.max(0, filtered.length - 1), index + 1));
           } else if (event.key === 'ArrowUp' && open) {
             event.preventDefault();
             setActiveIndex((index) => Math.max(0, index - 1));
@@ -153,6 +154,7 @@ export default function SupplierSearchCombobox({
           ))}
         </div>
       ) : null}
+      </div>
 
       {error ? (
         <p id={messageId} role="alert" className="text-sm text-red-600">{error}</p>
