@@ -433,6 +433,7 @@ const {
   hasUnsavedChanges,
 
   supplierId,
+  commercial,
   selectedProductId,
   quantity,
   items,
@@ -454,6 +455,7 @@ const {
   closeCreateModal,
 
   handleSupplierChange,
+  handleCommercialChange,
   handleSelectedProductChange,
   handleFormQuantityChange,
 
@@ -1294,6 +1296,7 @@ async function loadPageData() {
         suppliers={suppliers}
         products={products}
         supplierId={supplierId}
+        commercial={commercial}
         selectedProductId={selectedProductId}
         quantity={quantity}
         items={items}
@@ -1314,6 +1317,7 @@ async function loadPageData() {
         onAddProduct={handleAddProduct}
         onRemoveItem={handleRemoveItem}
         onSupplierChange={handleSupplierChange}
+        onCommercialChange={handleCommercialChange}
         onSelectedProductChange={
           handleSelectedProductChange
         }
