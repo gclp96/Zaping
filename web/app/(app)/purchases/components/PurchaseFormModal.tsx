@@ -401,7 +401,10 @@ export default function PurchaseFormModal({
                         Cantidad
                       </th>
                       <th className="px-3 py-2 text-right" scope="col">
-                        Costo
+                        Costo unitario
+                      </th>
+                      <th className="px-3 py-2 text-right" scope="col">
+                        Descuento (%)
                       </th>
                       <th className="px-3 py-2 text-right" scope="col">
                         Subtotal
@@ -450,12 +453,12 @@ export default function PurchaseFormModal({
                             <MoneyInput
                               id={`purchase-item-unit-cost-${item.productId}-table`}
                               aria-label={`Costo unitario de ${item.name}`}
-                              value={itemUnitCostDrafts[item.productId] ?? String(item.unitCost)}
+                              value={itemUnitCostDrafts[item.productId] ?? String(item.baseUnitCost ?? item.unitCost)}
                               maxDecimals={4}
                               error={itemUnitCostErrors[item.productId]}
                               onValueChange={(value) => onItemUnitCostChange?.(item.productId, value)}
                             />
-                          ) : formatMoney(item.unitCost)}
+                          ) : formatMoney(item.baseUnitCost ?? item.unitCost)}
                         </td>
 
                         <td className="px-3 py-3 text-right font-medium text-gray-900">
@@ -527,7 +530,7 @@ export default function PurchaseFormModal({
                             <MoneyInput
                               id={`purchase-item-unit-cost-${item.productId}-mobile`}
                               label={`Costo unitario de ${item.name}`}
-                              value={itemUnitCostDrafts[item.productId] ?? String(item.unitCost)}
+                              value={itemUnitCostDrafts[item.productId] ?? String(item.baseUnitCost ?? item.unitCost)}
                               maxDecimals={4}
                               error={itemUnitCostErrors[item.productId]}
                               onValueChange={(value) => onItemUnitCostChange?.(item.productId, value)}
@@ -536,7 +539,7 @@ export default function PurchaseFormModal({
                             <>
                               <dt className="text-gray-500">Costo</dt>
                               <dd className="mt-1 font-medium text-gray-900">
-                                {formatMoney(item.unitCost)}
+                                {formatMoney(item.baseUnitCost ?? item.unitCost)}
                               </dd>
                             </>
                           )}
