@@ -56,3 +56,17 @@ test('candidate sync-check references ONLY operational PostgreSQL and read-only 
   assert.match(source, /verifyTableFingerprints/);
   assert.doesNotMatch(source, /\bdropdb\b|\bcreatedb\b|pg_restore|migrate deploy|migrate reset/);
 });
+
+test('active QA API check has explicit candidate and rollback modes only', () => {
+  const { chooseTarget } = require('./issue284-api-active-db-check.cjs');
+  assert.deepEqual(chooseTarget('--candidate'), ['zaping_qa_official_candidate_v1', 54, 0]);
+  assert.deepEqual(chooseTarget('--original'), ['zaping_qa', 55, 1]);
+  assert.throws(() => chooseTarget('--production'));
+});
+
+test('QA config switch refuses unexpected concurrent PostgreSQL clients', () => {
+  const source = fs.readFileSync(path.join(__dirname, 'issue284-qa-env-switch.cjs'), 'utf8');
+  assert.match(source, /pg_stat_activity/);
+  assert.match(source, /backend_type='client backend'/);
+  assert.match(source, /unexpected PostgreSQL clients during QA pause/);
+});
