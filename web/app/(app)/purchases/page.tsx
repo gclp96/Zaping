@@ -737,11 +737,11 @@ async function loadPageData() {
             ? 'grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6'
             : 'grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6'}>
           <Input
-            label={purchasesWorkspaceEnabled ? 'Buscar por folio, proveedor o SKU' : 'Buscar compras'}
+            label={purchasesWorkspaceEnabled ? 'Buscar por folio, proveedor o producto' : 'Buscar compras'}
             type="search"
             value={search}
             placeholder="Folio, proveedor o producto"
-            helperText="También puedes buscar por contacto, email o SKU."
+            helperText={purchasesWorkspaceEnabled ? undefined : 'También puedes buscar por contacto, email o SKU.'}
             startAdornment={<Search size={17} />}
             containerClassName="sm:col-span-2"
             onChange={(event) => {
@@ -935,6 +935,7 @@ async function loadPageData() {
     {
       id: 'items',
       header: 'Partidas',
+      align: 'center',
       sortable: true,
       priority: 'tertiary',
       minWidth: 80,
@@ -1019,7 +1020,7 @@ async function loadPageData() {
     {
       id: 'actions',
       header: 'Acciones',
-      align: 'end',
+      align: 'center',
       priority: 'primary',
       minWidth: 180,
       cell: (purchase) => {
@@ -1034,6 +1035,12 @@ async function loadPageData() {
                 },
               ]
             : []),
+          {
+            id: 'view',
+            label: 'Ver',
+            onSelect: (selectedPurchase) =>
+              router.push(`/purchases/${encodeURIComponent(selectedPurchase.id)}`),
+          },
           {
             id: 'download-pdf',
             label:
@@ -1058,7 +1065,7 @@ async function loadPageData() {
         ];
 
         return (
-          <div className="relative flex flex-wrap items-center justify-end gap-2">
+          <div className="relative flex flex-wrap items-center justify-center gap-2">
             {purchase.status === 'DRAFT' && canApprove ? (
               <Button
                 variant="success"
