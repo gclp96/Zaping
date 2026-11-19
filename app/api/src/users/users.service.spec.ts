@@ -156,6 +156,43 @@ describe('UsersService', () => {
     expect(safeUser).not.toHaveProperty('passwordHash');
   });
 
+  it('permite otorgar permiso de costo al encargado WAREHOUSE sin cambiar el rol', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+    prismaMock.user.create.mockResolvedValue({
+      ...safeUser, role: UserRole.WAREHOUSE, canAdjustPurchaseUnitCost: true,
+    });
+    await service.create(companyId, {
+      firstName: 'Comprador',
+      lastName: 'Zaping',
+      email: 'comprador@zaping.test',
+      password: 'secure-password',
+      role: UserRole.WAREHOUSE,
+      canAdjustPurchaseUnitCost: true,
+    });
+    expect(prismaMock.user.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        role: UserRole.WAREHOUSE,
+        canAdjustPurchaseUnitCost: true,
+      }),
+    }));
+  });
+
+  it('no concede el permiso especial a roles ajenos a WAREHOUSE', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+    prismaMock.user.create.mockResolvedValue(safeUser);
+    await service.create(companyId, {
+      firstName: 'Vendedor',
+      lastName: 'Zaping',
+      email: 'vendedor@zaping.test',
+      password: 'secure-password',
+      role: UserRole.SALES,
+      canAdjustPurchaseUnitCost: true,
+    });
+    expect(prismaMock.user.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ canAdjustPurchaseUnitCost: false }),
+    }));
+  });
+
   it('rejects duplicate emails on create', async () => {
     prismaMock.user.findUnique.mockResolvedValue({ id: 'existing-user' });
 
