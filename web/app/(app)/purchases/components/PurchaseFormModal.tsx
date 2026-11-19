@@ -38,6 +38,8 @@ type PurchaseFormModalProps = {
   itemQuantityErrors: Record<string, string>;
   itemUnitCostDrafts?: Record<string, string>;
   itemUnitCostErrors?: Record<string, string>;
+  itemDiscountDrafts?: Record<string, string>;
+  itemDiscountErrors?: Record<string, string>;
   canAdjustUnitCost?: boolean;
   itemsError: string;
 
@@ -61,6 +63,7 @@ type PurchaseFormModalProps = {
     value: string,
   ) => void;
   onItemUnitCostChange?: (productId: string, value: string) => void;
+  onItemDiscountChange?: (productId: string, value: string) => void;
 };
 
 function getItemSubtotal(item: PurchaseFormItem): number {
@@ -89,6 +92,8 @@ export default function PurchaseFormModal({
   itemQuantityErrors,
   itemUnitCostDrafts = {},
   itemUnitCostErrors = {},
+  itemDiscountDrafts = {},
+  itemDiscountErrors = {},
   canAdjustUnitCost = false,
   itemsError,
   subtotal,
@@ -105,6 +110,7 @@ export default function PurchaseFormModal({
   onQuantityChange,
   onItemQuantityChange,
   onItemUnitCostChange,
+  onItemDiscountChange,
 }: PurchaseFormModalProps) {
   // PUR-UX-02C: create and DRAFT edit use the same visual workspace.
   // Edit eligibility and POST/PATCH behavior stay in the purchase hook.
@@ -173,7 +179,7 @@ export default function PurchaseFormModal({
           type="button"
           loading={saving}
           loadingText={editing ? 'Guardando cambios...' : 'Guardando...'}
-          disabled={saving || !supplierId || items.length === 0 || Object.keys(itemUnitCostErrors).length > 0}
+          disabled={saving || !supplierId || items.length === 0 || Object.keys(itemUnitCostErrors).length > 0 || Object.keys(itemDiscountErrors).length > 0}
           className="w-full sm:min-w-40 sm:w-auto"
           onClick={onSubmit}
         >
