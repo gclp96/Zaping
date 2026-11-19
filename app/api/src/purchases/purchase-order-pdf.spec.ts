@@ -32,13 +32,15 @@ describe('purchase order PDF', () => {
     subtotal: 100,
     iva: 16,
     total: 116,
-    items: [{
-      productId: 'product-1',
-      product: { sku: 'INS-1', name: 'Equipo de prueba' },
-      quantity: 10,
-      price: 10,
-      subtotal: 100,
-    }],
+    items: [
+      {
+        productId: 'product-1',
+        product: { sku: 'INS-1', name: 'Equipo de prueba' },
+        quantity: 10,
+        price: 10,
+        subtotal: 100,
+      },
+    ],
   };
 
   it('returns a valid PDF stream with download headers', async () => {
@@ -76,20 +78,24 @@ describe('purchase order PDF', () => {
       setHeader: jest.fn(),
     }) as unknown as Response;
 
-    renderPurchaseOrderPdf({
-      ...base,
-      items: Array.from({ length: 60 }, (_, i) => ({
-        ...base.items[0],
-        productId: `product-${i}`,
-        product: {
-          sku: `SKU-${i}`,
-          name: `Producto ${i}: artículo con descripción comercial suficientemente larga`,
-        },
-      })),
-    }, response);
+    renderPurchaseOrderPdf(
+      {
+        ...base,
+        items: Array.from({ length: 60 }, (_, i) => ({
+          ...base.items[0],
+          productId: `product-${i}`,
+          product: {
+            sku: `SKU-${i}`,
+            name: `Producto ${i}: artículo con descripción comercial suficientemente larga`,
+          },
+        })),
+      },
+      response,
+    );
     const pdf = await result;
     const raw = pdf.toString('latin1');
-    expect((raw.match(/\/Type\s*\/Page\b/g) ?? []).length)
-      .toBeGreaterThan(1);
+    expect((raw.match(/\/Type\s*\/Page\b/g) ?? []).length).toBeGreaterThan(
+      1,
+    );
   });
 });
