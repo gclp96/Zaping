@@ -105,6 +105,10 @@ describe('PurchasesService — annual folio creation', () => {
           ],
         },
       },
+      include: {
+        supplier: true,
+        items: { include: { product: true } },
+      },
     });
     expect(tx.product.findMany).toHaveBeenCalledTimes(1);
   });
