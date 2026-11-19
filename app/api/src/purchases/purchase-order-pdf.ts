@@ -107,7 +107,12 @@ export function renderPurchaseOrderPdf(
   }
 
   function line(at: number) {
-    doc.moveTo(left, at).lineTo(right, at).strokeColor(RULE).lineWidth(0.7).stroke();
+    doc
+      .moveTo(left, at)
+      .lineTo(right, at)
+      .strokeColor(RULE)
+      .lineWidth(0.7)
+      .stroke();
   }
 
   function ensureRoom(space: number, withTableHeader = false) {
@@ -136,9 +141,30 @@ export function renderPurchaseOrderPdf(
     companyY = textAt(value, left, companyY, 333, 8, false, MUTED) + 2;
   }
 
-  let folioY = textAt(purchase.folio, right - 205, y + 3, 205, 12, true, BLUE, 'right') + 3;
-  folioY = textAt(`Fecha: ${issued}`, right - 205, folioY, 205, 9, false, MUTED, 'right') + 2;
-  folioY = textAt(`Estado: ${statusLabel(purchase.status)}`, right - 205, folioY, 205, 9, false, MUTED, 'right');
+  let folioY =
+    textAt(purchase.folio, right - 205, y + 3, 205, 12, true, BLUE, 'right') +
+    3;
+  folioY =
+    textAt(
+      `Fecha: ${issued}`,
+      right - 205,
+      folioY,
+      205,
+      9,
+      false,
+      MUTED,
+      'right',
+    ) + 2;
+  folioY = textAt(
+    `Estado: ${statusLabel(purchase.status)}`,
+    right - 205,
+    folioY,
+    205,
+    9,
+    false,
+    MUTED,
+    'right',
+  );
   y = Math.max(companyY, folioY) + 13;
   line(y);
   y += 15;
@@ -147,10 +173,12 @@ export function renderPurchaseOrderPdf(
   textAt('PROVEEDOR', left, y, 235, 9, true, BLUE);
   textAt('CONDICIONES COMERCIALES', left + 263, y, 250, 9, true, BLUE);
   y += 18;
-  let supplierY = textAt(supplier.legalName || supplier.name, left, y, 239, 10, true) + 3;
+  let supplierY =
+    textAt(supplier.legalName || supplier.name, left, y, 239, 10, true) + 3;
   const supplierLines = [
     supplier.legalName && supplier.name !== supplier.legalName
-      ? `Nombre comercial: ${supplier.name}` : null,
+      ? `Nombre comercial: ${supplier.name}`
+      : null,
     supplier.rfc ? `RFC: ${supplier.rfc}` : null,
     clean(supplier.fiscalAddress),
     supplier.code ? `Código proveedor: ${supplier.code}` : null,
@@ -218,9 +246,36 @@ export function renderPurchaseOrderPdf(
     const rowY = y + 7;
     textAt(item.sku, x.sku, rowY, w.sku, 8, false, MUTED);
     textAt(item.name, x.product, rowY, w.product, 8.5);
-    textAt(String(item.quantity), x.quantity, rowY, w.quantity, 8.5, false, TEXT, 'right');
-    textAt(money(item.unitCost, currency, 4), x.cost, rowY, w.cost, 8.5, false, TEXT, 'right');
-    textAt(money(item.subtotal, currency, 2), x.amount, rowY, w.amount, 8.5, false, TEXT, 'right');
+    textAt(
+      String(item.quantity),
+      x.quantity,
+      rowY,
+      w.quantity,
+      8.5,
+      false,
+      TEXT,
+      'right',
+    );
+    textAt(
+      money(item.unitCost, currency, 4),
+      x.cost,
+      rowY,
+      w.cost,
+      8.5,
+      false,
+      TEXT,
+      'right',
+    );
+    textAt(
+      money(item.subtotal, currency, 2),
+      x.amount,
+      rowY,
+      w.amount,
+      8.5,
+      false,
+      TEXT,
+      'right',
+    );
     y += rowHeight;
     line(y);
     y += 3;
@@ -233,18 +288,49 @@ export function renderPurchaseOrderPdf(
   const amountWidth = 128;
 
   textAt('Subtotal', totalsX, y, labelsWidth, 9, false, MUTED);
-  textAt(money(purchase.subtotal, currency, 2), totalsX + labelsWidth, y, amountWidth, 9, false, TEXT, 'right');
+  textAt(
+    money(purchase.subtotal, currency, 2),
+    totalsX + labelsWidth,
+    y,
+    amountWidth,
+    9,
+    false,
+    TEXT,
+    'right',
+  );
   y += 22;
   textAt('IVA (16%)', totalsX, y, labelsWidth, 9, false, MUTED);
-  textAt(money(purchase.iva, currency, 2), totalsX + labelsWidth, y, amountWidth, 9, false, TEXT, 'right');
+  textAt(
+    money(purchase.iva, currency, 2),
+    totalsX + labelsWidth,
+    y,
+    amountWidth,
+    9,
+    false,
+    TEXT,
+    'right',
+  );
   y += 22;
   doc.moveTo(totalsX, y).lineTo(right, y).strokeColor(RULE).stroke();
   y += 10;
   textAt('TOTAL', totalsX, y, labelsWidth, 11, true);
-  textAt(money(purchase.total, currency, 2), totalsX + labelsWidth, y, amountWidth, 12, true, BLUE, 'right');
+  textAt(
+    money(purchase.total, currency, 2),
+    totalsX + labelsWidth,
+    y,
+    amountWidth,
+    12,
+    true,
+    BLUE,
+    'right',
+  );
   y += 30;
 
-  if (currency === 'MXN' && purchase.total >= 0 && purchase.total < 1_000_000_000) {
+  if (
+    currency === 'MXN' &&
+    purchase.total >= 0 &&
+    purchase.total < 1_000_000_000
+  ) {
     const words = moneyToSpanishWordsMXN(purchase.total);
     textAt('TOTAL CON LETRA', left, y, 245, 8, true, MUTED);
     y += 14;
@@ -256,7 +342,15 @@ export function renderPurchaseOrderPdf(
   for (let index = 0; index < pageRange.count; index += 1) {
     doc.switchToPage(pageRange.start + index);
     doc.moveTo(left, 740).lineTo(right, 740).strokeColor(RULE).stroke();
-    textAt('Documento generado por Zaping ERP', left, 748, 315, 7.5, false, MUTED);
+    textAt(
+      'Documento generado por Zaping ERP',
+      left,
+      748,
+      315,
+      7.5,
+      false,
+      MUTED,
+    );
     textAt(
       `Página ${index + 1} de ${pageRange.count}`,
       right - 145,
