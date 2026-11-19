@@ -17,7 +17,7 @@ const SERVICE = 'zaping-qa-postgres';
 const USER = 'zaping_qa';
 const CLEAN_DB = 'zaping_qa';
 const SOURCE_DB = 'zaping_issue284_restore_check';
-const TRIAL_DB = 'zaping_issue284_transfer_trial_v2';
+const TRIAL_DB = 'zaping_issue284_transfer_trial_v3';
 const R2 = '20261113190000_zaping_files_r2_v1';
 const EXPECTED_MIGRATIONS = 54;
 const EXCLUDED = new Set([
@@ -25,14 +25,17 @@ const EXCLUDED = new Set([
 ]);
 
 function command(bin, args, options = {}) {
+  const { rawOutput = false, ...execOptions } = options;
   try {
-    return execFileSync(bin, args, {
+    const output = execFileSync(bin, args, {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 120000,
       maxBuffer: 10 * 1024 * 1024,
-      ...options,
-    }).trim();
+      ...execOptions,
+    });
+    // Preserve COPY payload bytes when generating SQL from a custom archive.
+    return rawOutput ? output : output.trim();
   } catch (error) {
     const details = Buffer.isBuffer(error.stderr)
       ? error.stderr.toString('utf8')
@@ -41,8 +44,8 @@ function command(bin, args, options = {}) {
   }
 }
 
-function compose(args) {
-  return command('docker', ['compose', '-f', COMPOSE, 'exec', '-T', SERVICE, ...args]);
+function compose(args, options = {}) {
+  return command('docker', ['compose', '-f', COMPOSE, 'exec', '-T', SERVICE, ...args], options);
 }
 
 function psql(database, sql) {
@@ -77,6 +80,17 @@ function officialTableNames(text) {
  * Only in the isolated trial: set a trusted path for the restore SESSION.
  * Never change a function, constraint, DB or migration to bypass this.
  */
+function restoreSqlArgs(archive) {
+  if (!/^\/tmp\/issue284-official-data-[0-9a-f-]+\.dump$/.test(archive)) {
+    throw new Error('STOP: unexpected archive path');
+  }
+  // pg_restore requires either -d/--dbname or -f/--file for custom archives.
+  // --file=- writes SQL to stdout for controlled, transaction-scoped psql input.
+  return [
+    'pg_restore', '--data-only', '--no-owner', '--no-acl', '--file=-', archive,
+  ];
+}
+
 function restoreWithQualifiedSearchPath(plainSql) {
   const reset = "SELECT pg_catalog.set_config('search_path', '', false);";
   const exactResetLines = plainSql.match(/^SELECT pg_catalog\.set_config\('search_path', '', false\);$/gm) || [];
@@ -177,18 +191,17 @@ function main() {
     throw new Error('STOP: archive contains forbidden tables or lacks Company');
   }
 
-  // This only creates an additional DB within the isolated rehearsal project.
+  // Validate custom-archive SQL output BEFORE creating a new database.
+  // pg_restore requires --file or --dbname when reading a custom archive.
+  // Preserve the output exactly: it contains COPY payloads, not just metadata.
+  const restoreSql = compose(restoreSqlArgs(archive), { rawOutput: true });
+  const safeRestoreSql = restoreWithQualifiedSearchPath(restoreSql);
+
+  // pg_restore normally resets search_path to empty. Existing deferred
+  // custody-trigger functions use unqualified table names. Keep the trigger
+  // definitions and FK enforcement unchanged; set the session's safe path only.
   compose(['createdb', '-U', USER, '-T', CLEAN_DB, TRIAL_DB]);
   console.log('Official schema cloned into new trial database');
-
-  // Convert archive to PostgreSQL SQL and replace only its search_path header.
-  // PostgreSQL pg_restore resets search_path to empty, which breaks unqualified
-  // table references in the existing deferrable custody trigger functions.
-  // Keep all triggers/FKs enabled and the entire data import atomic.
-  const restoreSql = compose([
-    'pg_restore', '--data-only', '--no-owner', '--no-acl', archive,
-  ]);
-  const safeRestoreSql = restoreWithQualifiedSearchPath(restoreSql);
   command('docker', [
     'compose', '-f', COMPOSE, 'exec', '-T', SERVICE,
     'psql', '-X', '--single-transaction', '-v', 'ON_ERROR_STOP=1',
@@ -228,4 +241,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { identifier, listFromSql, officialTableNames, countAndFingerprintSql, restoreWithQualifiedSearchPath };
+module.exports = { identifier, listFromSql, officialTableNames, countAndFingerprintSql, restoreSqlArgs, restoreWithQualifiedSearchPath };
