@@ -31,7 +31,7 @@ export class PurchasesController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE)
   create(@Request() req: any, @Body() dto: CreatePurchaseDto) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
-    return this.purchasesService.create(req.user.companyId, dto);
+    return this.purchasesService.create(req.user.companyId, dto, req.user.role);
   }
 
   @Get()
@@ -63,7 +63,7 @@ export class PurchasesController {
     @Body() dto: UpdatePurchaseDto,
   ) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
-    return this.purchasesService.update(req.user.companyId, id, dto);
+    return this.purchasesService.update(req.user.companyId, id, dto, req.user.role);
   }
 
   @Get(':id/inventory-movements')
