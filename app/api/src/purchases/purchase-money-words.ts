@@ -1,18 +1,49 @@
 const UNITS = [
-  'CERO', 'UNO', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS',
-  'SIETE', 'OCHO', 'NUEVE',
+  'CERO',
+  'UNO',
+  'DOS',
+  'TRES',
+  'CUATRO',
+  'CINCO',
+  'SEIS',
+  'SIETE',
+  'OCHO',
+  'NUEVE',
 ];
 const TEENS = [
-  'DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE',
-  'DIECISÉIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE',
+  'DIEZ',
+  'ONCE',
+  'DOCE',
+  'TRECE',
+  'CATORCE',
+  'QUINCE',
+  'DIECISÉIS',
+  'DIECISIETE',
+  'DIECIOCHO',
+  'DIECINUEVE',
 ];
 const TENS = [
-  '', '', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA',
-  'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA',
+  '',
+  '',
+  'VEINTE',
+  'TREINTA',
+  'CUARENTA',
+  'CINCUENTA',
+  'SESENTA',
+  'SETENTA',
+  'OCHENTA',
+  'NOVENTA',
 ];
 const HUNDREDS = [
-  '', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS',
-  'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS',
+  '',
+  'CIENTO',
+  'DOSCIENTOS',
+  'TRESCIENTOS',
+  'CUATROCIENTOS',
+  'QUINIENTOS',
+  'SEISCIENTOS',
+  'SETECIENTOS',
+  'OCHOCIENTOS',
   'NOVECIENTOS',
 ];
 
@@ -23,7 +54,9 @@ function lessThanThousand(n: number, beforeNoun = false): string {
     return [
       HUNDREDS[Math.floor(n / 100)],
       lessThanThousand(n % 100, beforeNoun),
-    ].filter(Boolean).join(' ');
+    ]
+      .filter(Boolean)
+      .join(' ');
   }
   if (n < 10) return n === 1 && beforeNoun ? 'UN' : UNITS[n];
   if (n < 20) return TEENS[n - 10];
@@ -47,15 +80,18 @@ function integerToSpanish(n: number, beforeNoun = false): string {
 
   const millions = Math.floor(n / 1_000_000);
   if (millions) {
-    const millionLabel = millions === 1 ? 'UN MILLÓN' :
-      `${integerToSpanish(millions, true)} MILLONES`;
+    const millionLabel =
+      millions === 1
+        ? 'UN MILLÓN'
+        : `${integerToSpanish(millions, true)} MILLONES`;
     parts.push(millionLabel);
   }
 
   const thousands = Math.floor((n % 1_000_000) / 1_000);
   if (thousands) {
-    parts.push(thousands === 1 ? 'MIL' :
-      `${lessThanThousand(thousands, true)} MIL`);
+    parts.push(
+      thousands === 1 ? 'MIL' : `${lessThanThousand(thousands, true)} MIL`,
+    );
   }
 
   const remainder = n % 1_000;
