@@ -439,6 +439,30 @@ describe('SuppliersPage', () => {
     ).toBeNull();
   });
 
+  it('captura la identidad fiscal completa del proveedor en el alta', async () => {
+    const user = userEvent.setup();
+    await renderSuppliersPage();
+    await user.click(screen.getByRole('button', { name: 'Nuevo proveedor' }));
+    await user.type(screen.getByRole('textbox', { name: 'Nombre' }), 'Proveedor Fiscal');
+    await user.type(screen.getByRole('textbox', { name: 'Razón social' }), 'Proveedor Fiscal S.A.');
+    await user.type(screen.getByRole('textbox', { name: 'RFC' }), 'HME091016DQ8');
+    await user.type(screen.getByRole('textbox', { name: 'Domicilio fiscal completo' }), 'Calle Fiscal 100, México, C.P. 64850');
+    await user.type(screen.getByRole('textbox', { name: 'Código de proveedor' }), '177');
+    await user.click(screen.getByRole('button', { name: 'Registrar proveedor' }));
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith(
+        '/suppliers',
+        expect.objectContaining({
+          name: 'Proveedor Fiscal',
+          legalName: 'Proveedor Fiscal S.A.',
+          rfc: 'HME091016DQ8',
+          fiscalAddress: 'Calle Fiscal 100, México, C.P. 64850',
+          supplierCode: '177',
+        }),
+      );
+    });
+  });
+
   it('mantiene abierto el formulario y muestra el error de creación sin alert', async () => {
     const user = userEvent.setup();
     const alertSpy = vi
