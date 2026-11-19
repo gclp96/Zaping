@@ -37,7 +37,7 @@ export default function CompanySettingsPage() {
     if (session.status === 'loading' || !allowed) return;
     let active = true;
 
-    api.get<CompanyFiscalProfile>('/companies/me').then(({ data }) => {
+    api.get<CompanyFiscalProfile>('/company-settings').then(({ data }) => {
       if (!active) return;
       setCompany(data);
       setFiscalAddress(data.fiscalAddress || '');
@@ -63,7 +63,7 @@ export default function CompanySettingsPage() {
     setError('');
     setSuccess(false);
     try {
-      const response = await api.patch<CompanyFiscalProfile>('/companies/me', {
+      const response = await api.patch<CompanyFiscalProfile>('/company-settings', {
         fiscalAddress: fiscalAddress.trim() || null,
         placeOfIssue: placeOfIssue.trim() || null,
       });
