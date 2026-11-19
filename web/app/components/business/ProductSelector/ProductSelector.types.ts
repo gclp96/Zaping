@@ -53,4 +53,5 @@ export interface ProductSelectorProps {
   helperText?: string;
 
   enableStockFilter?: boolean;
+  collapseSearchOnSelection?: boolean;
 }

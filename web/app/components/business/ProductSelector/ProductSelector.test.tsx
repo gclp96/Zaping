@@ -13,6 +13,7 @@ import {
   vi,
 } from 'vitest';
 
+import { useState } from 'react';
 import ProductSelector from './ProductSelector';
 
 afterEach(() => {
@@ -555,6 +556,39 @@ describe('ProductSelector', () => {
         'Precio: $125.75',
       ),
     ).toBeDefined();
+  });
+
+  it('oculta el buscador redundante en modo compacto y enfoca la búsqueda al cambiar', () => {
+    function ControlledSelector() {
+      const [value, setValue] = useState('product-1');
+      return (
+        <ProductSelector
+          options={products}
+          value={value}
+          onChange={setValue}
+          collapseSearchOnSelection
+        />
+      );
+    }
+
+    render(<ControlledSelector />);
+    expect(screen.getByText(/SKU-001.*Catéter diagnóstico/i)).toBeTruthy();
+    expect(screen.queryByRole('combobox', { name: 'Producto' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cambiar' }));
+    const search = screen.getByRole('combobox', { name: 'Producto' });
+    expect(document.activeElement).toBe(search);
+    expect(search.getAttribute('aria-expanded')).toBe('true');
+
+    fireEvent.change(search, { target: { value: 'SKU-002' } });
+    fireEvent.click(screen.getByRole('option', { name: /SKU-002.*Guía médica/i }));
+    expect(screen.queryByRole('combobox', { name: 'Producto' })).toBeNull();
+    expect(screen.getByText(/SKU-002.*Guía médica/i)).toBeTruthy();
+  });
+
+  it('conserva el buscador visible por defecto aunque haya producto seleccionado', () => {
+    render(<ProductSelector options={products} value="product-1" onChange={() => undefined} />);
+    expect(screen.getByRole('combobox', { name: 'Producto' })).toBeTruthy();
   });
 
   it('permite cambiar el producto seleccionado', () => {

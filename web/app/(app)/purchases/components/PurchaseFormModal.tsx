@@ -133,7 +133,18 @@ export default function PurchaseFormModal({
           {itemsError}
         </p>
       ) : null}
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+      <div className={workspaceEnabled
+        ? 'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'
+        : ''}>
+        {workspaceEnabled && items.length > 0 ? (
+          <p className="flex items-baseline gap-2 text-sm text-text-muted">
+            Total de la compra
+            <strong className="text-lg font-semibold text-text tabular-nums">
+              {formatMoney(total)}
+            </strong>
+          </p>
+        ) : null}
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <Button
           type="button"
           variant="outline"
@@ -153,6 +164,7 @@ export default function PurchaseFormModal({
         >
           {editing ? 'Guardar cambios' : 'Crear compra'}
         </Button>
+        </div>
       </div>
     </footer>
   );
@@ -169,14 +181,14 @@ export default function PurchaseFormModal({
     >
       <div
         data-testid="purchase-form-content"
-        className={workspaceEnabled ? 'space-y-5 pb-1' : 'space-y-6 pb-2'}
+        className={workspaceEnabled ? 'space-y-3 pb-1' : 'space-y-6 pb-2'}
       >
         <section
           aria-labelledby="purchase-form-details-heading"
           data-testid="purchase-form-details"
           className={
             workspaceEnabled
-              ? 'space-y-4 rounded-xl border border-border bg-surface-subtle p-4 sm:p-5'
+              ? 'space-y-3 rounded-xl border border-border bg-surface-subtle p-3 sm:p-4'
               : 'space-y-4'
           }
         >
@@ -206,11 +218,11 @@ export default function PurchaseFormModal({
           data-testid="purchase-form-add-item"
           className={
             workspaceEnabled
-              ? 'rounded-xl border border-border bg-white p-4 sm:p-5'
+              ? 'rounded-xl border border-border bg-white p-3 sm:p-4'
               : 'rounded-lg border border-gray-200 bg-gray-50/60 p-4 sm:p-5'
           }
         >
-          <div className="mb-4">
+          <div className={workspaceEnabled ? 'mb-3' : 'mb-4'}>
             <h3
               id="purchase-form-add-item-heading"
               className="font-semibold text-gray-900"
@@ -222,7 +234,7 @@ export default function PurchaseFormModal({
             </p>
           </div>
 
-          <div className="space-y-4">
+          <div className={workspaceEnabled ? 'space-y-3' : 'space-y-4'}>
             <ProductSelector
               options={products}
               value={selectedProductId}
@@ -230,12 +242,15 @@ export default function PurchaseFormModal({
                 (item) => item.productId,
               )}
               priceMode="cost"
+              collapseSearchOnSelection={workspaceEnabled}
               onChange={onSelectedProductChange}
               error={productError}
-              helperText="Busca por nombre, SKU, código de barras, marca o categoría."
+              helperText={workspaceEnabled ? undefined : 'Busca por nombre, SKU, código de barras, marca o categoría.'}
             />
 
-            <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <div className={workspaceEnabled
+              ? 'grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end'
+              : 'grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end'}>
               <Input
                 label="Cantidad"
                 type="number"
@@ -266,7 +281,7 @@ export default function PurchaseFormModal({
           data-testid="purchase-form-items"
           className={
             workspaceEnabled
-              ? 'space-y-3 rounded-xl border border-border bg-white p-4 sm:p-5'
+              ? 'space-y-2 rounded-xl border border-border bg-white p-3 sm:p-4'
               : 'space-y-3'
           }
         >
@@ -470,14 +485,14 @@ export default function PurchaseFormModal({
           data-testid="purchase-form-lower-area"
           className={
             workspaceEnabled
-              ? 'grid min-w-0 gap-4 lg:grid-cols-[minmax(0,11fr)_minmax(0,9fr)] lg:items-start'
+              ? 'grid min-w-0 gap-3 lg:grid-cols-[minmax(0,11fr)_minmax(0,9fr)] lg:items-start'
               : ''
           }
         >
           {workspaceEnabled ? (
             <section
               aria-label="Revisión de la orden"
-              className="min-w-0 space-y-4 rounded-xl border border-border bg-white p-4 sm:p-5"
+              className="min-w-0 space-y-3 rounded-xl border border-border bg-white p-3 sm:p-4"
             >
               <div>
                 <h3 className="font-semibold text-text">Revisión de la orden</h3>
@@ -510,13 +525,13 @@ export default function PurchaseFormModal({
             data-testid="purchase-form-financial-summary"
             className={
               workspaceEnabled
-                ? 'min-w-0 rounded-xl border border-border bg-surface-subtle p-4 sm:p-5'
+                ? 'min-w-0 rounded-xl border border-border bg-surface-subtle p-3 sm:p-4'
                 : 'rounded-lg border border-gray-200 bg-gray-50 p-4 sm:p-5'
             }
           >
           <h3
             id="purchase-form-summary-heading"
-            className="mb-4 font-semibold text-gray-900"
+            className={workspaceEnabled ? 'mb-3 font-semibold text-gray-900' : 'mb-4 font-semibold text-gray-900'}
           >
             Resumen financiero
           </h3>

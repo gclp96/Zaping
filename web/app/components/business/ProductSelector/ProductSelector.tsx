@@ -1,8 +1,10 @@
 'use client';
 
 import {
+  useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -105,6 +107,7 @@ export default function ProductSelector({
   helperText,
 
   enableStockFilter = false,
+  collapseSearchOnSelection = false,
 }: ProductSelectorProps) {
   const generatedId = useId();
 
@@ -117,6 +120,8 @@ export default function ProductSelector({
 
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const focusOnClearRef = useRef(false);
 
   const [stockFilter, setStockFilter] =
     useState<ProductStockFilter>('all');
@@ -133,6 +138,13 @@ export default function ProductSelector({
       ) ?? null,
     [options, value],
   );
+
+  useEffect(() => {
+    if (!selectedProduct && focusOnClearRef.current) {
+      focusOnClearRef.current = false;
+      searchInputRef.current?.focus();
+    }
+  }, [selectedProduct]);
 
   const filteredProducts = useMemo(() => {
     const normalizedSearch =
@@ -205,6 +217,7 @@ export default function ProductSelector({
       return;
     }
 
+    focusOnClearRef.current = collapseSearchOnSelection;
     onChange('');
     setSearch('');
     setOpen(true);
@@ -237,7 +250,7 @@ export default function ProductSelector({
   return (
     <div className="flex w-full flex-col gap-2">
       <label
-        htmlFor={inputId}
+        htmlFor={selectedProduct && collapseSearchOnSelection ? undefined : inputId}
         className="text-sm font-medium text-gray-700"
       >
         {label}
@@ -315,8 +328,12 @@ export default function ProductSelector({
         </div>
       ) : null}
 
-      <div className="relative">
+      <div
+        className="relative"
+        hidden={Boolean(selectedProduct && collapseSearchOnSelection)}
+      >
         <input
+          ref={searchInputRef}
           id={inputId}
           type="search"
           role="combobox"

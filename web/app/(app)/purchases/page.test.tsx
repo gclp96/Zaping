@@ -3174,7 +3174,11 @@ describe('PUR-UX-01B — lista visual de Compras con flag reversible', () => {
 
     await screen.findByRole('button', { name: 'Abrir detalle de compra OC-0001' });
 
-    expect(screen.getByRole('heading', { name: 'Historial de compras', level: 2 })).toBeTruthy();
+    const toolbar = screen.getByRole('group', { name: 'Controles de tabla' });
+    expect(within(toolbar).getByRole('heading', { name: 'Historial de compras', level: 2 })).toBeTruthy();
+    expect(within(toolbar).getByText('2 de 2 órdenes')).toBeTruthy();
+    expect(within(toolbar).getByRole('button', { name: 'Limpiar filtros' })).toBeTruthy();
+    expect(screen.getAllByText('2 de 2 órdenes')).toHaveLength(1);
     expect(screen.getByText('Registra órdenes de compra y da seguimiento a recepciones parciales o completas.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Abrir detalle de compra OC-0001' }).getAttribute('aria-haspopup')).toBe('dialog');
     expect(screen.getByText('2 de 2 órdenes')).toBeTruthy();

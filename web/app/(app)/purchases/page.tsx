@@ -686,16 +686,55 @@ async function loadPageData() {
         hasDateRange,
     );
 
+    const toolbarActions = (
+      <div className="flex flex-wrap items-center gap-2">
+        {companyTimezoneState.status === 'error' ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void loadCompanyTimezone()}
+          >
+            Reintentar zona horaria
+          </Button>
+        ) : null}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={resetDisabled}
+          onClick={clearFilters}
+        >
+          <RotateCcw aria-hidden="true" size={16} />
+          Limpiar filtros
+        </Button>
+      </div>
+    );
+
     return (
       <div
         role="group"
         aria-label="Controles de tabla"
         className={purchasesWorkspaceEnabled
-          ? 'space-y-4 rounded-xl border border-border bg-surface p-4 shadow-sm sm:p-5'
+          ? 'space-y-3 rounded-xl border border-border bg-surface p-3 shadow-sm sm:p-4'
           : 'space-y-4 rounded-xl border border-border bg-surface p-4 sm:p-5'}
       >
+        {purchasesWorkspaceEnabled ? (
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold text-text">
+                Historial de compras
+              </h2>
+              <p className="text-sm text-text-muted">
+                {filteredPurchases.length} de {purchases.length} órdenes
+              </p>
+            </div>
+            {toolbarActions}
+          </div>
+        ) : null}
+
         <div className={purchasesWorkspaceEnabled
-            ? 'grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6'
+            ? 'grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6'
             : 'grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6'}>
           <Input
             label={purchasesWorkspaceEnabled ? 'Buscar por folio, proveedor o SKU' : 'Buscar compras'}
@@ -750,34 +789,14 @@ async function loadPageData() {
           />
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-          <p className="text-sm text-text-muted">
-            {filteredPurchases.length} de {purchases.length} órdenes
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            {companyTimezoneState.status === 'error' ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => void loadCompanyTimezone()}
-              >
-                Reintentar zona horaria
-              </Button>
-            ) : null}
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={resetDisabled}
-              onClick={clearFilters}
-            >
-              <RotateCcw aria-hidden="true" size={16} />
-              Limpiar filtros
-            </Button>
+        {!purchasesWorkspaceEnabled ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+            <p className="text-sm text-text-muted">
+              {filteredPurchases.length} de {purchases.length} órdenes
+            </p>
+            {toolbarActions}
           </div>
-        </div>
+        ) : null}
 
         {dateRangeMessage ? (
           <p
@@ -1102,9 +1121,12 @@ async function loadPageData() {
   return (
     <>
       {/* Página de compras */}
-      <PageContainer size={purchasesWorkspaceEnabled ? 'wide' : 'default'}>
+      <PageContainer
+        size={purchasesWorkspaceEnabled ? 'wide' : 'default'}
+        className={purchasesWorkspaceEnabled ? '[&>*+*]:mt-4' : undefined}
+      >
         <div className={purchasesWorkspaceEnabled
-          ? 'min-w-0 rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6 [&>div]:mb-0'
+          ? 'min-w-0 rounded-2xl border border-border bg-surface p-4 shadow-sm sm:p-5 [&>div]:mb-0 [&_h1]:text-2xl [&_p]:mt-1'
           : 'rounded-xl border border-border border-t-4 border-t-blue-600 bg-surface p-5 sm:p-6 [&>div]:mb-0'}>
           <PageHeader
             title="Compras"
@@ -1189,12 +1211,7 @@ async function loadPageData() {
             }
           />
         ) : (
-          <Section
-            title={purchasesWorkspaceEnabled ? 'Historial de compras' : undefined}
-            description={purchasesWorkspaceEnabled
-              ? 'Consulta las órdenes, su estado y el avance de recepción de mercancía.'
-              : undefined}
-          >
+          <Section>
             <p className="text-sm text-text-muted sm:hidden">
               Desliza la tabla para ver el estado y las acciones de cada compra.
             </p>

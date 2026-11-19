@@ -164,6 +164,31 @@ describe('PurchaseFormModal', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it('compacta el producto elegido y mantiene el total visible en el pie del workspace', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    renderModal({ selectedProductId: product.id });
+
+    const dialog = screen.getByRole('dialog', { name: 'Nueva compra' });
+    const selectedProduct = screen.getByTestId('purchase-form-add-item');
+    expect(within(selectedProduct).getByText(/MED-001.*Producto médico/)).toBeTruthy();
+    expect(within(selectedProduct).queryByRole('combobox', { name: 'Producto' })).toBeNull();
+    expect(within(selectedProduct).getByRole('button', { name: 'Cambiar' })).toBeTruthy();
+
+    const footer = within(dialog).getByTestId('purchase-form-footer');
+    expect(within(footer).getByText('Total de la compra')).toBeTruthy();
+    expect(within(footer).getByText('$348.00')).toBeTruthy();
+    expect(within(footer).getByRole('button', { name: 'Crear compra' })).toBeTruthy();
+    expect(within(screen.getByTestId('purchase-form-financial-summary')).getByText('$348.00')).toBeTruthy();
+  });
+
+  it('mantiene el buscador inicial y no muestra total fijo sin partidas', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    renderModal({ selectedProductId: '', items: [], subtotal: 0, iva: 0, total: 0 });
+    expect(screen.getByRole('combobox', { name: 'Producto' })).toBeTruthy();
+    expect(within(screen.getByTestId('purchase-form-footer')).queryByText('Total de la compra')).toBeNull();
+    expect((within(screen.getByTestId('purchase-form-footer')).getByRole('button', { name: 'Crear compra' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it.each([
     { label: 'proveedor elegido', supplierId: supplier.id, selectedProductId: '', quantity: '1', items: [] },
     { label: 'producto elegido', supplierId: '', selectedProductId: product.id, quantity: '1', items: [] },
