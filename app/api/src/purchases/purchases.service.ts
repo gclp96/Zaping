@@ -34,6 +34,7 @@ export class PurchasesService {
     companyId: string,
     dto: CreatePurchaseDto,
     actorRole?: UserRole,
+    actorCanAdjustPurchaseUnitCost = false,
   ) {
     return this.prisma.$transaction(async (tx) => {
       const productIds = dto.items.map((item) => item.productId);
@@ -101,6 +102,7 @@ export class PurchasesService {
           item.unitCost,
           product.cost,
           actorRole,
+          actorCanAdjustPurchaseUnitCost,
         );
         const itemSubtotal = this.roundMoney(item.quantity * unitCost);
 
@@ -277,6 +279,7 @@ export class PurchasesService {
     purchaseId: string,
     dto: UpdatePurchaseDto,
     actorRole?: UserRole,
+    actorCanAdjustPurchaseUnitCost = false,
   ) {
     return this.prisma.$transaction(async (tx) => {
       const purchase = await tx.purchase.findFirst({
@@ -377,6 +380,7 @@ export class PurchasesService {
           item.unitCost,
           existingLineCost ?? product.cost,
           actorRole,
+          actorCanAdjustPurchaseUnitCost,
         );
         const itemSubtotal = this.roundMoney(item.quantity * unitCost);
 
@@ -632,12 +636,16 @@ export class PurchasesService {
     requestedCost: number | undefined,
     fallbackCost: number,
     actorRole?: UserRole,
+    actorCanAdjustPurchaseUnitCost = false,
   ): number {
     if (requestedCost === undefined) {
       return fallbackCost;
     }
 
-    if (actorRole !== UserRole.ADMIN && actorRole !== UserRole.MANAGER) {
+    const roleAllowsEdit = actorRole === UserRole.ADMIN || actorRole === UserRole.MANAGER;
+    const delegatedBuyer = actorRole === UserRole.WAREHOUSE && actorCanAdjustPurchaseUnitCost;
+
+    if (!roleAllowsEdit && !delegatedBuyer) {
       throw new ForbiddenException(
         'No tienes permiso para modificar el costo unitario de la compra',
       );
