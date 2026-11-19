@@ -94,6 +94,33 @@ function coreCountsQuery() {
     (name) => '(SELECT COUNT(*) FROM public.' + qName(name) + ')',
   ).join(', ') + ';';
 }
+function officialInventoryQuery() {
+  return "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public' " +
+    "AND tablename NOT IN ('_prisma_migrations','ZapingFile','ZapingFileReceiptLink','ZapingFileEvent') ORDER BY tablename;";
+}
+function fingerprintSql(name) {
+  // Table names come only from pg_catalog and must use safe quoted identifiers.
+  const table = qName(name);
+  return "SELECT '" + name + "', COUNT(*), " +
+    "COALESCE(md5(string_agg(md5(to_jsonb(t)::text), '' " +
+    "ORDER BY md5(to_jsonb(t)::text))), md5('')) " +
+    'FROM public.' + table + ' t';
+}
+function allFingerprintsQuery(names) {
+  assert.equal(names.length, 57, 'STOP: unexpected official table inventory');
+  return names.map(fingerprintSql).join(' UNION ALL ') + ';';
+}
+function verifyTableFingerprints(sourceOutput, targetOutput) {
+  const lines = sourceOutput.split(/\r?\n/).filter(Boolean);
+  const right = targetOutput.split(/\r?\n/).filter(Boolean);
+  assert.equal(lines.length, 57, 'STOP: original QA table fingerprints incomplete');
+  assert.deepEqual(lines, right, 'STOP: data changed since v3 snapshot; freeze and re-plan');
+  const total = lines.reduce((sum, line) => {
+    assert.match(line, /^[A-Za-z_][A-Za-z0-9_]*\|\d+\|[a-f0-9]{32}$/);
+    return sum + Number(line.split('|')[1]);
+  }, 0);
+  assert.equal(total, 110, 'STOP: total official data changed');
+}
 function assertSnapshot(label, actual) {
   assert.equal(actual.core, '2|5|4|14|7|5|5|3|5', 'STOP: ' + label + ' QA data changed');
   assert.equal(actual.rows, '110', 'STOP: ' + label + ' official row total changed');
@@ -144,13 +171,29 @@ function main() {
   assertSnapshot('operational', originalSnapshot);
   assertSnapshot('v3', trialSnapshot);
 
+  const r2Counts = sql(operational, OP.database, [
+    'SELECT (SELECT COUNT(*) FROM public."ZapingFile"),',
+    '(SELECT COUNT(*) FROM public."ZapingFileReceiptLink"),',
+    '(SELECT COUNT(*) FROM public."ZapingFileEvent");',
+  ].join(' '));
+  assert.equal(r2Counts, '1|1|3', 'STOP: historical R2 records changed; preserve before cutover');
+
+  const qaNames = sql(operational, OP.database, officialInventoryQuery()).split(/\r?\n/).filter(Boolean);
+  const v3Names = sql(rehearsal, TRIAL.database, officialInventoryQuery()).split(/\r?\n/).filter(Boolean);
+  assert.deepEqual(qaNames, v3Names, 'STOP: source and v3 official tables differ');
+  const fingerprintQuery = allFingerprintsQuery(qaNames);
+  verifyTableFingerprints(
+    sql(operational, OP.database, fingerprintQuery),
+    sql(rehearsal, TRIAL.database, fingerprintQuery),
+  );
+
   const candidateCount = sql(operational, 'postgres',
     "SELECT count(*) FROM pg_database WHERE datname = '" + CANDIDATE + "';");
   assert.equal(candidateCount, '0', 'STOP: QA candidate name exists; do not overwrite');
 
   console.log('PASS: operational QA identity; 55 migrations including historical R2; 110 official rows');
   console.log('PASS: isolated official v3 identity; 54 migrations, 0 R2, 110 official rows');
-  console.log('PASS: official migration names agree; candidate name is available');
+  console.log('PASS: all 57 official table fingerprints and 110 rows match current QA; candidate name available');
   console.log('HOLD: NO database created, NO data transferred, NO QA API/Web configuration changed');
 }
 if (require.main === module) {
@@ -162,5 +205,7 @@ if (require.main === module) {
   }
 }
 module.exports = {
-  officialCountsQuery, coreCountsQuery, assertSnapshot, CANDIDATE, OFFICIAL_TABLES,
+  officialCountsQuery, coreCountsQuery, assertSnapshot, officialInventoryQuery,
+  fingerprintSql, allFingerprintsQuery, verifyTableFingerprints,
+  CANDIDATE, OFFICIAL_TABLES,
 };
