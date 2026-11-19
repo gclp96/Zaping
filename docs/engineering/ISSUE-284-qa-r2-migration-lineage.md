@@ -227,6 +227,69 @@ una copia adicional, verificación de rollback y aprobación expresa. Si el
 test falla, **no** cambiar conexiones ni datos de QA operativa: revisar la
 salida y el guard fallido.
 
+## Paso 2d — Smoke indispensable de LOGIN y ESCRITURA en copia nueva (pendiente local)
+
+Sin repetir las 48 comprobaciones de lectura. El gate crea exclusivamente
+'zaping_issue284_write_trial_v1' en el proyecto aislado
+'zaping-issue284-rehearsal', copiando 'zaping_issue284_transfer_trial_v3'.
+No modifica v3, QA operativa, ni las bases y respaldos históricos.
+
+Precondiciones: CI verde en HEAD del PR Draft #285, v3 y lectura funcional PASS,
+PostgreSQL de rehearsal disponible. Si el destino existe, DETENERSE y no repetir.
+
+El preparador del host valida el nombre y etiqueta del proyecto Docker,
+usuario PostgreSQL, 54 migraciones/0 R2, dos empresas, cinco usuarios,
+cuatro clientes, siete compras, siete partidas, y ausencia del destino
+ANTES de createdb. No acepta otro proyecto, base o destino.
+
+~~~powershell
+cd C:\dev\zaping
+git pull --ff-only origin fix/issue-284-qa-migration-lineage-audit-20261118
+node --test scripts/qa/*.test.cjs
+docker compose -f docker-compose.qa-history-rehearsal.yml --profile functional config --quiet
+docker compose -f docker-compose.qa-history-rehearsal.yml --profile functional up -d --wait --no-deps zaping-qa-postgres
+
+# Ejecutar UNA SOLA VEZ y únicamente sobre la base nueva
+node scripts/qa/prepare-issue284-write-trial.cjs
+
+# Reutiliza la imagen aislada del gate de lectura. Override solo de entrypoint.
+docker compose -f docker-compose.qa-history-rehearsal.yml --profile functional run --rm --no-deps --entrypoint node functional-check /issue284-tools/issue284-write-check.cjs
+~~~
+
+El runner se limita a la base de escritura, red Docker internal:true, sin
+puertos publicados, sin secretos de QA, R2 o correo, y sin proveedores externos.
+Genera contraseñas sintéticas (no las imprime) y sustituye SOLO los hashes
+de dos usuarios en la copia nueva; la firma JWT de la API es efímera.
+
+Prueba el login real de ADMIN A y usuario B, rechazo de contraseña incorrecta,
+crear/leer/actualizar cliente nuevo, bloqueo cross-tenant 403/404,
+crear/leer compra con proveedor/producto existentes y partida asociada,
+rechazo de proveedor extranjero y aislamiento por empresa.
+
+Final esperado en la COPIA: 2 empresas, 5 usuarios, 5 clientes, 8 compras,
+8 partidas; 54 migraciones, 0 R2; recuentos de empresa B intactos.
+Se esperan dos líneas PASS y un HOLD del runner.
+
+IMPORTANTE: al usar contraseña y JWT sintéticos, esto NO comprueba continuidad
+de claves, sesiones o contraseñas operativas. Si falla, conservar la BD y
+detenerse; no repetir, limpiar, borrar ni usar down -v o reset.
+
+## Paso 2e — Rollback del futuro corte (plan documental, NO ejecución)
+
+Previo a la autorización de cambio de QA:
+- Respaldo nuevo y restauración de prueba de QA operativa; validar datos y
+  evidencia histórica R2 antes de cualquier cambio.
+- Registrar destino anterior y candidato, guardando URLs y secretos en
+  almacenamiento privado y NUNCA en Issues/logs.
+- Definir ventana, responsables y detención de escritores. Ejecutar cambio
+  solo con autorización expresa y verificar login con credenciales y JWT
+  operativos, health y un flujo sobre la QA candidata.
+- Ante fallo, parar escritores y restaurar el destino anterior apuntando a
+  la QA preservada; comprobar salud y autenticación. Identificar cualquier
+  escritura divergente antes de reintentar. Volver a la QA antigua es una
+  recuperación temporal, NO reconciliación de su migración R2.
+- Este PR NO realiza el corte ni la reversión.
+
 ## Paso 3 — Corte real de QA: gate humano pendiente
 
 **No forma parte de este PR.** No basta con un rehearsal verde para cambiar
@@ -267,6 +330,7 @@ la base que usan QA ADMIN/SALES/etc. Se requiere:
 - [x] Respaldo restaurado verificado, 5 consultas de integridad sin huérfanos, inventario 110+5 y equivalencia estructural documentada.
 - [x] Transferencia a la sexta BD de ensayo v3: 110 filas oficiales, huellas coincidentes, 54 migraciones, 0 R2.
 - [ ] Smoke funcional API aislada: JWT/RBAC, tenant A/B, Clientes, Compras, Recepciones y Healthcare.
+- [ ] Login real y escritura mínima verificados en la copia nueva (pendiente local).
 - [ ] Política de preservación de datos y autorización de corte definidas.
 - [ ] Corte hacia BD QA de `main` completado y pruebas de regresión PASS.
 - [ ] Cerrar issue #284 solo después de comprobar que la QA activa no posee
