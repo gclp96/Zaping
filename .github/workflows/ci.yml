@@ -43,6 +43,7 @@ jobs:
           node --check scripts/qa/issue284-write-check.cjs
           node --check scripts/qa/issue284-cutover-preflight.cjs
           node --check scripts/qa/issue284-prepare-qa-candidate.cjs
+          node --check scripts/qa/issue284-api-candidate-connection-check.cjs
           node --test scripts/qa/*.test.cjs
 
       - name: Validate isolated history rehearsal Compose syntax
