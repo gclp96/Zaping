@@ -8,6 +8,7 @@ const {
   officialTableNames,
   countAndFingerprintSql,
   restoreWithQualifiedSearchPath,
+  restoreSqlArgs,
 } = require('./rehearse-issue284-official-data.cjs');
 
 test('double-quotes only validated PostgreSQL identifiers', () => {
@@ -83,4 +84,15 @@ test('refuses missing or unexpected pg_restore search_path statements', () => {
     () => restoreWithQualifiedSearchPath(reset + '\nSET search_path = public;'),
     /unexpected pg_restore search_path/,
   );
+});
+
+test('pg_restore custom archive renders SQL to stdout without accessing a database', () => {
+  const args = restoreSqlArgs('/tmp/issue284-official-data-123e4567-e89b-12d3-a456-426614174000.dump');
+  assert.deepEqual(args, [
+    'pg_restore', '--data-only', '--no-owner', '--no-acl', '--file=-',
+    '/tmp/issue284-official-data-123e4567-e89b-12d3-a456-426614174000.dump',
+  ]);
+  assert.ok(args.includes('--file=-'));
+  assert.ok(!args.includes('-d') && !args.includes('--dbname'));
+  assert.throws(() => restoreSqlArgs('/tmp/other.dump'), /unexpected archive path/);
 });
