@@ -17,20 +17,21 @@ const SERVICE = 'zaping-qa-postgres';
 const USER = 'zaping_qa';
 const CLEAN_DB = 'zaping_qa';
 const SOURCE_DB = 'zaping_issue284_restore_check';
-const TRIAL_DB = 'zaping_issue284_transfer_trial';
+const TRIAL_DB = 'zaping_issue284_transfer_trial_v2';
 const R2 = '20261113190000_zaping_files_r2_v1';
 const EXPECTED_MIGRATIONS = 54;
 const EXCLUDED = new Set([
   '_prisma_migrations', 'ZapingFile', 'ZapingFileEvent', 'ZapingFileReceiptLink',
 ]);
 
-function command(bin, args) {
+function command(bin, args, options = {}) {
   try {
     return execFileSync(bin, args, {
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 120000,
       maxBuffer: 10 * 1024 * 1024,
+      ...options,
     }).trim();
   } catch (error) {
     const details = Buffer.isBuffer(error.stderr)
@@ -68,6 +69,22 @@ function officialTableNames(text) {
     throw new Error('STOP: official table inventory not recognized');
   }
   return names.map(identifier);
+}
+
+/**
+ * pg_restore clears search_path even when the app's current schema is public.
+ * Some official deferred trigger functions still query unqualified tables.
+ * Only in the isolated trial: set a trusted path for the restore SESSION.
+ * Never change a function, constraint, DB or migration to bypass this.
+ */
+function restoreWithQualifiedSearchPath(plainSql) {
+  const reset = "SELECT pg_catalog.set_config('search_path', '', false);";
+  const exactResetLines = plainSql.match(/^SELECT pg_catalog\.set_config\('search_path', '', false\);$/gm) || [];
+  const allSearchPathMentions = plainSql.match(/search_path/gi) || [];
+  if (exactResetLines.length !== 1 || allSearchPathMentions.length !== 1) {
+    throw new Error('STOP: unexpected pg_restore search_path header; no import attempted');
+  }
+  return plainSql.replace(reset, reset + '\nSET search_path = pg_catalog, public;');
 }
 
 function countAndFingerprintSql(quotedName) {
@@ -164,11 +181,19 @@ function main() {
   compose(['createdb', '-U', USER, '-T', CLEAN_DB, TRIAL_DB]);
   console.log('Official schema cloned into new trial database');
 
-  // No triggers disabled. Failure rolls back the import transaction.
-  compose([
-    'pg_restore', '--data-only', '--single-transaction', '--exit-on-error',
-    '--no-owner', '--no-acl', '-U', USER, '-d', TRIAL_DB, archive,
+  // Convert archive to PostgreSQL SQL and replace only its search_path header.
+  // PostgreSQL pg_restore resets search_path to empty, which breaks unqualified
+  // table references in the existing deferrable custody trigger functions.
+  // Keep all triggers/FKs enabled and the entire data import atomic.
+  const restoreSql = compose([
+    'pg_restore', '--data-only', '--no-owner', '--no-acl', archive,
   ]);
+  const safeRestoreSql = restoreWithQualifiedSearchPath(restoreSql);
+  command('docker', [
+    'compose', '-f', COMPOSE, 'exec', '-T', SERVICE,
+    'psql', '-X', '--single-transaction', '-v', 'ON_ERROR_STOP=1',
+    '-U', USER, '-d', TRIAL_DB, '-f', '-',
+  ], { input: safeRestoreSql + '\n' });
   console.log('Data-only import completed; verifying source/trial fingerprints');
 
   const migrations = psql(TRIAL_DB,
@@ -203,4 +228,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { identifier, listFromSql, officialTableNames, countAndFingerprintSql };
+module.exports = { identifier, listFromSql, officialTableNames, countAndFingerprintSql, restoreWithQualifiedSearchPath };
