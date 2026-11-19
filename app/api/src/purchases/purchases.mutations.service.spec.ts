@@ -264,6 +264,87 @@ describe('PurchasesService — tenant-safe mutations', () => {
     expect(transactionClient.purchaseItem.createMany).not.toHaveBeenCalled();
   });
 
+  it('conserva costo bruto y descuento cuando solo edita cantidad WAREHOUSE', async () => {
+    transactionClient.purchase.findFirst
+      .mockResolvedValueOnce({
+        id: purchaseId,
+        status: PurchaseStatus.DRAFT,
+        items: [{
+          productId,
+          price: 76.95,
+          listUnitCost: 85.5,
+          discountPercent: 10,
+        }],
+      })
+      .mockResolvedValueOnce({ id: purchaseId, status: PurchaseStatus.DRAFT });
+
+    await service.update(companyId, purchaseId, updateDto, UserRole.WAREHOUSE);
+
+    expect(transactionClient.purchaseItem.createMany).toHaveBeenCalledWith({
+      data: [{
+        purchaseId,
+        productId,
+        quantity: 2,
+        price: 76.95,
+        listUnitCost: 85.5,
+        discountPercent: 10,
+        subtotal: 153.9,
+      }],
+    });
+  });
+
+  it('permite al comprador delegado cambiar descuento del borrador', async () => {
+    transactionClient.purchase.findFirst
+      .mockResolvedValueOnce({
+        id: purchaseId,
+        status: PurchaseStatus.DRAFT,
+        items: [{ productId, price: 100, discountPercent: 0 }],
+      })
+      .mockResolvedValueOnce({ id: purchaseId, status: PurchaseStatus.DRAFT });
+
+    await service.update(
+      companyId,
+      purchaseId,
+      {
+        ...updateDto,
+        items: [{ productId, quantity: 2, discountPercent: 10 }],
+      },
+      UserRole.WAREHOUSE,
+      true,
+    );
+    expect(transactionClient.purchaseItem.createMany).toHaveBeenCalledWith({
+      data: [{
+        purchaseId,
+        productId,
+        quantity: 2,
+        price: 90,
+        listUnitCost: 100,
+        discountPercent: 10,
+        subtotal: 180,
+      }],
+    });
+  });
+
+  it('impide cambio de descuento no autorizado sin mutar compra', async () => {
+    transactionClient.purchase.findFirst.mockResolvedValue({
+      id: purchaseId,
+      status: PurchaseStatus.DRAFT,
+      items: [{ productId, price: 100, discountPercent: 0 }],
+    });
+    await expect(
+      service.update(
+        companyId,
+        purchaseId,
+        {
+          ...updateDto,
+          items: [{ productId, quantity: 2, discountPercent: 10 }],
+        },
+        UserRole.WAREHOUSE,
+      ),
+    ).rejects.toThrow();
+    expect(transactionClient.purchase.updateMany).not.toHaveBeenCalled();
+  });
+
   it('rechaza un proveedor de otro tenant antes de mutar compra o partidas', async () => {
     transactionClient.purchase.findFirst.mockResolvedValue({
       id: purchaseId,
