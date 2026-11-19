@@ -96,6 +96,13 @@ function renderModal(
     suppliers: [supplier],
     products: [product],
     supplierId: supplier.id,
+    commercial: {
+      paymentTerms: '',
+      paymentMethod: '',
+      paymentDueDate: '',
+      expectedDeliveryDate: '',
+      buyerName: '',
+    },
     selectedProductId: '',
     quantity: '1',
     items: [item],
@@ -113,6 +120,7 @@ function renderModal(
     onAddProduct: vi.fn(),
     onRemoveItem: vi.fn(),
     onSupplierChange: vi.fn(),
+    onCommercialChange: vi.fn(),
     onSelectedProductChange: vi.fn(),
     onQuantityChange: vi.fn(),
     onItemQuantityChange: vi.fn(),
@@ -126,6 +134,26 @@ describe('PurchaseFormModal', () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllEnvs();
+  });
+
+  it('edita las condiciones comerciales sin afectar las partidas', () => {
+    const onCommercialChange = vi.fn();
+    renderModal({
+      onCommercialChange,
+      commercial: {
+        paymentTerms: 'Crédito 30 días',
+        paymentMethod: 'Transferencia electrónica',
+        paymentDueDate: '2026-12-17',
+        expectedDeliveryDate: '2026-11-17',
+        buyerName: 'Responsable de Compras',
+      },
+    });
+    const terms = screen.getByRole('heading', { name: 'Condiciones comerciales' });
+    expect(terms).toBeTruthy();
+    const paymentTerms = screen.getByRole('textbox', { name: 'Condiciones de pago' });
+    fireEvent.change(paymentTerms, { target: { value: 'Contado' } });
+    expect(onCommercialChange).toHaveBeenCalledWith('paymentTerms', 'Contado');
+    expect((screen.getByLabelText('Fecha de pago') as HTMLInputElement).value).toBe('2026-12-17');
   });
 
   it('habilita el workspace únicamente para Nueva compra y reubica el footer fuera del scroll', () => {
