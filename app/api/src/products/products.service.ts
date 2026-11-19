@@ -65,7 +65,9 @@ export class ProductsService {
         brand: dto.brand,
         categoryId: dto.categoryId,
         barcode: dto.barcode,
-        unitOfMeasure: dto.unitOfMeasure?.trim() || null,
+        ...(dto.unitOfMeasure !== undefined && {
+          unitOfMeasure: dto.unitOfMeasure.trim() || null,
+        }),
         cost: dto.cost,
         price: dto.price,
         minStock: dto.minStock,
