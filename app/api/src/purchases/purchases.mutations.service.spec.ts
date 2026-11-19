@@ -156,28 +156,55 @@ describe('PurchasesService — tenant-safe mutations', () => {
         items: [{ productId, price: 72.125 }],
       })
       .mockResolvedValueOnce({ id: purchaseId, status: PurchaseStatus.DRAFT });
+
     await service.update(companyId, purchaseId, updateDto, UserRole.WAREHOUSE);
+
     expect(transactionClient.purchase.updateMany).toHaveBeenCalledWith({
       where: { id: purchaseId, companyId, status: PurchaseStatus.DRAFT },
       data: { supplierId, subtotal: 144.25, iva: 23.08, total: 167.33 },
     });
     expect(transactionClient.purchaseItem.createMany).toHaveBeenCalledWith({
-      data: [{ purchaseId, productId, quantity: 2, price: 72.125, subtotal: 144.25 }],
+      data: [
+        {
+          purchaseId,
+          productId,
+          quantity: 2,
+          price: 72.125,
+          subtotal: 144.25,
+        },
+      ],
     });
   });
 
   it('permite cambiar el costo del borrador con rol autorizado', async () => {
     transactionClient.purchase.findFirst
       .mockResolvedValueOnce({
-        id: purchaseId, status: PurchaseStatus.DRAFT,
+        id: purchaseId,
+        status: PurchaseStatus.DRAFT,
         items: [{ productId, price: 100 }],
       })
       .mockResolvedValueOnce({ id: purchaseId, status: PurchaseStatus.DRAFT });
-    await service.update(companyId, purchaseId, {
-      ...updateDto, items: [{ productId, quantity: 2, unitCost: 12.3456 }],
-    }, UserRole.MANAGER);
+
+    await service.update(
+      companyId,
+      purchaseId,
+      {
+        ...updateDto,
+        items: [{ productId, quantity: 2, unitCost: 12.3456 }],
+      },
+      UserRole.MANAGER,
+    );
+
     expect(transactionClient.purchaseItem.createMany).toHaveBeenCalledWith({
-      data: [{ purchaseId, productId, quantity: 2, price: 12.3456, subtotal: 24.69 }],
+      data: [
+        {
+          purchaseId,
+          productId,
+          quantity: 2,
+          price: 12.3456,
+          subtotal: 24.69,
+        },
+      ],
     });
   });
 
@@ -189,22 +216,50 @@ describe('PurchasesService — tenant-safe mutations', () => {
         items: [{ productId, price: 100 }],
       })
       .mockResolvedValueOnce({ id: purchaseId, status: PurchaseStatus.DRAFT });
-    await service.update(companyId, purchaseId, {
-      ...updateDto, items: [{ productId, quantity: 2, unitCost: 43.125 }],
-    }, UserRole.WAREHOUSE, true);
+
+    await service.update(
+      companyId,
+      purchaseId,
+      {
+        ...updateDto,
+        items: [{ productId, quantity: 2, unitCost: 43.125 }],
+      },
+      UserRole.WAREHOUSE,
+      true,
+    );
+
     expect(transactionClient.purchaseItem.createMany).toHaveBeenCalledWith({
-      data: [{ purchaseId, productId, quantity: 2, price: 43.125, subtotal: 86.25 }],
+      data: [
+        {
+          purchaseId,
+          productId,
+          quantity: 2,
+          price: 43.125,
+          subtotal: 86.25,
+        },
+      ],
     });
   });
 
   it('rechaza modificaciones de costo de un usuario de almacén sin mutación final', async () => {
     transactionClient.purchase.findFirst.mockResolvedValue({
-      id: purchaseId, status: PurchaseStatus.DRAFT,
+      id: purchaseId,
+      status: PurchaseStatus.DRAFT,
       items: [{ productId, price: 100 }],
     });
-    await expect(service.update(companyId, purchaseId, {
-      ...updateDto, items: [{ productId, quantity: 2, unitCost: 50 }],
-    }, UserRole.WAREHOUSE)).rejects.toThrow();
+
+    await expect(
+      service.update(
+        companyId,
+        purchaseId,
+        {
+          ...updateDto,
+          items: [{ productId, quantity: 2, unitCost: 50 }],
+        },
+        UserRole.WAREHOUSE,
+      ),
+    ).rejects.toThrow();
+
     expect(transactionClient.purchase.updateMany).not.toHaveBeenCalled();
     expect(transactionClient.purchaseItem.createMany).not.toHaveBeenCalled();
   });
