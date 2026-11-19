@@ -44,6 +44,9 @@ jobs:
           node --check scripts/qa/issue284-cutover-preflight.cjs
           node --check scripts/qa/issue284-prepare-qa-candidate.cjs
           node --check scripts/qa/issue284-api-candidate-connection-check.cjs
+          node --check scripts/qa/issue284-qa-candidate-sync-check.cjs
+          node --check scripts/qa/issue284-qa-env-switch.cjs
+          node --check scripts/qa/issue284-api-active-db-check.cjs
           node --test scripts/qa/*.test.cjs
 
       - name: Validate isolated history rehearsal Compose syntax
