@@ -122,7 +122,9 @@ export class UsersService {
     if (dto.role !== undefined) data.role = dto.role;
     if (dto.isActive !== undefined) data.isActive = dto.isActive;
     if (finalRole !== UserRole.WAREHOUSE) {
-      data.canAdjustPurchaseUnitCost = false;
+      if (dto.role !== undefined || dto.canAdjustPurchaseUnitCost === true) {
+        data.canAdjustPurchaseUnitCost = false;
+      }
     } else if (dto.canAdjustPurchaseUnitCost !== undefined) {
       data.canAdjustPurchaseUnitCost = dto.canAdjustPurchaseUnitCost;
     }
