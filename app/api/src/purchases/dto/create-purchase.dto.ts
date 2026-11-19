@@ -2,8 +2,9 @@ import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsUUID, ValidateNested } from 'class-validator';
 
 import { CreatePurchaseItemDto } from './create-purchase-item.dto';
+import { PurchaseCommercialFields } from './purchase-commercial-fields';
 
-export class CreatePurchaseDto {
+export class CreatePurchaseDto extends PurchaseCommercialFields {
   @IsUUID('4', {
     message: 'El proveedor debe tener un identificador válido',
   })

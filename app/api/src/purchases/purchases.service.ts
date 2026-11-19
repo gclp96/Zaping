@@ -8,13 +8,17 @@ import {
 
 import { UserRole } from '@prisma/client';
 
-import PDFDocument from 'pdfkit';
 import { Response } from 'express';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto';
 import { PurchasesFolioService } from './purchases-folio.service';
+import { renderPurchaseOrderPdf } from './purchase-order-pdf';
+import {
+  buildPurchaseCommercialSnapshot,
+  parsePurchaseCalendarDate,
+} from './purchase-commercial';
 
 type PurchaseWithReceiptItems = {
   items: Array<{
@@ -128,6 +132,23 @@ export class PurchasesService {
           subtotal,
           iva,
           total,
+          ...(dto.paymentTerms !== undefined && {
+            paymentTerms: dto.paymentTerms,
+          }),
+          ...(dto.paymentMethod !== undefined && {
+            paymentMethod: dto.paymentMethod,
+          }),
+          ...(dto.paymentDueDate !== undefined && {
+            paymentDueDate: parsePurchaseCalendarDate(dto.paymentDueDate),
+          }),
+          ...(dto.expectedDeliveryDate !== undefined && {
+            expectedDeliveryDate: parsePurchaseCalendarDate(
+              dto.expectedDeliveryDate,
+            ),
+          }),
+          ...(dto.buyerName !== undefined && {
+            buyerName: dto.buyerName,
+          }),
           items: {
             create: purchaseItems,
           },
@@ -409,6 +430,23 @@ export class PurchasesService {
           subtotal,
           iva,
           total,
+          ...(dto.paymentTerms !== undefined && {
+            paymentTerms: dto.paymentTerms,
+          }),
+          ...(dto.paymentMethod !== undefined && {
+            paymentMethod: dto.paymentMethod,
+          }),
+          ...(dto.paymentDueDate !== undefined && {
+            paymentDueDate: parsePurchaseCalendarDate(dto.paymentDueDate),
+          }),
+          ...(dto.expectedDeliveryDate !== undefined && {
+            expectedDeliveryDate: parsePurchaseCalendarDate(
+              dto.expectedDeliveryDate,
+            ),
+          }),
+          ...(dto.buyerName !== undefined && {
+            buyerName: dto.buyerName,
+          }),
         },
       });
 
@@ -552,6 +590,7 @@ export class PurchasesService {
           companyId,
         },
         include: {
+          company: true,
           supplier: true,
           items: {
             include: {
@@ -571,7 +610,20 @@ export class PurchasesService {
         );
       }
 
-      return purchase;
+      // The snapshot and status transition are in the same DB transaction.
+      // Later edits to Company, Supplier or Product cannot rewrite this PDF.
+      const commercialSnapshot = buildPurchaseCommercialSnapshot(purchase);
+      const frozen = await tx.purchase.updateMany({
+        where: { id: purchaseId, companyId, status: 'CONFIRMED' },
+        data: {
+          commercialSnapshot,
+        },
+      });
+      if (frozen.count !== 1) {
+        throw new ConflictException('No fue posible congelar la compra');
+      }
+
+      return { ...purchase, commercialSnapshot };
     });
   }
 
@@ -675,17 +727,12 @@ export class PurchasesService {
 
   async generatePDF(companyId: string, purchaseId: string, res: Response) {
     const purchase = await this.prisma.purchase.findFirst({
-      where: {
-        id: purchaseId,
-        companyId,
-      },
+      where: { id: purchaseId, companyId },
       include: {
         company: true,
         supplier: true,
         items: {
-          include: {
-            product: true,
-          },
+          include: { product: true },
         },
       },
     });
@@ -694,338 +741,6 @@ export class PurchasesService {
       throw new NotFoundException('Compra no encontrada');
     }
 
-    const formatMoney = (value: number) =>
-      new Intl.NumberFormat('es-MX', {
-        style: 'currency',
-        currency: purchase.company.currency,
-      }).format(value);
-
-    const formatDate = (date: Date) =>
-      new Intl.DateTimeFormat('es-MX', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      }).format(date);
-
-    const getStatusLabel = (status: string) => {
-      if (status === 'DRAFT') return 'Borrador';
-      if (status === 'CONFIRMED') return 'Confirmada';
-      if (status === 'PARTIALLY_RECEIVED') {
-        return 'Recibida partcialmente';
-      }
-      if (status === 'RECEIVED') return 'Recibida';
-      if (status === 'CANCELLED') return 'Cancelada';
-
-      return status;
-    };
-
-    const getValue = (value?: string | null) =>
-      value && value.trim().length > 0 ? value : 'No especificado';
-
-    const fileName = `compra-${purchase.folio.replace(/[^a-zA-Z0-9-_]/g, '-')}.pdf`;
-
-    const doc = new PDFDocument({
-      margin: 50,
-      size: 'LETTER',
-    });
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
-
-    doc.pipe(res);
-
-    const left = doc.page.margins.left;
-    const right = doc.page.width - doc.page.margins.right;
-    const pageWidth = right - left;
-
-    const addPageIfNeeded = (requiredSpace: number) => {
-      if (doc.y + requiredSpace > doc.page.height - doc.page.margins.bottom) {
-        doc.addPage();
-        return true;
-      }
-
-      return false;
-    };
-
-    const drawDivider = () => {
-      doc
-        .moveTo(left, doc.y)
-        .lineTo(right, doc.y)
-        .strokeColor('#E5E7EB')
-        .stroke();
-
-      doc.moveDown();
-    };
-
-    const companyName = purchase.company.tradeName || purchase.company.name;
-
-    // Encabezado
-    doc
-      .fillColor('#111827')
-      .font('Helvetica-Bold')
-      .fontSize(20)
-      .text(companyName, {
-        align: 'left',
-      });
-
-    doc
-      .font('Helvetica')
-      .fontSize(9)
-      .fillColor('#4B5563')
-      .text(`RFC: ${purchase.company.rfc}`)
-      .text(`Correo: ${getValue(purchase.company.email)}`)
-      .text(`Teléfono: ${getValue(purchase.company.phone)}`);
-
-    doc.moveDown();
-
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(18)
-      .fillColor('#111827')
-      .text('ORDEN DE COMPRA', {
-        align: 'right',
-      });
-
-    doc
-      .font('Helvetica')
-      .fontSize(10)
-      .fillColor('#374151')
-      .text(`Folio: ${purchase.folio}`, {
-        align: 'right',
-      })
-      .text(`Fecha: ${formatDate(purchase.createdAt)}`, {
-        align: 'right',
-      })
-      .text(`Estado: ${getStatusLabel(purchase.status)}`, {
-        align: 'right',
-      });
-
-    doc.moveDown();
-    drawDivider();
-
-    // Proveedor
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(13)
-      .fillColor('#111827')
-      .text('Proveedor');
-
-    doc.moveDown(0.5);
-
-    doc
-      .font('Helvetica')
-      .fontSize(10)
-      .fillColor('#374151')
-      .text(`Nombre: ${purchase.supplier.name}`)
-      .text(`Contacto: ${getValue(purchase.supplier.contactName)}`)
-      .text(`Correo: ${getValue(purchase.supplier.email)}`)
-      .text(`Teléfono: ${getValue(purchase.supplier.phone)}`)
-      .text(`Dirección: ${getValue(purchase.supplier.address)}`);
-
-    doc.moveDown();
-    drawDivider();
-
-    // Tabla
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(13)
-      .fillColor('#111827')
-      .text('Productos');
-
-    doc.moveDown(0.75);
-
-    const columns = {
-      sku: {
-        x: left,
-        width: 70,
-      },
-      product: {
-        x: left + 75,
-        width: 205,
-      },
-      quantity: {
-        x: left + 285,
-        width: 55,
-      },
-      price: {
-        x: left + 345,
-        width: 80,
-      },
-      subtotal: {
-        x: left + 430,
-        width: pageWidth - 430,
-      },
-    };
-
-    const drawTableHeader = () => {
-      const y = doc.y;
-
-      doc.rect(left, y, pageWidth, 24).fillColor('#F3F4F6').fill();
-
-      doc.font('Helvetica-Bold').fontSize(9).fillColor('#111827');
-
-      doc.text('SKU', columns.sku.x + 4, y + 7, {
-        width: columns.sku.width,
-      });
-
-      doc.text('Producto', columns.product.x, y + 7, {
-        width: columns.product.width,
-      });
-
-      doc.text('Cant.', columns.quantity.x, y + 7, {
-        width: columns.quantity.width,
-        align: 'right',
-      });
-
-      doc.text('Costo', columns.price.x, y + 7, {
-        width: columns.price.width,
-        align: 'right',
-      });
-
-      doc.text('Subtotal', columns.subtotal.x, y + 7, {
-        width: columns.subtotal.width,
-        align: 'right',
-      });
-
-      doc.y = y + 30;
-    };
-
-    drawTableHeader();
-
-    purchase.items.forEach((item) => {
-      const productName = item.product.name;
-      const productHeight = doc.heightOfString(productName, {
-        width: columns.product.width,
-      });
-
-      const rowHeight = Math.max(30, productHeight + 14);
-
-      const addedPage = addPageIfNeeded(rowHeight + 20);
-
-      if (addedPage) {
-        drawTableHeader();
-      }
-
-      const y = doc.y;
-
-      doc.font('Helvetica').fontSize(9).fillColor('#374151');
-
-      doc.text(item.product.sku, columns.sku.x + 4, y + 7, {
-        width: columns.sku.width,
-      });
-
-      doc.text(productName, columns.product.x, y + 7, {
-        width: columns.product.width,
-      });
-
-      doc.text(String(item.quantity), columns.quantity.x, y + 7, {
-        width: columns.quantity.width,
-        align: 'right',
-      });
-
-      doc.text(formatMoney(item.price), columns.price.x, y + 7, {
-        width: columns.price.width,
-        align: 'right',
-      });
-
-      doc.text(formatMoney(item.subtotal), columns.subtotal.x, y + 7, {
-        width: columns.subtotal.width,
-        align: 'right',
-      });
-
-      doc
-        .moveTo(left, y + rowHeight)
-        .lineTo(right, y + rowHeight)
-        .strokeColor('#E5E7EB')
-        .stroke();
-
-      doc.y = y + rowHeight + 6;
-    });
-
-    // Totales
-    addPageIfNeeded(110);
-
-    doc.moveDown();
-
-    const totalsX = right - 220;
-    const totalsLabelWidth = 100;
-    const totalsValueWidth = 120;
-
-    doc.font('Helvetica').fontSize(10).fillColor('#374151');
-
-    doc.text('Subtotal', totalsX, doc.y, {
-      width: totalsLabelWidth,
-    });
-
-    doc.text(
-      formatMoney(purchase.subtotal),
-      totalsX + totalsLabelWidth,
-      doc.y - 12,
-      {
-        width: totalsValueWidth,
-        align: 'right',
-      },
-    );
-
-    doc.moveDown(0.75);
-
-    doc.text('IVA (16%)', totalsX, doc.y, {
-      width: totalsLabelWidth,
-    });
-
-    doc.text(
-      formatMoney(purchase.iva),
-      totalsX + totalsLabelWidth,
-      doc.y - 12,
-      {
-        width: totalsValueWidth,
-        align: 'right',
-      },
-    );
-
-    doc.moveDown(0.75);
-
-    doc
-      .moveTo(totalsX, doc.y)
-      .lineTo(right, doc.y)
-      .strokeColor('#D1D5DB')
-      .stroke();
-
-    doc.moveDown(0.5);
-
-    doc.font('Helvetica-Bold').fontSize(12).fillColor('#111827');
-
-    doc.text('Total', totalsX, doc.y, {
-      width: totalsLabelWidth,
-    });
-
-    doc.text(
-      formatMoney(purchase.total),
-      totalsX + totalsLabelWidth,
-      doc.y - 14,
-      {
-        width: totalsValueWidth,
-        align: 'right',
-      },
-    );
-
-    // Pie
-    doc.moveDown(3);
-
-    doc
-      .font('Helvetica')
-      .fontSize(8)
-      .fillColor('#6B7280')
-      .text(
-        'Documento generado por Zaping ERP. Esta orden de compra es para control operativo interno.',
-        left,
-        doc.page.height - 70,
-        {
-          width: pageWidth,
-          align: 'center',
-        },
-      );
-
-    doc.end();
+    renderPurchaseOrderPdf(purchase, res);
   }
 }

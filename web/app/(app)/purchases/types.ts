@@ -149,6 +149,11 @@ export type Purchase = {
   iva: number;
   total: number;
   createdAt: string;
+  paymentTerms?: string | null;
+  paymentMethod?: string | null;
+  paymentDueDate?: string | null;
+  expectedDeliveryDate?: string | null;
+  buyerName?: string | null;
   receiptProgress: PurchaseReceiptProgress;
 
   supplier: {
@@ -194,3 +199,13 @@ export type PurchaseFormItem = {
   quantity: string;
   unitCost: number;
 };
+
+export type PurchaseCommercialForm = {
+  paymentTerms: string;
+  paymentMethod: string;
+  paymentDueDate: string;
+  expectedDeliveryDate: string;
+  buyerName: string;
+};
+
+export type PurchaseCommercialFormField = keyof PurchaseCommercialForm;

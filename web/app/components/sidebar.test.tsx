@@ -22,6 +22,7 @@ const expectedNavigation = [
   ["Médicos", "/doctors"],
   ["Hospitales", "/hospitals"],
   ["Usuarios", "/users"],
+  ["Datos fiscales de empresa", "/company-settings"],
 ] as const;
 
 afterEach(() => {
@@ -80,8 +81,10 @@ describe("Sidebar", () => {
         role: "MANAGER" as const,
         visible: expectedNavigation
           .map(([label]) => label)
-          .filter((label) => label !== "Usuarios"),
-        hidden: ["Usuarios"],
+          .filter(
+            (label) => label !== "Usuarios" && label !== "Datos fiscales de empresa",
+          ),
+        hidden: ["Usuarios", "Datos fiscales de empresa"],
       },
       {
         role: "SALES" as const,
@@ -105,6 +108,7 @@ describe("Sidebar", () => {
           "Documentos de proveedor",
           "Equipos",
           "Usuarios",
+          "Datos fiscales de empresa",
         ],
       },
       {
@@ -123,7 +127,7 @@ describe("Sidebar", () => {
           "Médicos",
           "Hospitales",
         ],
-        hidden: ["Clientes", "Cotizaciones", "Ventas", "Documentos de proveedor", "Usuarios"],
+        hidden: ["Clientes", "Cotizaciones", "Ventas", "Documentos de proveedor", "Usuarios", "Datos fiscales de empresa"],
       },
     ];
 

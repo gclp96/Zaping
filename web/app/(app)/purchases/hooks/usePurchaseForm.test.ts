@@ -128,6 +128,56 @@ describe('usePurchaseForm', () => {
     expect(result.current.total).toBe(0);
   });
 
+  it('envía las condiciones comerciales capturadas en una nueva orden', async () => {
+    const { result } = setupHook();
+    vi.mocked(api.post).mockResolvedValue({ data: { id: 'new-1' } } as never);
+    act(() => result.current.openCreateModal());
+    act(() => {
+      result.current.handleSupplierChange('supplier-1');
+      result.current.handleSelectedProductChange('product-1');
+      result.current.handleCommercialChange('paymentTerms', 'Crédito 30 días');
+      result.current.handleCommercialChange('paymentMethod', 'Transferencia electrónica');
+      result.current.handleCommercialChange('paymentDueDate', '2026-12-17');
+      result.current.handleCommercialChange('expectedDeliveryDate', '2026-11-17');
+      result.current.handleCommercialChange('buyerName', 'Comprador QA');
+    });
+    act(() => result.current.handleAddProduct());
+
+    expect(result.current.hasUnsavedChanges).toBe(true);
+    await act(async () => {
+      await result.current.handleCreatePurchase();
+    });
+
+    expect(api.post).toHaveBeenCalledWith(
+      '/purchases',
+      expect.objectContaining({
+        paymentTerms: 'Crédito 30 días',
+        paymentMethod: 'Transferencia electrónica',
+        paymentDueDate: '2026-12-17',
+        expectedDeliveryDate: '2026-11-17',
+        buyerName: 'Comprador QA',
+      }),
+    );
+  });
+
+  it('envía null cuando se elimina una condición comercial del borrador', async () => {
+    const { result } = setupHook();
+    const purchase = { ...draftPurchase, paymentTerms: 'Crédito 30 días' };
+    vi.mocked(api.patch).mockResolvedValue({ data: purchase } as never);
+    act(() => result.current.openEditModal(purchase));
+    expect(result.current.commercial.paymentTerms).toBe('Crédito 30 días');
+    expect(result.current.hasUnsavedChanges).toBe(false);
+    act(() => result.current.handleCommercialChange('paymentTerms', ''));
+    expect(result.current.hasUnsavedChanges).toBe(true);
+    await act(async () => {
+      await result.current.handleCreatePurchase();
+    });
+    expect(api.patch).toHaveBeenCalledWith(
+      '/purchases/purchase-1',
+      expect.objectContaining({ paymentTerms: null }),
+    );
+  });
+
   it('abre el formulario para crear una compra', () => {
     const { result } = setupHook();
 

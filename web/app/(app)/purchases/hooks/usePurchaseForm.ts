@@ -7,7 +7,27 @@ import type {
   Product,
   Purchase,
   PurchaseFormItem,
+  PurchaseCommercialForm,
+  PurchaseCommercialFormField,
 } from '../types';
+
+const emptyCommercial: PurchaseCommercialForm = {
+  paymentTerms: '',
+  paymentMethod: '',
+  paymentDueDate: '',
+  expectedDeliveryDate: '',
+  buyerName: '',
+};
+
+function fromPurchase(purchase: Purchase): PurchaseCommercialForm {
+  return {
+    paymentTerms: purchase.paymentTerms ?? '',
+    paymentMethod: purchase.paymentMethod ?? '',
+    paymentDueDate: purchase.paymentDueDate?.slice(0, 10) ?? '',
+    expectedDeliveryDate: purchase.expectedDeliveryDate?.slice(0, 10) ?? '',
+    buyerName: purchase.buyerName ?? '',
+  };
+}
 
 type UsePurchaseFormParams = {
   products: Product[];
@@ -40,6 +60,8 @@ export function usePurchaseForm({
     useState<Purchase | null>(null);
 
   const [supplierId, setSupplierId] = useState('');
+  const [commercial, setCommercial] =
+    useState<PurchaseCommercialForm>({ ...emptyCommercial });
   const [selectedProductId, setSelectedProductId] =
     useState('');
   const [quantity, setQuantity] = useState('1');
@@ -83,13 +105,20 @@ export function usePurchaseForm({
     }
 
     if (!purchaseToEdit) {
-      return supplierId !== '' || items.length > 0;
+      return supplierId !== '' || items.length > 0 ||
+        Object.values(commercial).some((value) => value.trim() !== '');
     }
 
     if (
       supplierId !== purchaseToEdit.supplier.id ||
       items.length !== purchaseToEdit.items.length
     ) {
+      return true;
+    }
+
+    if (Object.entries(commercial).some(([field, value]) =>
+      value !== fromPurchase(purchaseToEdit)[field as PurchaseCommercialFormField],
+    )) {
       return true;
     }
 
@@ -103,10 +132,11 @@ export function usePurchaseForm({
         item.unitCost !== originalItem.price
       );
     });
-  }, [items, itemUnitCostErrors, purchaseToEdit, quantity, selectedProductId, supplierId]);
+  }, [items, itemUnitCostErrors, purchaseToEdit, quantity, selectedProductId, supplierId, commercial]);
 
   function resetForm() {
     setSupplierId('');
+    setCommercial({ ...emptyCommercial });
     setSelectedProductId('');
     setQuantity('1');
     setItems([]);
@@ -134,6 +164,7 @@ export function usePurchaseForm({
     setPurchaseToEdit(purchase);
 
     setSupplierId(purchase.supplier.id);
+    setCommercial(fromPurchase(purchase));
     setSelectedProductId('');
     setQuantity('1');
 
@@ -171,6 +202,13 @@ export function usePurchaseForm({
   function handleSupplierChange(value: string) {
     setSupplierId(value);
     setSupplierError('');
+  }
+
+  function handleCommercialChange(
+    field: PurchaseCommercialFormField,
+    value: string,
+  ) {
+    setCommercial((current) => ({ ...current, [field]: value }));
   }
 
   function handleSelectedProductChange(
@@ -390,8 +428,20 @@ export function usePurchaseForm({
     try {
       setSaving(true);
 
+      const existingCommercial = purchaseToEdit
+        ? fromPurchase(purchaseToEdit)
+        : emptyCommercial;
+      const commercialChanges: Partial<Record<PurchaseCommercialFormField, string | null>> = {};
+      for (const field of Object.keys(commercial) as PurchaseCommercialFormField[]) {
+        const value = commercial[field].trim();
+        if (value !== existingCommercial[field]) {
+          commercialChanges[field] = value || null;
+        }
+      }
+
       const payload = {
         supplierId,
+        ...commercialChanges,
         items: items.map((item) => {
           const catalogCost = products.find((product) => product.id === item.productId)?.cost;
           const previousCost = purchaseToEdit?.items.find((line) => line.productId === item.productId)?.price;
@@ -441,6 +491,7 @@ export function usePurchaseForm({
     hasUnsavedChanges,
 
     supplierId,
+    commercial,
     selectedProductId,
     quantity,
     items,
@@ -462,6 +513,7 @@ export function usePurchaseForm({
     closeCreateModal,
 
     handleSupplierChange,
+    handleCommercialChange,
     handleSelectedProductChange,
     handleFormQuantityChange,
 
