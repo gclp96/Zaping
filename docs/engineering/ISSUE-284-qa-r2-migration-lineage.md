@@ -133,7 +133,7 @@ para esa sesión. Importa mediante `psql --single-transaction -v ON_ERROR_STOP=1
 con los triggers y las FKs activados. No altera migraciones oficiales,
 definiciones de funciones, constraints ni el esquema permanente.
 
-**Procedimiento del ensayo v3 (aún no ejecutado en QA local):**
+**Procedimiento del ensayo v3 (ejecutado y PASS en QA local):**
 
 Desde la raíz de la rama de este PR, con los tres controles de rehearsal ya realizados:
 
@@ -157,6 +157,70 @@ Después:
 **Si falla:** conservar la sexta base, si se llegó a crear, y todas las bases anteriores; no borrar volúmenes ni datos, revisar el error y ajustar el ensayo en una base nueva. **Un fallo no autoriza deshabilitar restricciones ni modificar QA operativa.**
 
 **Si pasa:** todavía falta asegurar funcionalidad por roles, configuración de usuario y sesiones, y validar las referencias al almacenamiento externo R2 (el dump no contiene el objeto binario) antes del corte de QA. Un ensayo verde **no** cambia ninguna conexión de API/Web.
+
+## Paso 2c — API funcional aislada, SOLO lectura (pendiente de ejecución local)
+
+**Datos recuperados y verificados por el usuario:** la sexta base
+`zaping_issue284_transfer_trial_v3` pasó la transferencia atómica: 54
+migraciones oficiales, 110 filas idénticas a la restauración histórica y 0
+migraciones/tablas R2. Los intentos anteriores v1/v2 y la QA operativa siguen
+intactos.
+
+El servicio opt-in `functional-check` del mismo
+`docker-compose.qa-history-rehearsal.yml` construye la API NestJS de la
+rama actual en un contenedor **sin puertos publicados**, sin acceso a la
+red externa (solo `functional-private`, red Docker con `internal: true`).
+El PostgreSQL de ensayo se conecta además a esa red; no se comparte la
+red o los volúmenes de `zaping-local-qa`.
+
+**Seguridad:** no monta `.qa/api.env`, no utiliza las credenciales JWT,
+R2, Postalkit ni correo de QA, no lee `zaping_dev` y no activa proveedores
+externos. Solo recibe `.qa/postgres.env` para construir **dentro de su
+contenedor** una conexión a
+`zaping-qa-postgres:5432/zaping_issue284_transfer_trial_v3`.
+El guard de preflight rechaza otro destino, secrets de API o una BD con
+historial R2. Genera un JWT efímero diferente en cada ejecución, firma
+tokens de prueba para los **usuarios ya existentes** en la base aislada
+y nunca imprime JWT, email ni contraseñas. Los tokens efímeros no son
+válidos contra la QA operativa.
+
+Los controles funcionales son **exclusivamente GET**:
+- `health/live`, `health/ready`, `auth/me`, rutas sin credenciales (401).
+- Usuarios activos de ADMIN, MANAGER, SALES y WAREHOUSE, límites 403.
+- Clientes, productos, compras, recepciones, cotizaciones, ventas y casos
+  Healthcare. Compara recuentos retornados por API con Prisma y comprueba
+  `companyId` de cada registro visible.
+- Rechazo 404 al consultar un cliente del tenant contrario.
+- Recuentos de nueve entidades antes/después para verificar que no hubo
+  escrituras visibles.
+
+**Ejecución en PowerShell** en la rama del PR #285, después de revisar CI:
+
+```powershell
+cd C:\dev\zaping
+git pull --ff-only origin fix/issue-284-qa-migration-lineage-audit-20261118
+node --test scripts/qa/issue284-api-functional-check.test.cjs
+docker compose -f docker-compose.qa-history-rehearsal.yml --profile functional config --quiet
+docker compose -f docker-compose.qa-history-rehearsal.yml --profile functional build functional-check
+docker compose -f docker-compose.qa-history-rehearsal.yml --profile functional up -d --no-deps zaping-qa-postgres
+docker compose -f docker-compose.qa-history-rehearsal.yml --profile functional run --rm --no-deps functional-check
+```
+
+La operación `up` puede **recrear el contenedor PostgreSQL aislado de ensayo
+para añadirle la red interna**; su volumen `rehearsal-postgres` conserva las
+bases. No hay conexión ni puertos compartidos con el PostgreSQL de QA
+operativa. **No usar** `down -v` ni `--remove-orphans`.
+
+Resultado esperado:
+`PASS: isolated API ready; JWT/RBAC; tenant-scoped customer, products, purchases, receipts, quotes, sales and healthcare reads`.
+
+**Límites de evidencia:** la firma JWT sintética no comprueba login con
+contraseñas QA, ni prueba operaciones de escritura, front-end real,
+disponibilidad del objeto externo R2 o continuidad de secretos tras un
+corte. Antes de cortar QA necesitamos pruebas de login y transacciones en
+una copia adicional, verificación de rollback y aprobación expresa. Si el
+test falla, **no** cambiar conexiones ni datos de QA operativa: revisar la
+salida y el guard fallido.
 
 ## Paso 3 — Corte real de QA: gate humano pendiente
 
@@ -196,7 +260,8 @@ la base que usan QA ADMIN/SALES/etc. Se requiere:
 - [x] Auditor ejecutado en QA local; una migración R2 huérfana, 1/1/3 registros, checksum verificado.
 - [x] Ensayo limpio PostgreSQL 16 completado: 54 migraciones, 0 R2; `migrate status` y `validate` PASS.
 - [x] Respaldo restaurado verificado, 5 consultas de integridad sin huérfanos, inventario 110+5 y equivalencia estructural documentada.
-- [ ] Ensayo de transferencia a cuarta BD con 110 filas oficiales y hashes coincidentes.
+- [x] Transferencia a la sexta BD de ensayo v3: 110 filas oficiales, huellas coincidentes, 54 migraciones, 0 R2.
+- [ ] Smoke funcional API aislada: JWT/RBAC, tenant A/B, Clientes, Compras, Recepciones y Healthcare.
 - [ ] Política de preservación de datos y autorización de corte definidas.
 - [ ] Corte hacia BD QA de `main` completado y pruebas de regresión PASS.
 - [ ] Cerrar issue #284 solo después de comprobar que la QA activa no posee
