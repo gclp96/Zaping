@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 
 import { Response } from 'express';
 
@@ -29,8 +30,7 @@ export class PurchasesController {
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE)
-  create(@Request() req: any, @Body() dto: CreatePurchaseDto) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+  create(@Request() req: AuthenticatedRequest, @Body() dto: CreatePurchaseDto) {
     return this.purchasesService.create(
       req.user.companyId,
       dto,
@@ -63,11 +63,10 @@ export class PurchasesController {
   @Patch(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE)
   update(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body() dto: UpdatePurchaseDto,
   ) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
     return this.purchasesService.update(
       req.user.companyId,
       id,
