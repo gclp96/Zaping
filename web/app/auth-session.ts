@@ -16,6 +16,7 @@ export type AuthenticatedSession = {
   firstName: string;
   lastName: string;
   role: UserRole;
+  canAdjustPurchaseUnitCost?: boolean;
   companyTimezone: string;
   companyName: string;
 };

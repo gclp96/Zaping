@@ -34,6 +34,7 @@ describe('UsersService', () => {
     firstName: 'User',
     lastName: 'Zaping',
     role: UserRole.SALES,
+    canAdjustPurchaseUnitCost: false,
     isActive: true,
     createdAt: new Date('2026-08-30T10:00:00.000Z'),
     updatedAt: new Date('2026-08-30T10:00:00.000Z'),
@@ -53,6 +54,7 @@ describe('UsersService', () => {
     firstName: true,
     lastName: true,
     role: true,
+    canAdjustPurchaseUnitCost: true,
     isActive: true,
     createdAt: true,
     updatedAt: true,
@@ -142,6 +144,7 @@ describe('UsersService', () => {
         email: 'user@zaping.test',
         passwordHash: createCall[0].data.passwordHash,
         role: UserRole.SALES,
+        canAdjustPurchaseUnitCost: false,
       },
       select: safeUserSelect,
     });
@@ -151,6 +154,58 @@ describe('UsersService', () => {
       bcrypt.compare('secure-password', createCall[0].data.passwordHash),
     ).resolves.toBe(true);
     expect(safeUser).not.toHaveProperty('passwordHash');
+  });
+
+  it('permite otorgar permiso de costo al encargado WAREHOUSE sin cambiar el rol', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+    prismaMock.user.create.mockResolvedValue({
+      ...safeUser,
+      role: UserRole.WAREHOUSE,
+      canAdjustPurchaseUnitCost: true,
+    });
+
+    await service.create(companyId, {
+      firstName: 'Comprador',
+      lastName: 'Zaping',
+      email: 'comprador@zaping.test',
+      password: 'secure-password',
+      role: UserRole.WAREHOUSE,
+      canAdjustPurchaseUnitCost: true,
+    });
+
+    const call = prismaMock.user.create.mock.calls[0] as [
+      {
+        data: {
+          role: UserRole;
+          canAdjustPurchaseUnitCost: boolean;
+        };
+      },
+    ];
+    expect(call[0].data.role).toBe(UserRole.WAREHOUSE);
+    expect(call[0].data.canAdjustPurchaseUnitCost).toBe(true);
+  });
+
+  it('no concede el permiso especial a roles ajenos a WAREHOUSE', async () => {
+    prismaMock.user.findUnique.mockResolvedValue(null);
+    prismaMock.user.create.mockResolvedValue(safeUser);
+
+    await service.create(companyId, {
+      firstName: 'Vendedor',
+      lastName: 'Zaping',
+      email: 'vendedor@zaping.test',
+      password: 'secure-password',
+      role: UserRole.SALES,
+      canAdjustPurchaseUnitCost: true,
+    });
+
+    const call = prismaMock.user.create.mock.calls[0] as [
+      {
+        data: {
+          canAdjustPurchaseUnitCost: boolean;
+        };
+      },
+    ];
+    expect(call[0].data.canAdjustPurchaseUnitCost).toBe(false);
   });
 
   it('rejects duplicate emails on create', async () => {
@@ -223,6 +278,7 @@ describe('UsersService', () => {
         firstName: 'Updated',
         role: UserRole.MANAGER,
         isActive: false,
+        canAdjustPurchaseUnitCost: false,
       },
     });
   });

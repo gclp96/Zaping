@@ -49,6 +49,7 @@ type UserFormValues = {
   lastName: string;
   email: string;
   role: UserRole | "";
+  canAdjustPurchaseUnitCost: boolean;
   password: string;
   confirmPassword: string;
 };
@@ -67,6 +68,7 @@ const initialFormValues: UserFormValues = {
   lastName: "",
   email: "",
   role: "",
+  canAdjustPurchaseUnitCost: false,
   password: "",
   confirmPassword: "",
 };
@@ -202,6 +204,7 @@ export default function UsersPage() {
       lastName: user.lastName,
       email: user.email,
       role: user.role,
+      canAdjustPurchaseUnitCost: Boolean(user.canAdjustPurchaseUnitCost),
       password: "",
       confirmPassword: "",
     });
@@ -278,6 +281,7 @@ export default function UsersPage() {
           lastName: formValues.lastName.trim(),
           email: formValues.email.trim(),
           role: formValues.role as UserRole,
+          canAdjustPurchaseUnitCost: formValues.role === 'WAREHOUSE' && formValues.canAdjustPurchaseUnitCost,
           password: formValues.password,
         };
 
@@ -288,6 +292,7 @@ export default function UsersPage() {
           lastName: formValues.lastName.trim(),
           email: formValues.email.trim(),
           role: formValues.role as UserRole,
+          canAdjustPurchaseUnitCost: formValues.role === 'WAREHOUSE' && formValues.canAdjustPurchaseUnitCost,
         };
 
         await api.patch(`/users/${editingUser.id}`, payload);
@@ -711,6 +716,23 @@ export default function UsersPage() {
               disabled={saving}
               onChange={(event) => updateFormValue("role", event.target.value)}
             />
+            {formValues.role === 'WAREHOUSE' ? (
+              <label className="flex items-start gap-3 rounded-lg border border-border p-3 sm:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={formValues.canAdjustPurchaseUnitCost}
+                  disabled={saving}
+                  onChange={(event) => setFormValues((values) => ({
+                    ...values,
+                    canAdjustPurchaseUnitCost: event.target.checked,
+                  }))}
+                />
+                <span className="text-sm">
+                  <span className="block font-medium text-text">Responsable de Compras: permitir ajustar costo unitario</span>
+                  <span className="mt-1 block text-text-muted">Autorización individual para negociar precios en órdenes de compra. No permite aprobar ni cancelar órdenes.</span>
+                </span>
+              </label>
+            ) : null}
             {formMode === "create" ? (
               <>
                 <Input

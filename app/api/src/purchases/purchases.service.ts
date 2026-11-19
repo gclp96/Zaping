@@ -3,7 +3,10 @@ import {
   BadRequestException,
   NotFoundException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
+
+import { UserRole } from '@prisma/client';
 
 import PDFDocument from 'pdfkit';
 import { Response } from 'express';
@@ -27,7 +30,12 @@ export class PurchasesService {
     private readonly folios: PurchasesFolioService,
   ) {}
 
-  async create(companyId: string, dto: CreatePurchaseDto) {
+  async create(
+    companyId: string,
+    dto: CreatePurchaseDto,
+    actorRole?: UserRole,
+    actorCanAdjustPurchaseUnitCost = false,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const productIds = dto.items.map((item) => item.productId);
       const uniqueProductIds = new Set(productIds);
@@ -90,15 +98,20 @@ export class PurchasesService {
           );
         }
 
-        const itemSubtotal = this.roundMoney(item.quantity * product.cost);
+        const unitCost = this.resolvePurchaseItemUnitCost(
+          item.unitCost,
+          product.cost,
+          actorRole,
+          actorCanAdjustPurchaseUnitCost,
+        );
+        const itemSubtotal = this.roundMoney(item.quantity * unitCost);
 
         subtotal = this.roundMoney(subtotal + itemSubtotal);
 
         purchaseItems.push({
           productId: product.id,
-
           quantity: item.quantity,
-          price: product.cost,
+          price: unitCost,
           subtotal: itemSubtotal,
         });
       }
@@ -261,7 +274,13 @@ export class PurchasesService {
     };
   }
 
-  async update(companyId: string, purchaseId: string, dto: UpdatePurchaseDto) {
+  async update(
+    companyId: string,
+    purchaseId: string,
+    dto: UpdatePurchaseDto,
+    actorRole?: UserRole,
+    actorCanAdjustPurchaseUnitCost = false,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const purchase = await tx.purchase.findFirst({
         where: {
@@ -271,6 +290,12 @@ export class PurchasesService {
         select: {
           id: true,
           status: true,
+          items: {
+            select: {
+              productId: true,
+              price: true,
+            },
+          },
         },
       });
 
@@ -349,15 +374,23 @@ export class PurchasesService {
           );
         }
 
-        const itemSubtotal = this.roundMoney(item.quantity * product.cost);
+        const existingLineCost = purchase.items?.find(
+          (line) => line.productId === product.id,
+        )?.price;
+        const unitCost = this.resolvePurchaseItemUnitCost(
+          item.unitCost,
+          existingLineCost ?? product.cost,
+          actorRole,
+          actorCanAdjustPurchaseUnitCost,
+        );
+        const itemSubtotal = this.roundMoney(item.quantity * unitCost);
 
         subtotal = this.roundMoney(subtotal + itemSubtotal);
 
         purchaseItems.push({
           productId: product.id,
-
           quantity: item.quantity,
-          price: product.cost,
+          price: unitCost,
           subtotal: itemSubtotal,
         });
       }
@@ -598,6 +631,42 @@ export class PurchasesService {
         },
       },
     });
+  }
+
+  private resolvePurchaseItemUnitCost(
+    requestedCost: number | undefined,
+    fallbackCost: number,
+    actorRole?: UserRole,
+    actorCanAdjustPurchaseUnitCost = false,
+  ): number {
+    if (requestedCost === undefined) {
+      return fallbackCost;
+    }
+
+    const roleAllowsEdit =
+      actorRole === UserRole.ADMIN || actorRole === UserRole.MANAGER;
+    const delegatedBuyer =
+      actorRole === UserRole.WAREHOUSE && actorCanAdjustPurchaseUnitCost;
+
+    if (!roleAllowsEdit && !delegatedBuyer) {
+      throw new ForbiddenException(
+        'No tienes permiso para modificar el costo unitario de la compra',
+      );
+    }
+
+    const inTenThousandths = requestedCost * 10_000;
+    if (
+      !Number.isFinite(requestedCost) ||
+      requestedCost < 0 ||
+      !Number.isSafeInteger(Math.round(inTenThousandths)) ||
+      Math.abs(inTenThousandths - Math.round(inTenThousandths)) > 0.000001
+    ) {
+      throw new BadRequestException(
+        'El costo unitario debe ser no negativo y tener como máximo 4 decimales',
+      );
+    }
+
+    return requestedCost;
   }
 
   private roundMoney(value: number): number {

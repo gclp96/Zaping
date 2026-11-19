@@ -441,6 +441,8 @@ const {
   productError,
   quantityError,
   itemQuantityErrors,
+  itemUnitCostDrafts,
+  itemUnitCostErrors,
   itemsError,
 
   subtotal,
@@ -457,11 +459,13 @@ const {
 
   handleAddProduct,
   handleItemQuantityChange,
+  handleItemUnitCostChange,
   handleRemoveItem,
   handleCreatePurchase,
 } = usePurchaseForm({
   products,
   onPurchaseSaved: loadPurchases,
+  canAdjustUnitCost: canApprove || Boolean(sessionState.status === 'success' && sessionState.user.canAdjustPurchaseUnitCost),
 });
 
   //propiedades de recepcion
@@ -1297,6 +1301,9 @@ async function loadPageData() {
         productError={productError}
         quantityError={quantityError}
         itemQuantityErrors={itemQuantityErrors}
+        itemUnitCostDrafts={itemUnitCostDrafts}
+        itemUnitCostErrors={itemUnitCostErrors}
+        canAdjustUnitCost={canApprove || Boolean(sessionState.status === 'success' && sessionState.user.canAdjustPurchaseUnitCost)}
         itemsError={itemsError}
         subtotal={subtotal}
         iva={iva}
@@ -1314,6 +1321,7 @@ async function loadPageData() {
         onItemQuantityChange={
           handleItemQuantityChange
         }
+        onItemUnitCostChange={handleItemUnitCostChange}
         />
       <PurchaseReceiptModal
         isOpen={purchaseToReceive !== null || createdReceipt !== null}

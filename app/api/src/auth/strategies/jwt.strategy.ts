@@ -52,6 +52,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         firstName: true,
         lastName: true,
         role: true,
+        canAdjustPurchaseUnitCost: true,
         authVersion: true,
       },
     });
@@ -73,6 +74,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       firstName: user.firstName,
       lastName: user.lastName,
       role: user.role,
+      canAdjustPurchaseUnitCost: user.canAdjustPurchaseUnitCost,
     };
   }
 }

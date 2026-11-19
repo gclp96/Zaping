@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import ProductSelector from '@/app/components/business/ProductSelector';
+import MoneyInput from '@/app/components/business/MoneyInput';
 import SupplierSelector from '@/app/components/business/SupplierSelector';
 
 import Button from '@/app/components/ui/Button';
@@ -32,6 +33,9 @@ type PurchaseFormModalProps = {
   productError: string;
   quantityError: string;
   itemQuantityErrors: Record<string, string>;
+  itemUnitCostDrafts?: Record<string, string>;
+  itemUnitCostErrors?: Record<string, string>;
+  canAdjustUnitCost?: boolean;
   itemsError: string;
 
   subtotal: number;
@@ -52,6 +56,7 @@ type PurchaseFormModalProps = {
     productId: string,
     value: string,
   ) => void;
+  onItemUnitCostChange?: (productId: string, value: string) => void;
 };
 
 function getItemSubtotal(item: PurchaseFormItem): number {
@@ -77,6 +82,9 @@ export default function PurchaseFormModal({
   productError,
   quantityError,
   itemQuantityErrors,
+  itemUnitCostDrafts = {},
+  itemUnitCostErrors = {},
+  canAdjustUnitCost = false,
   itemsError,
   subtotal,
   iva,
@@ -90,6 +98,7 @@ export default function PurchaseFormModal({
   onSelectedProductChange,
   onQuantityChange,
   onItemQuantityChange,
+  onItemUnitCostChange,
 }: PurchaseFormModalProps) {
   // PUR-UX-02C: create and DRAFT edit use the same visual workspace.
   // Edit eligibility and POST/PATCH behavior stay in the purchase hook.
@@ -158,7 +167,7 @@ export default function PurchaseFormModal({
           type="button"
           loading={saving}
           loadingText={editing ? 'Guardando cambios...' : 'Guardando...'}
-          disabled={saving || !supplierId || items.length === 0}
+          disabled={saving || !supplierId || items.length === 0 || Object.keys(itemUnitCostErrors).length > 0}
           className="w-full sm:min-w-40 sm:w-auto"
           onClick={onSubmit}
         >
@@ -374,8 +383,17 @@ export default function PurchaseFormModal({
                           />
                         </td>
 
-                        <td className="px-3 py-3 text-right text-gray-700">
-                          {formatMoney(item.unitCost)}
+                        <td className="min-w-40 px-3 py-3 text-right text-gray-700">
+                          {workspaceEnabled && canAdjustUnitCost ? (
+                            <MoneyInput
+                              id={`purchase-item-unit-cost-${item.productId}-table`}
+                              aria-label={`Costo unitario de ${item.name}`}
+                              value={itemUnitCostDrafts[item.productId] ?? String(item.unitCost)}
+                              maxDecimals={4}
+                              error={itemUnitCostErrors[item.productId]}
+                              onValueChange={(value) => onItemUnitCostChange?.(item.productId, value)}
+                            />
+                          ) : formatMoney(item.unitCost)}
                         </td>
 
                         <td className="px-3 py-3 text-right font-medium text-gray-900">
@@ -443,10 +461,23 @@ export default function PurchaseFormModal({
 
                       <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-3 text-sm">
                         <div>
-                          <dt className="text-gray-500">Costo</dt>
-                          <dd className="mt-1 font-medium text-gray-900">
-                            {formatMoney(item.unitCost)}
-                          </dd>
+                          {workspaceEnabled && canAdjustUnitCost ? (
+                            <MoneyInput
+                              id={`purchase-item-unit-cost-${item.productId}-mobile`}
+                              label={`Costo unitario de ${item.name}`}
+                              value={itemUnitCostDrafts[item.productId] ?? String(item.unitCost)}
+                              maxDecimals={4}
+                              error={itemUnitCostErrors[item.productId]}
+                              onValueChange={(value) => onItemUnitCostChange?.(item.productId, value)}
+                            />
+                          ) : (
+                            <>
+                              <dt className="text-gray-500">Costo</dt>
+                              <dd className="mt-1 font-medium text-gray-900">
+                                {formatMoney(item.unitCost)}
+                              </dd>
+                            </>
+                          )}
                         </div>
                         <div>
                           <dt className="text-gray-500">Subtotal</dt>

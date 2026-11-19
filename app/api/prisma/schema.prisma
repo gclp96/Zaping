@@ -693,6 +693,7 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   role         UserRole
+  canAdjustPurchaseUnitCost Boolean @default(false)
 
   company Company @relation(fields: [companyId], references: [id])
 

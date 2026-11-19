@@ -9,12 +9,14 @@ export type User = {
   firstName: string;
   lastName: string;
   role: UserRole;
+  canAdjustPurchaseUnitCost?: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 };
 
 export type CreateUserPayload = {
+  canAdjustPurchaseUnitCost?: boolean;
   firstName: string;
   lastName: string;
   email: string;
@@ -23,6 +25,7 @@ export type CreateUserPayload = {
 };
 
 export type UpdateUserPayload = {
+  canAdjustPurchaseUnitCost?: boolean;
   firstName: string;
   lastName: string;
   email: string;

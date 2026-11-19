@@ -82,7 +82,7 @@ const draftPurchase: Purchase = {
   ],
 };
 
-function setupHook() {
+function setupHook(canAdjustUnitCost = false) {
   const onPurchaseSaved = vi
     .fn()
     .mockResolvedValue(undefined);
@@ -91,6 +91,7 @@ function setupHook() {
     usePurchaseForm({
       products: [product],
       onPurchaseSaved,
+      canAdjustUnitCost,
     }),
   );
 
@@ -342,6 +343,60 @@ describe('usePurchaseForm', () => {
     expect(result.current.purchaseToEdit).toBeNull();
     expect(result.current.supplierId).toBe('');
     expect(result.current.items).toEqual([]);
+  });
+
+  it('acepta costo negociado de 4 decimales y envía override sin modificar catálogo', async () => {
+    const { result } = setupHook(true);
+    vi.mocked(api.post).mockResolvedValue({ data: { id: 'new-1' } } as never);
+    act(() => result.current.openCreateModal());
+    act(() => {
+      result.current.handleSupplierChange('supplier-1');
+      result.current.handleSelectedProductChange('product-1');
+      result.current.handleFormQuantityChange('2');
+    });
+    act(() => result.current.handleAddProduct());
+    act(() => result.current.handleItemUnitCostChange('product-1', '12.3456'));
+    expect(result.current.items[0].unitCost).toBe(12.3456);
+    expect(result.current.subtotal).toBe(24.69);
+    expect(result.current.iva).toBe(3.95);
+    expect(result.current.total).toBe(28.64);
+    await act(async () => { await result.current.handleCreatePurchase(); });
+    expect(api.post).toHaveBeenCalledWith('/purchases', {
+      supplierId: 'supplier-1',
+      items: [{ productId: 'product-1', quantity: 2, unitCost: 12.3456 }],
+    });
+    expect(product.cost).toBe(100);
+  });
+
+  it('bloquea guardar con costo vacío y conserva el valor pactado al editar', async () => {
+    const { result } = setupHook(true);
+    act(() => result.current.openEditModal(draftPurchase));
+    act(() => result.current.handleItemUnitCostChange('product-1', ''));
+    expect(result.current.itemUnitCostErrors['product-1']).toBeTruthy();
+    expect(result.current.hasUnsavedChanges).toBe(true);
+    await act(async () => { await result.current.handleCreatePurchase(); });
+    expect(api.patch).not.toHaveBeenCalled();
+
+    act(() => result.current.handleItemUnitCostChange('product-1', '99.9999'));
+    expect(result.current.itemUnitCostErrors).toEqual({});
+    expect(result.current.hasUnsavedChanges).toBe(true);
+    vi.mocked(api.patch).mockResolvedValue({ data: { id: 'purchase-1' } } as never);
+    await act(async () => { await result.current.handleCreatePurchase(); });
+    expect(api.patch).toHaveBeenCalledWith('/purchases/purchase-1', {
+      supplierId: 'supplier-1',
+      items: [{ productId: 'product-1', quantity: 10, unitCost: 99.9999 }],
+    });
+  });
+
+  it('impide modificar costo desde UI no autorizada', () => {
+    const { result } = setupHook(false);
+    act(() => result.current.openCreateModal());
+    act(() => {
+      result.current.handleSelectedProductChange('product-1');
+    });
+    act(() => result.current.handleAddProduct());
+    act(() => result.current.handleItemUnitCostChange('product-1', '1'));
+    expect(result.current.items[0].unitCost).toBe(100);
   });
 
   it('actualiza una compra en borrador mediante PATCH', async () => {

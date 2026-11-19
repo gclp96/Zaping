@@ -12,11 +12,26 @@ import type {
 type UsePurchaseFormParams = {
   products: Product[];
   onPurchaseSaved: () => Promise<void>;
+  canAdjustUnitCost?: boolean;
 };
+
+function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function isValidUnitCost(value: string): boolean {
+  if (!value.trim()) return false;
+  const parsed = Number(value);
+  const scaled = parsed * 10_000;
+  return Number.isFinite(parsed) && parsed >= 0 &&
+    Number.isSafeInteger(Math.round(scaled)) &&
+    Math.abs(scaled - Math.round(scaled)) <= 0.000001;
+}
 
 export function usePurchaseForm({
   products,
   onPurchaseSaved,
+  canAdjustUnitCost = false,
 }: UsePurchaseFormParams) {
   const [openModal, setOpenModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -41,6 +56,8 @@ export function usePurchaseForm({
     useState('');
   const [itemQuantityErrors, setItemQuantityErrors] =
     useState<Record<string, string>>({});
+  const [itemUnitCostDrafts, setItemUnitCostDrafts] = useState<Record<string, string>>({});
+  const [itemUnitCostErrors, setItemUnitCostErrors] = useState<Record<string, string>>({});
   const [itemsError, setItemsError] = useState('');
 
   const subtotal = useMemo(() => {
@@ -51,20 +68,17 @@ export function usePurchaseForm({
         return total;
       }
 
-      return (
-        total +
-        parsedQuantity * item.unitCost
-      );
+      return roundMoney(total + roundMoney(parsedQuantity * item.unitCost));
     }, 0);
   }, [items]);
 
-  const iva = subtotal * 0.16;
-  const total = subtotal + iva;
+  const iva = roundMoney(subtotal * 0.16);
+  const total = roundMoney(subtotal + iva);
 
   // A draft's preloaded supplier and lines are the baseline, not new edits.
   // The existing hook stays responsible for form state and POST/PATCH payloads.
   const hasUnsavedChanges = useMemo(() => {
-    if (selectedProductId !== '' || quantity !== '1') {
+    if (selectedProductId !== '' || quantity !== '1' || Object.keys(itemUnitCostErrors).length > 0) {
       return true;
     }
 
@@ -89,7 +103,7 @@ export function usePurchaseForm({
         item.unitCost !== originalItem.price
       );
     });
-  }, [items, purchaseToEdit, quantity, selectedProductId, supplierId]);
+  }, [items, itemUnitCostErrors, purchaseToEdit, quantity, selectedProductId, supplierId]);
 
   function resetForm() {
     setSupplierId('');
@@ -101,6 +115,8 @@ export function usePurchaseForm({
     setProductError('');
     setQuantityError('');
     setItemQuantityErrors({});
+    setItemUnitCostDrafts({});
+    setItemUnitCostErrors({});
     setItemsError('');
   }
 
@@ -135,6 +151,8 @@ export function usePurchaseForm({
     setProductError('');
     setQuantityError('');
     setItemQuantityErrors({});
+    setItemUnitCostDrafts({});
+    setItemUnitCostErrors({});
     setItemsError('');
 
     setOpenModal(true);
@@ -267,6 +285,24 @@ export function usePurchaseForm({
     });
   }
 
+  function handleItemUnitCostChange(productId: string, value: string) {
+    if (!canAdjustUnitCost) return;
+    setItemUnitCostDrafts((current) => ({ ...current, [productId]: value }));
+    const valid = isValidUnitCost(value);
+    setItemUnitCostErrors((current) => {
+      const next = { ...current };
+      if (!valid) next[productId] = 'El costo debe ser no negativo, con máximo 4 decimales.';
+      else delete next[productId];
+      return next;
+    });
+    if (valid) {
+      setItems((current) => current.map((item) =>
+        item.productId === productId ? { ...item, unitCost: Number(value) } : item,
+      ));
+    }
+    setItemsError('');
+  }
+
   function handleRemoveItem(productId: string) {
     setItems((currentItems) =>
       currentItems.filter(
@@ -275,6 +311,16 @@ export function usePurchaseForm({
     );
 
     setItemsError('');
+    setItemUnitCostDrafts((current) => {
+      const next = { ...current };
+      delete next[productId];
+      return next;
+    });
+    setItemUnitCostErrors((current) => {
+      const next = { ...current };
+      delete next[productId];
+      return next;
+    });
     setItemQuantityErrors((currentErrors) => {
       if (!currentErrors[productId]) {
         return currentErrors;
@@ -332,6 +378,10 @@ export function usePurchaseForm({
       );
       valid = false;
     }
+    if (Object.keys(itemUnitCostErrors).length > 0) {
+      setItemsError('Corrige los costos unitarios antes de guardar.');
+      valid = false;
+    }
 
     if (!valid) {
       return;
@@ -342,10 +392,19 @@ export function usePurchaseForm({
 
       const payload = {
         supplierId,
-        items: items.map((item) => ({
-          productId: item.productId,
-          quantity: Number(item.quantity),
-        })),
+        items: items.map((item) => {
+          const catalogCost = products.find((product) => product.id === item.productId)?.cost;
+          const previousCost = purchaseToEdit?.items.find((line) => line.productId === item.productId)?.price;
+          const overrideNeeded = canAdjustUnitCost && (
+            (catalogCost !== undefined && item.unitCost !== catalogCost) ||
+            (previousCost !== undefined && item.unitCost !== previousCost)
+          );
+          return {
+            productId: item.productId,
+            quantity: Number(item.quantity),
+            ...(overrideNeeded ? { unitCost: item.unitCost } : {}),
+          };
+        }),
       };
 
       if (purchaseToEdit) {
@@ -390,6 +449,8 @@ export function usePurchaseForm({
     productError,
     quantityError,
     itemQuantityErrors,
+    itemUnitCostDrafts,
+    itemUnitCostErrors,
     itemsError,
 
     subtotal,
@@ -406,6 +467,7 @@ export function usePurchaseForm({
 
     handleAddProduct,
     handleItemQuantityChange,
+    handleItemUnitCostChange,
     handleRemoveItem,
     handleCreatePurchase,
   };
