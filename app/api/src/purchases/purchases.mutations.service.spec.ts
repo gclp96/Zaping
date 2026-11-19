@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { PurchaseStatus } from '@prisma/client';
+import { PurchaseStatus, UserRole } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto';
@@ -146,6 +146,51 @@ describe('PurchasesService — tenant-safe mutations', () => {
         },
       },
     });
+  });
+
+  it('preserva el costo pactado de una partida al editar únicamente la cantidad', async () => {
+    transactionClient.purchase.findFirst
+      .mockResolvedValueOnce({
+        id: purchaseId,
+        status: PurchaseStatus.DRAFT,
+        items: [{ productId, price: 72.125 }],
+      })
+      .mockResolvedValueOnce({ id: purchaseId, status: PurchaseStatus.DRAFT });
+    await service.update(companyId, purchaseId, updateDto, UserRole.WAREHOUSE);
+    expect(transactionClient.purchase.updateMany).toHaveBeenCalledWith({
+      where: { id: purchaseId, companyId, status: PurchaseStatus.DRAFT },
+      data: { supplierId, subtotal: 144.25, iva: 23.08, total: 167.33 },
+    });
+    expect(transactionClient.purchaseItem.createMany).toHaveBeenCalledWith({
+      data: [{ purchaseId, productId, quantity: 2, price: 72.125, subtotal: 144.25 }],
+    });
+  });
+
+  it('permite cambiar el costo del borrador con rol autorizado', async () => {
+    transactionClient.purchase.findFirst
+      .mockResolvedValueOnce({
+        id: purchaseId, status: PurchaseStatus.DRAFT,
+        items: [{ productId, price: 100 }],
+      })
+      .mockResolvedValueOnce({ id: purchaseId, status: PurchaseStatus.DRAFT });
+    await service.update(companyId, purchaseId, {
+      ...updateDto, items: [{ productId, quantity: 2, unitCost: 12.3456 }],
+    }, UserRole.MANAGER);
+    expect(transactionClient.purchaseItem.createMany).toHaveBeenCalledWith({
+      data: [{ purchaseId, productId, quantity: 2, price: 12.3456, subtotal: 24.69 }],
+    });
+  });
+
+  it('rechaza modificaciones de costo de un usuario de almacén sin mutación final', async () => {
+    transactionClient.purchase.findFirst.mockResolvedValue({
+      id: purchaseId, status: PurchaseStatus.DRAFT,
+      items: [{ productId, price: 100 }],
+    });
+    await expect(service.update(companyId, purchaseId, {
+      ...updateDto, items: [{ productId, quantity: 2, unitCost: 50 }],
+    }, UserRole.WAREHOUSE)).rejects.toThrow();
+    expect(transactionClient.purchase.updateMany).not.toHaveBeenCalled();
+    expect(transactionClient.purchaseItem.createMany).not.toHaveBeenCalled();
   });
 
   it('rechaza un proveedor de otro tenant antes de mutar compra o partidas', async () => {
