@@ -465,7 +465,7 @@ const {
 } = usePurchaseForm({
   products,
   onPurchaseSaved: loadPurchases,
-  canAdjustUnitCost: canApprove,
+  canAdjustUnitCost: canApprove || Boolean(sessionState.status === 'success' && sessionState.user.canAdjustPurchaseUnitCost),
 });
 
   //propiedades de recepcion
@@ -1303,7 +1303,7 @@ async function loadPageData() {
         itemQuantityErrors={itemQuantityErrors}
         itemUnitCostDrafts={itemUnitCostDrafts}
         itemUnitCostErrors={itemUnitCostErrors}
-        canAdjustUnitCost={canApprove}
+        canAdjustUnitCost={canApprove || Boolean(sessionState.status === 'success' && sessionState.user.canAdjustPurchaseUnitCost)}
         itemsError={itemsError}
         subtotal={subtotal}
         iva={iva}
