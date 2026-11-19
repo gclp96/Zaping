@@ -6,7 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 
-import { Prisma, UserRole } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 
 import { Response } from 'express';
 
