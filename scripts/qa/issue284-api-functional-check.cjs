@@ -82,6 +82,9 @@ async function main() {
     NODE_ENV: 'test', DATABASE_URL: dbUrl, JWT_SECRET: secret,
     FRONTEND_ORIGIN: 'http://localhost:3000',
     FRONTEND_BASE_URL: 'http://localhost:3000',
+    INVENTORY_AUTHORITY_PROTOCOL: 'inventory-authority-v1',
+    INVENTORY_RUNTIME_BUILD: 'issue284-functional-v3',
+    INVENTORY_RUNTIME_ENVIRONMENT: 'isolated-rehearsal',
     PORT: '3001', TRUST_PROXY_HOPS: '0',
   };
   const { PrismaClient } = createRequire('/app/package.json')('@prisma/client');
