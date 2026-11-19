@@ -88,6 +88,8 @@ export class PurchasesService {
         productId: string;
         quantity: number;
         price: number;
+        listUnitCost?: number;
+        discountPercent?: number;
         subtotal: number;
       }> = [];
 
@@ -102,12 +104,21 @@ export class PurchasesService {
           );
         }
 
-        const unitCost = this.resolvePurchaseItemUnitCost(
+        const baseCost = this.resolvePurchaseItemUnitCost(
           item.unitCost,
           product.cost,
           actorRole,
           actorCanAdjustPurchaseUnitCost,
         );
+        const discount = this.resolvePurchaseItemDiscount(
+          item.discountPercent,
+          0,
+          actorRole,
+          actorCanAdjustPurchaseUnitCost,
+        );
+        // Inventory receipts use PurchaseItem.price, so it stores the
+        // effective (discounted) unit cost, never the list price.
+        const unitCost = this.roundUnitCost(baseCost * (1 - discount / 100));
         const itemSubtotal = this.roundMoney(item.quantity * unitCost);
 
         subtotal = this.roundMoney(subtotal + itemSubtotal);
@@ -116,6 +127,10 @@ export class PurchasesService {
           productId: product.id,
           quantity: item.quantity,
           price: unitCost,
+          ...(discount > 0 && {
+            listUnitCost: baseCost,
+            discountPercent: discount,
+          }),
           subtotal: itemSubtotal,
         });
       }
@@ -315,6 +330,8 @@ export class PurchasesService {
             select: {
               productId: true,
               price: true,
+              listUnitCost: true,
+              discountPercent: true,
             },
           },
         },
@@ -381,6 +398,8 @@ export class PurchasesService {
         productId: string;
         quantity: number;
         price: number;
+        listUnitCost?: number;
+        discountPercent?: number;
         subtotal: number;
       }> = [];
 
@@ -395,15 +414,22 @@ export class PurchasesService {
           );
         }
 
-        const existingLineCost = purchase.items?.find(
+        const previous = purchase.items?.find(
           (line) => line.productId === product.id,
-        )?.price;
-        const unitCost = this.resolvePurchaseItemUnitCost(
+        );
+        const baseCost = this.resolvePurchaseItemUnitCost(
           item.unitCost,
-          existingLineCost ?? product.cost,
+          previous?.listUnitCost ?? previous?.price ?? product.cost,
           actorRole,
           actorCanAdjustPurchaseUnitCost,
         );
+        const discount = this.resolvePurchaseItemDiscount(
+          item.discountPercent,
+          previous?.discountPercent ?? 0,
+          actorRole,
+          actorCanAdjustPurchaseUnitCost,
+        );
+        const unitCost = this.roundUnitCost(baseCost * (1 - discount / 100));
         const itemSubtotal = this.roundMoney(item.quantity * unitCost);
 
         subtotal = this.roundMoney(subtotal + itemSubtotal);
@@ -412,6 +438,10 @@ export class PurchasesService {
           productId: product.id,
           quantity: item.quantity,
           price: unitCost,
+          ...(discount > 0 && {
+            listUnitCost: baseCost,
+            discountPercent: discount,
+          }),
           subtotal: itemSubtotal,
         });
       }
@@ -683,6 +713,40 @@ export class PurchasesService {
         },
       },
     });
+  }
+
+  private roundUnitCost(value: number): number {
+    return Math.round((value + Number.EPSILON) * 10_000) / 10_000;
+  }
+
+  private resolvePurchaseItemDiscount(
+    requested: number | undefined,
+    fallback: number,
+    role?: UserRole,
+    delegated = false,
+  ): number {
+    if (requested === undefined) return fallback;
+
+    if (
+      role !== UserRole.ADMIN &&
+      role !== UserRole.MANAGER &&
+      !(role === UserRole.WAREHOUSE && delegated)
+    ) {
+      throw new ForbiddenException('No tienes permiso para modificar descuentos de compra');
+    }
+
+    const hundredths = requested * 100;
+    if (
+      !Number.isFinite(requested) ||
+      requested < 0 ||
+      requested > 100 ||
+      !Number.isSafeInteger(Math.round(hundredths)) ||
+      Math.abs(hundredths - Math.round(hundredths)) > 0.000001
+    ) {
+      throw new BadRequestException('El descuento debe ser un porcentaje entre 0 y 100 con máximo 2 decimales');
+    }
+
+    return requested;
   }
 
   private resolvePurchaseItemUnitCost(
