@@ -179,7 +179,12 @@ externos. Solo recibe `.qa/postgres.env` para construir **dentro de su
 contenedor** una conexión a
 `zaping-qa-postgres:5432/zaping_issue284_transfer_trial_v3`.
 El guard de preflight rechaza otro destino, secrets de API o una BD con
-historial R2. Genera un JWT efímero diferente en cada ejecución, firma
+historial R2. La API arranca con identidad de inventario **sintética y exclusiva**
+(`INVENTORY_AUTHORITY_PROTOCOL=inventory-authority-v1`,
+`INVENTORY_RUNTIME_BUILD=issue284-functional-v3`,
+`INVENTORY_RUNTIME_ENVIRONMENT=isolated-rehearsal`) para satisfacer
+`/health/ready` sin compartir la configuración de QA operativa.
+Genera un JWT efímero diferente en cada ejecución, firma
 tokens de prueba para los **usuarios ya existentes** en la base aislada
 y nunca imprime JWT, email ni contraseñas. Los tokens efímeros no son
 válidos contra la QA operativa.
