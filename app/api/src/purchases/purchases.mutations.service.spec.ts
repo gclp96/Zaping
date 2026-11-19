@@ -269,27 +269,31 @@ describe('PurchasesService — tenant-safe mutations', () => {
       .mockResolvedValueOnce({
         id: purchaseId,
         status: PurchaseStatus.DRAFT,
-        items: [{
-          productId,
-          price: 76.95,
-          listUnitCost: 85.5,
-          discountPercent: 10,
-        }],
+        items: [
+          {
+            productId,
+            price: 76.95,
+            listUnitCost: 85.5,
+            discountPercent: 10,
+          },
+        ],
       })
       .mockResolvedValueOnce({ id: purchaseId, status: PurchaseStatus.DRAFT });
 
     await service.update(companyId, purchaseId, updateDto, UserRole.WAREHOUSE);
 
     expect(transactionClient.purchaseItem.createMany).toHaveBeenCalledWith({
-      data: [{
-        purchaseId,
-        productId,
-        quantity: 2,
-        price: 76.95,
-        listUnitCost: 85.5,
-        discountPercent: 10,
-        subtotal: 153.9,
-      }],
+      data: [
+        {
+          purchaseId,
+          productId,
+          quantity: 2,
+          price: 76.95,
+          listUnitCost: 85.5,
+          discountPercent: 10,
+          subtotal: 153.9,
+        },
+      ],
     });
   });
 
@@ -313,15 +317,17 @@ describe('PurchasesService — tenant-safe mutations', () => {
       true,
     );
     expect(transactionClient.purchaseItem.createMany).toHaveBeenCalledWith({
-      data: [{
-        purchaseId,
-        productId,
-        quantity: 2,
-        price: 90,
-        listUnitCost: 100,
-        discountPercent: 10,
-        subtotal: 180,
-      }],
+      data: [
+        {
+          purchaseId,
+          productId,
+          quantity: 2,
+          price: 90,
+          listUnitCost: 100,
+          discountPercent: 10,
+          subtotal: 180,
+        },
+      ],
     });
   });
 
