@@ -9,6 +9,9 @@ services:
     env_file: .qa/postgres.env
     volumes:
       - rehearsal-postgres:/var/lib/postgresql/data
+    networks:
+      - default
+      - functional-private
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U zaping_qa -d zaping_qa"]
       interval: 3s
@@ -51,6 +54,43 @@ services:
         npx prisma migrate deploy
         npx prisma migrate status
         npx prisma validate
+
+  # Opt-in, no published ports, no QA API secrets, no external network.
+  # Runs once; starts and stops an API entirely inside this container.
+  functional-check:
+    profiles: ["functional"]
+    build:
+      context: ./app/api
+      dockerfile: Dockerfile
+    image: zaping-issue284-functional-api:local
+    env_file: .qa/postgres.env
+    environment:
+      NODE_ENV: test
+      PORT: "3001"
+      TRUST_PROXY_HOPS: "0"
+      FRONTEND_ORIGIN: http://localhost:3000
+      FRONTEND_BASE_URL: http://localhost:3000
+    working_dir: /app
+    entrypoint: ["node", "/issue284-tools/issue284-api-functional-check.cjs"]
+    volumes:
+      - ./scripts/qa:/issue284-tools:ro
+    networks:
+      - functional-private
+    depends_on:
+      zaping-qa-postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+
+networks:
+  functional-private:
+    internal: true
 
 volumes:
   rehearsal-postgres:
