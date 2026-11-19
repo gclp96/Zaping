@@ -47,10 +47,12 @@ describe('CompaniesService fiscal document settings', () => {
   });
 
   it('updates only allowed fields under company scope', async () => {
-    await expect(service.updateOwnCommercial(companyId, {
-      fiscalAddress: 'Calle Uno 100, Hermosillo',
-      placeOfIssue: 'Hermosillo, Sonora',
-    })).resolves.toEqual(data);
+    await expect(
+      service.updateOwnCommercial(companyId, {
+        fiscalAddress: 'Calle Uno 100, Hermosillo',
+        placeOfIssue: 'Hermosillo, Sonora',
+      }),
+    ).resolves.toEqual(data);
     expect(company.updateMany).toHaveBeenCalledWith({
       where: { id: companyId },
       data: {
@@ -62,9 +64,11 @@ describe('CompaniesService fiscal document settings', () => {
 
   it('refuses an unknown company and does not leak other tenants', async () => {
     company.updateMany.mockResolvedValue({ count: 0 });
-    await expect(service.updateOwnCommercial('unknown', {
-      fiscalAddress: 'test',
-    })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.updateOwnCommercial('unknown', {
+        fiscalAddress: 'test',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
     expect(company.findUnique).not.toHaveBeenCalled();
   });
 });
