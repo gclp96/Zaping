@@ -34,6 +34,7 @@ describe('UsersService', () => {
     firstName: 'User',
     lastName: 'Zaping',
     role: UserRole.SALES,
+    canAdjustPurchaseUnitCost: false,
     isActive: true,
     createdAt: new Date('2026-08-30T10:00:00.000Z'),
     updatedAt: new Date('2026-08-30T10:00:00.000Z'),
@@ -53,6 +54,7 @@ describe('UsersService', () => {
     firstName: true,
     lastName: true,
     role: true,
+    canAdjustPurchaseUnitCost: true,
     isActive: true,
     createdAt: true,
     updatedAt: true,
@@ -142,6 +144,7 @@ describe('UsersService', () => {
         email: 'user@zaping.test',
         passwordHash: createCall[0].data.passwordHash,
         role: UserRole.SALES,
+        canAdjustPurchaseUnitCost: false,
       },
       select: safeUserSelect,
     });
@@ -223,6 +226,7 @@ describe('UsersService', () => {
         firstName: 'Updated',
         role: UserRole.MANAGER,
         isActive: false,
+        canAdjustPurchaseUnitCost: false,
       },
     });
   });
