@@ -84,6 +84,16 @@ function ensureStopped() {
   ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   assert.equal(clients, '0', 'STOP: unexpected PostgreSQL clients during QA pause');
 }
+function requireSynchronizedData() {
+  const output = execFileSync(process.execPath, [
+    'scripts/qa/issue284-qa-candidate-sync-check.cjs',
+  ], {
+    encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: 120000, maxBuffer: 1024 * 1024,
+  }).trim();
+  assert.ok(output.includes('PASS: original and staged candidate contain 110 matching rows'),
+    'STOP: QA candidate/original fingerprint check not approved');
+}
 function validateHost() {
   assert.equal(process.platform, 'win32', 'STOP: Windows host required');
   const current = execFileSync('git', ['branch', '--show-current'], {
@@ -97,6 +107,7 @@ function validateHost() {
 function switchFile() {
   validateHost();
   ensureStopped();
+  requireSynchronizedData();
   assert.ok(!fs.existsSync(STATE_PATH),
     'STOP: a prior cutover state exists; never overwrite');
   const original = fs.readFileSync(ENV_PATH, 'utf8');
@@ -129,6 +140,7 @@ function switchFile() {
 function rollbackFile() {
   validateHost();
   ensureStopped();
+  requireSynchronizedData();
   assert.ok(fs.existsSync(STATE_PATH), 'STOP: no prior cutover state');
   const state = JSON.parse(fs.readFileSync(STATE_PATH, 'utf8'));
   assert.equal(state.issue, 284);
