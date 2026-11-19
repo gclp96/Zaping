@@ -200,7 +200,7 @@ function main() {
     candidateCreated = true;
     console.log('PASS: separate QA candidate created; original zaping_qa remains untouched');
 
-    // No --clean, --create, --disable-triggers or migration commands.
+    // Restoration never cleans databases, creates another DB or disables triggers.
     // Target is a NEW db only, with all changes in one pg_restore transaction.
     invoke('docker', ['exec', op, 'pg_restore', '--exit-on-error',
       '--single-transaction', '--no-owner', '--no-acl', '-U', USER,
@@ -227,7 +227,11 @@ function main() {
   } finally {
     // Remove ONLY temporary sensitive host staging files, not any DB or volume.
     rmSync(work, { recursive: true, force: true });
-    // No Docker down, DROP, DELETE, migration resolve or changes to .env.
+    // Only delete the two unique temp archives generated in this call.
+    // Never drop or remove a database, volume, configuration or other files.
+    try { invoke('docker', ['exec', rehearsal, 'rm', '-f', '--', sourceDump]); } catch { /* preserve primary error */ }
+    try { invoke('docker', ['exec', op, 'rm', '-f', '--', targetDump]); } catch { /* preserve primary error */ }
+    // No Docker teardown or changes to .env.
   }
 }
 if (require.main === module) {
