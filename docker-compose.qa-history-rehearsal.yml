@@ -1,0 +1,97 @@
+# Issue #284 — ISOLATED clean-history rehearsal, NOT the operational QA Compose project.
+# Distinct Compose project, network and named volumes. No published host ports.
+# No service can connect to zaping-local-qa by its Docker service name.
+name: zaping-issue284-rehearsal
+
+services:
+  zaping-qa-postgres:
+    image: postgres:16
+    env_file: .qa/postgres.env
+    volumes:
+      - rehearsal-postgres:/var/lib/postgresql/data
+    networks:
+      - default
+      - functional-private
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zaping_qa -d zaping_qa"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Dependencies are installed without access to API or PostgreSQL secrets.
+  deps:
+    image: node:24.20.0-bookworm-slim
+    working_dir: /work
+    volumes:
+      - ./app/api:/source:ro
+      - rehearsal-api:/work
+    entrypoint: ["sh", "-ec"]
+    command:
+      - |
+        test "$(pwd)" = "/work"
+        test -f /source/prisma/schema.prisma
+        cp /source/package.json /source/package-lock.json /source/prisma.config.ts /work/
+        # Only remove copied schema files inside the isolated rehearsal-api volume.
+        rm -rf /work/prisma
+        mkdir -p /work/prisma
+        cp -R /source/prisma/. /work/prisma/
+        npm ci --no-audit --no-fund
+
+  # This service never exposes a listening port or runs the Zaping application.
+  schema-check:
+    image: node:24.20.0-bookworm-slim
+    working_dir: /work
+    env_file: .qa/api.env
+    depends_on:
+      zaping-qa-postgres:
+        condition: service_healthy
+    volumes:
+      - rehearsal-api:/work
+    entrypoint: ["sh", "-ec"]
+    command:
+      - |
+        node -e 'const u = new URL(process.env.DATABASE_URL || ""); if (u.host !== "zaping-qa-postgres:5432" || u.pathname !== "/zaping_qa") { console.error("ABORT: Unexpected rehearsal target"); process.exit(42); }'
+        npx prisma migrate deploy
+        npx prisma migrate status
+        npx prisma validate
+
+  # Opt-in, no published ports, no QA API secrets, no external network.
+  # Runs once; starts and stops an API entirely inside this container.
+  functional-check:
+    profiles: ["functional"]
+    build:
+      context: ./app/api
+      dockerfile: Dockerfile
+    image: zaping-issue284-functional-api:local
+    env_file: .qa/postgres.env
+    environment:
+      NODE_ENV: test
+      PORT: "3001"
+      TRUST_PROXY_HOPS: "0"
+      FRONTEND_ORIGIN: http://localhost:3000
+      FRONTEND_BASE_URL: http://localhost:3000
+    working_dir: /app
+    entrypoint: ["node", "/issue284-tools/issue284-api-functional-check.cjs"]
+    volumes:
+      - ./scripts/qa:/issue284-tools:ro
+    networks:
+      - functional-private
+    depends_on:
+      zaping-qa-postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+
+networks:
+  functional-private:
+    internal: true
+
+volumes:
+  rehearsal-postgres:
+  rehearsal-api:
