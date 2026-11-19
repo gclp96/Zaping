@@ -328,8 +328,10 @@ export default function ProductSelector({
         </div>
       ) : null}
 
-      {(!selectedProduct || !collapseSearchOnSelection) ? (
-      <div className="relative">
+      <div
+        className="relative"
+        hidden={Boolean(selectedProduct && collapseSearchOnSelection)}
+      >
         <input
           ref={searchInputRef}
           id={inputId}
@@ -509,7 +511,6 @@ export default function ProductSelector({
           </div>
         ) : null}
       </div>
-      ) : null}
 
       {enableStockFilter ? (
         <div className="flex items-center gap-2">
