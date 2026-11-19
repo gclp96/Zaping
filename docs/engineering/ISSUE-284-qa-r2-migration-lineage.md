@@ -401,6 +401,53 @@ versionado solo tras diagnóstico. Un rollback hacia la base anterior no
 soluciona su divergencia histórica de Prisma, únicamente permite restaurar
 la disponibilidad si falla el corte.
 
+## Paso 2h — Conectividad read-only de API a candidata (pendiente local)
+
+**Estado local 19/nov/2026**: el usuario informó 41/41 pruebas unitarias PASS
+y ejecución satisfactoria del preparador opt-in. Existe la nueva BD
+'zaping_qa_official_candidate_v1' en PostgreSQL de QA. Los 110 registros en
+57 tablas oficiales coinciden con v3, 54 migraciones/0 R2, y las huellas
+de la QA original se mantuvieron intactas. La base original aún está activa.
+
+Script solo lectura agregado al PR:
+'scripts/qa/issue284-api-candidate-connection-check.cjs'.
+
+Ejecutar SOLO cuando CI HEAD esté 4/4 PASS y API de QA esté corriendo
+con su configuración ORIGINAL. No modificar .qa/api.env ni DATABASE_URL.
+
+~~~powershell
+cd C:\dev\zaping
+git pull --ff-only origin fix/issue-284-qa-migration-lineage-audit-20261118
+node --test scripts/qa/*.test.cjs
+
+docker compose -f docker-compose.qa.yml ps api
+docker compose -f docker-compose.qa.yml exec -T api node /qa-tools/issue284-api-candidate-connection-check.cjs
+~~~
+
+El script corre en un proceso separado dentro del contenedor actual de API,
+hereda el URL de base original en memoria, exige NODE_ENV=development,
+el host zapping-qa-postgres:5432, DB original 'zaping_qa' y usuario
+'zaping_qa'. Deriva URL de candidata SOLO en memoria para un cliente Prisma
+separado. Verifica conexión desde API a ambas bases; migraciones 55/54,
+ausencia de R2 en candidata, 2 empresas, 5 usuarios, 4 clientes y
+coincidencia completa (hash SHA-256 interno, sin imprimir valores) de
+id/empresa/email/passwordHash/rol/authVersion/isActive de los cinco usuarios.
+No ejecuta mutaciones ni reinicia la API, tampoco cambia archivos de entorno
+o servicios externos.
+
+Salida esperada:
+- PASS: running QA API container can connect to official candidate (read-only)
+- PASS: 54 official migrations, 0 R2; all five user credentials/roles/auth versions match original QA
+- HOLD: no API restart, no env changes, no cutover; real interactive password login still required after switch
+
+**Si falla**: conservar todo sin cambios y revisar el error. No alterar
+credenciales ni eliminar bases para hacer pasar el check. La conectividad
+read-only y la igualdad de hashes NO demuestran que el flujo de login real
+con contraseña conocida por usuario final haya sido ejecutado tras el corte.
+Antes de activar candidata, documentar respaldo privado de .qa/api.env,
+ventana de pausa de escritores y retorno de conexión original; requerir
+autorización expresa. No fusionar/cerrar #284 antes del cambio validado.
+
 ## Paso 3 — Corte real de QA: gate humano pendiente
 
 **No forma parte de este PR.** No basta con un rehearsal verde para cambiar
@@ -445,7 +492,8 @@ la base que usan QA ADMIN/SALES/etc. Se requiere:
 - [x] Respaldo QA actualizado restaurado en Docker de ensayo y recuentos verificados.
 - [x] Preflight read-only de corte en host local (57 huellas/identidades, 19/nov/2026 PASS).
 - [x] Preflight read-only de corte aprobado por usuario (37/37 unit y 57 huellas PASS).
-- [ ] Candidata oficial creada y verificada en PostgreSQL QA, sin cambiar conexiones.
+- [x] Candidata oficial creada y verificada en PostgreSQL QA, sin cambiar conexiones (PASS local, 19/nov/2026).
+- [ ] Verificar conectividad read-only desde contenedor API operativo a candidata.
 - [ ] Política de preservación de datos y autorización de corte definidas.
 - [ ] Corte hacia BD QA de `main` completado y pruebas de regresión PASS.
 - [ ] Cerrar issue #284 solo después de comprobar que la QA activa no posee
