@@ -169,6 +169,6 @@ describe('Purchase creation authorization contract', () => {
       companyId: 'company-foreign',
     };
     void controller.create({ user: { companyId: 'company-a' } }, dto);
-    expect(create).toHaveBeenCalledWith('company-a', dto, undefined);
+    expect(create).toHaveBeenCalledWith('company-a', dto, undefined, false);
   });
 });
