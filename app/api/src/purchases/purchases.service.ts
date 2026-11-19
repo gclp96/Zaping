@@ -732,7 +732,9 @@ export class PurchasesService {
       role !== UserRole.MANAGER &&
       !(role === UserRole.WAREHOUSE && delegated)
     ) {
-      throw new ForbiddenException('No tienes permiso para modificar descuentos de compra');
+      throw new ForbiddenException(
+        'No tienes permiso para modificar descuentos de compra',
+      );
     }
 
     const hundredths = requested * 100;
@@ -743,7 +745,9 @@ export class PurchasesService {
       !Number.isSafeInteger(Math.round(hundredths)) ||
       Math.abs(hundredths - Math.round(hundredths)) > 0.000001
     ) {
-      throw new BadRequestException('El descuento debe ser un porcentaje entre 0 y 100 con máximo 2 decimales');
+      throw new BadRequestException(
+        'El descuento debe ser un porcentaje entre 0 y 100 con máximo 2 decimales',
+      );
     }
 
     return requested;
