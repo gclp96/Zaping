@@ -448,6 +448,140 @@ Antes de activar candidata, documentar respaldo privado de .qa/api.env,
 ventana de pausa de escritores y retorno de conexión original; requerir
 autorización expresa. No fusionar/cerrar #284 antes del cambio validado.
 
+## Paso 2i — Corte controlado y reversible de API a candidata QA (AUTORIZADO por usuario)
+
+El 19/nov/2026, el usuario aprobó el cambio controlado de QA local, tras:
+- respaldo operativo restaurado y recuentos PASS;
+- candidata 'zaping_qa_official_candidate_v1' creada con 54 migraciones,
+  0 R2, 110 filas iguales en 57 tablas y QA original conservada;
+- conectividad desde API QA a candidata y hashes de cinco usuarios PASS
+  (45/45 pruebas unitarias).
+
+**CI requerido:** 4/4 PASS del HEAD más reciente de PR Draft #285.
+El cambio NO se ha ejecutado todavía en el equipo del usuario.
+La API actual usa 'zaping_qa'. No es un cambio de producción.
+
+**Control de datos:** el script
+'scripts/qa/issue284-qa-candidate-sync-check.cjs' compara
+PostgreSQL **operativo** original/candidata y exige identidades,
+55/54 migraciones, 3/0 tablas R2 y coincidencia de huellas de
+las 57 tablas oficiales/110 registros. No usar el antiguo
+'issue284-cutover-preflight.cjs' en esta fase: exige candidata AUSENTE.
+
+**Control de configuración:** el script
+'scripts/qa/issue284-qa-env-switch.cjs' opera únicamente el archivo local
+'.qa/api.env', nunca DB ni Docker. Exige Windows, rama del PR, API
+DETENIDA, ningún cliente conectado a original/candidata y sincronización
+de 57 huellas; genera backup fuera del repo en
+'%USERPROFILE%\Documents\Zaping-QA-Backups' con nombre único y
+estado privado bajo '.qa/issue284-api-switch-state.json'. Solo transforma
+el nombre de DB en DATABASE_URL, conserva todos los demás valores.
+No imprimir, copiar a GitHub o compartir esos archivos privados.
+Las copias de secretos quedan en disco: restringir su acceso al usuario.
+
+### Secuencia controlada en PowerShell (NO ejecutar antes del CI 4/4 PASS)
+
+**1. Revisar configuración previa sin cambios:**
+
+~~~powershell
+cd C:\dev\zaping
+git pull --ff-only origin fix/issue-284-qa-migration-lineage-audit-20261118
+if ($LASTEXITCODE -ne 0) { throw 'STOP: pull fallido' }
+node --test scripts/qa/*.test.cjs
+if ($LASTEXITCODE -ne 0) { throw 'STOP: tests fallidos' }
+node scripts/qa/issue284-qa-candidate-sync-check.cjs
+if ($LASTEXITCODE -ne 0) { throw 'STOP: datos divergentes' }
+docker compose -f docker-compose.qa.yml exec -T api node /qa-tools/issue284-api-candidate-connection-check.cjs
+if ($LASTEXITCODE -ne 0) { throw 'STOP: continuidad de credenciales no comprobada' }
+~~~
+
+Confirmar que nadie realiza operaciones en QA. El puerto local 5433
+acepta conexiones, por lo que detener la API NO bloquea por sí solo
+clientes externos. El switch comprueba que no hay clientes PG conectados.
+
+**2. Pausar el único escritor de QA (servicio API):**
+
+~~~powershell
+docker compose -f docker-compose.qa.yml stop api
+if ($LASTEXITCODE -ne 0) { throw 'STOP: no pudo detenerse API' }
+node scripts/qa/issue284-qa-candidate-sync-check.cjs
+if ($LASTEXITCODE -ne 0) { throw 'STOP: hubo escrituras después del snapshot' }
+~~~
+
+**3. Cambiar configuración, sin reiniciar todavía:**
+
+~~~powershell
+node scripts/qa/issue284-qa-env-switch.cjs --switch
+if ($LASTEXITCODE -ne 0) { throw 'STOP: no cambió configuración; revisar estado' }
+~~~
+
+PASS esperado: backup privado de .qa/api.env creado y nuevo DATABASE_URL.
+El script rechaza cualquier estado previo, sesión PG activa, identidad
+inadecuada, base distinta o divergencia en contenido.
+
+**4. Recrear SOLO API; no PostgreSQL ni Web:**
+
+~~~powershell
+docker compose -f docker-compose.qa.yml up -d --no-deps --force-recreate api
+if ($LASTEXITCODE -ne 0) { throw 'STOP: API no arrancó; ejecutar rollback' }
+~~~
+
+**5. Validar nueva conexión antes de permitir operaciones QA:**
+
+~~~powershell
+docker compose -f docker-compose.qa.yml exec -T api node /qa-tools/issue284-api-active-db-check.cjs --candidate
+if ($LASTEXITCODE -ne 0) { throw 'STOP: API apunta a DB inesperada; rollback' }
+
+docker compose -f docker-compose.qa.yml exec -T api npx prisma migrate status
+if ($LASTEXITCODE -ne 0) { throw 'STOP: migrate status falló; rollback' }
+
+$ready = Invoke-RestMethod -Uri http://127.0.0.1:3001/health/ready -Method Get
+if ($ready.status -ne 'ok') { throw 'STOP: API no está ready; rollback' }
+~~~
+
+**6. Manual: verificar login real** en la web local con contraseña
+operativa ya conocida (NO compartir la contraseña ni el JWT). Cerrar
+la sesión anterior, volver a iniciar sesión, revisar Clientes y
+Compras/Recepciones/Healthcare desde rol autorizado; mantener QA
+sin nuevas escrituras hasta terminar. La igualdad previa de hashes
+NO reemplaza este login manual. Documentar PASS/FAIL sin credenciales.
+
+### Reversión (si falla, sin perder datos)
+
+Aplicar rollback solo si todavía NO se han autorizado nuevas escrituras
+a candidata. El script exige que el contenido oficial de original y
+candidata sea idéntico; si difieren, DETENERSE y analizar registros
+antes de decidir cualquier reversión.
+
+~~~powershell
+docker compose -f docker-compose.qa.yml stop api
+if ($LASTEXITCODE -ne 0) { throw 'STOP: API no se detuvo para rollback' }
+
+node scripts/qa/issue284-qa-candidate-sync-check.cjs
+if ($LASTEXITCODE -ne 0) { throw 'STOP: bases divergen; no reconfigurar a ciegas' }
+
+node scripts/qa/issue284-qa-env-switch.cjs --rollback
+if ($LASTEXITCODE -ne 0) { throw 'STOP: restauración de configuración fallida' }
+
+docker compose -f docker-compose.qa.yml up -d --no-deps --force-recreate api
+if ($LASTEXITCODE -ne 0) { throw 'STOP: API original no pudo arrancar' }
+
+docker compose -f docker-compose.qa.yml exec -T api node /qa-tools/issue284-api-active-db-check.cjs --original
+if ($LASTEXITCODE -ne 0) { throw 'STOP: QA original no validada' }
+
+Invoke-RestMethod -Uri http://127.0.0.1:3001/health/ready -Method Get
+~~~
+
+Si el guard detiene la reversión por datos divergentes, preservar
+ambas bases y el backup, detener escrituras y reconciliar primero.
+Nunca usar prisma migrate reset/resolve, db push, DELETE, DROP,
+docker compose down -v o sobrescribir v3/QA operativa.
+
+**Después del cambio exitoso** no fusionar ni cerrar automáticamente:
+guardar evidencia de migrate status, health y login real, revisar en
+PR, entonces confirmar autoría/aprobación del merge. Conservar backup
+y base original como recuperación histórica; documentar R2 experimental.
+
 ## Paso 3 — Corte real de QA: gate humano pendiente
 
 **No forma parte de este PR.** No basta con un rehearsal verde para cambiar
@@ -493,7 +627,8 @@ la base que usan QA ADMIN/SALES/etc. Se requiere:
 - [x] Preflight read-only de corte en host local (57 huellas/identidades, 19/nov/2026 PASS).
 - [x] Preflight read-only de corte aprobado por usuario (37/37 unit y 57 huellas PASS).
 - [x] Candidata oficial creada y verificada en PostgreSQL QA, sin cambiar conexiones (PASS local, 19/nov/2026).
-- [ ] Verificar conectividad read-only desde contenedor API operativo a candidata.
+- [x] Verificar conectividad read-only desde contenedor API operativo a candidata (PASS local, 19/nov/2026).
+- [ ] Ejecutar cutover reversible API de QA con pausa de escritores y confirmar login real.
 - [ ] Política de preservación de datos y autorización de corte definidas.
 - [ ] Corte hacia BD QA de `main` completado y pruebas de regresión PASS.
 - [ ] Cerrar issue #284 solo después de comprobar que la QA activa no posee
