@@ -34,11 +34,13 @@ jobs:
       - name: Run agent tests
         run: node --test scripts/agents/*.test.mjs
 
-      - name: Verify read-only migration audit helpers (issue 284)
+      - name: Verify isolated migration and API check helpers (issue 284)
         run: |
           node --check scripts/qa/audit-zaping-files-r2-history.cjs
           node --check scripts/qa/rehearse-issue284-official-data.cjs
           node --check scripts/qa/issue284-api-functional-check.cjs
+          node --check scripts/qa/prepare-issue284-write-trial.cjs
+          node --check scripts/qa/issue284-write-check.cjs
           node --test scripts/qa/*.test.cjs
 
       - name: Validate isolated history rehearsal Compose syntax
