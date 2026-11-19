@@ -324,6 +324,7 @@ export default function Purchase360Page() {
     purchaseToEdit,
     hasUnsavedChanges,
     supplierId,
+    commercial,
     selectedProductId,
     quantity,
     items,
@@ -331,6 +332,8 @@ export default function Purchase360Page() {
     productError,
     quantityError,
     itemQuantityErrors,
+    itemUnitCostDrafts,
+    itemUnitCostErrors,
     itemsError,
     subtotal,
     iva,
@@ -338,15 +341,21 @@ export default function Purchase360Page() {
     openEditModal,
     closeCreateModal,
     handleSupplierChange,
+    handleCommercialChange,
     handleSelectedProductChange,
     handleFormQuantityChange,
     handleAddProduct,
     handleItemQuantityChange,
+    handleItemUnitCostChange,
     handleRemoveItem,
     handleCreatePurchase,
   } = usePurchaseForm({
     products,
     onPurchaseSaved: reloadPurchase360,
+    canAdjustUnitCost: canApprove || Boolean(
+      sessionState.status === 'success' &&
+      sessionState.user.canAdjustPurchaseUnitCost,
+    ),
   });
 
   const {
@@ -780,6 +789,7 @@ export default function Purchase360Page() {
         suppliers={suppliers}
         products={products}
         supplierId={supplierId}
+        commercial={commercial}
         selectedProductId={selectedProductId}
         quantity={quantity}
         items={items}
@@ -787,6 +797,12 @@ export default function Purchase360Page() {
         productError={productError}
         quantityError={quantityError}
         itemQuantityErrors={itemQuantityErrors}
+        itemUnitCostDrafts={itemUnitCostDrafts}
+        itemUnitCostErrors={itemUnitCostErrors}
+        canAdjustUnitCost={canApprove || Boolean(
+          sessionState.status === 'success' &&
+          sessionState.user.canAdjustPurchaseUnitCost
+        )}
         itemsError={itemsError}
         subtotal={subtotal}
         iva={iva}
@@ -797,9 +813,11 @@ export default function Purchase360Page() {
         onAddProduct={handleAddProduct}
         onRemoveItem={handleRemoveItem}
         onSupplierChange={handleSupplierChange}
+        onCommercialChange={handleCommercialChange}
         onSelectedProductChange={handleSelectedProductChange}
         onQuantityChange={handleFormQuantityChange}
         onItemQuantityChange={handleItemQuantityChange}
+        onItemUnitCostChange={handleItemUnitCostChange}
       />
 
       <PurchaseReceiptModal
