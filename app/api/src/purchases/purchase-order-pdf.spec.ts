@@ -89,8 +89,7 @@ describe('purchase order PDF', () => {
           status: 'DRAFT',
           company: {
             ...base.company,
-            name:
-            'RAZÓN SOCIAL DE LA EMPRESA EMISORA S.A. DE C.V.',
+            name: 'RAZÓN SOCIAL DE LA EMPRESA EMISORA S.A. DE C.V.',
           },
           paymentTerms: null,
           paymentMethod: null,
