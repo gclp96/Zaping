@@ -511,7 +511,11 @@ export default function ProductsPage() {
         brand: brand.trim() || undefined,
         categoryId: categoryId || null,
         barcode: barcode.trim() || undefined,
-        unitOfMeasure: unitOfMeasure.trim(),
+        ...(unitOfMeasure.trim()
+          ? { unitOfMeasure: unitOfMeasure.trim() }
+          : editingProduct?.unitOfMeasure
+            ? { unitOfMeasure: '' }
+            : {}),
         cost: costValue,
         price: priceValue,
         minStock: minStockValue,
