@@ -271,15 +271,17 @@ export default function SuppliersPage() {
 
     const payload = {
       name: trimmedName,
-      ...(normalizeOptionalValue(legalName) && {
-        legalName: normalizeOptionalValue(legalName),
+      ...((editingSupplier || normalizeOptionalValue(legalName)) && {
+        legalName: normalizeOptionalValue(legalName) ?? null,
       }),
-      ...(normalizedRfc && { rfc: normalizedRfc }),
-      ...(normalizeOptionalValue(fiscalAddress) && {
-        fiscalAddress: normalizeOptionalValue(fiscalAddress),
+      ...((editingSupplier || normalizedRfc) && {
+        rfc: normalizedRfc || null,
       }),
-      ...(normalizeOptionalValue(supplierCode) && {
-        supplierCode: normalizeOptionalValue(supplierCode),
+      ...((editingSupplier || normalizeOptionalValue(fiscalAddress)) && {
+        fiscalAddress: normalizeOptionalValue(fiscalAddress) ?? null,
+      }),
+      ...((editingSupplier || normalizeOptionalValue(supplierCode)) && {
+        supplierCode: normalizeOptionalValue(supplierCode) ?? null,
       }),
       email: normalizeOptionalValue(email),
       phone: normalizeOptionalValue(phone),
