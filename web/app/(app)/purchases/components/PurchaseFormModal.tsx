@@ -12,6 +12,8 @@ import Modal from '@/app/components/ui/Modal';
 import type {
   Product,
   PurchaseFormItem,
+  PurchaseCommercialForm,
+  PurchaseCommercialFormField,
   Supplier,
 } from '../types';
 
@@ -25,6 +27,7 @@ type PurchaseFormModalProps = {
   products: Product[];
 
   supplierId: string;
+  commercial: PurchaseCommercialForm;
   selectedProductId: string;
   quantity: string;
   items: PurchaseFormItem[];
@@ -50,6 +53,7 @@ type PurchaseFormModalProps = {
   onRemoveItem: (productId: string) => void;
 
   onSupplierChange: (value: string) => void;
+  onCommercialChange: (field: PurchaseCommercialFormField, value: string) => void;
   onSelectedProductChange: (value: string) => void;
   onQuantityChange: (value: string) => void;
   onItemQuantityChange: (
@@ -75,6 +79,7 @@ export default function PurchaseFormModal({
   suppliers,
   products,
   supplierId,
+  commercial,
   selectedProductId,
   quantity,
   items,
@@ -95,6 +100,7 @@ export default function PurchaseFormModal({
   onAddProduct,
   onRemoveItem,
   onSupplierChange,
+  onCommercialChange,
   onSelectedProductChange,
   onQuantityChange,
   onItemQuantityChange,
@@ -220,6 +226,55 @@ export default function PurchaseFormModal({
             error={supplierError}
             helperText="Proveedor que surtirá la orden de compra."
           />
+        </section>
+
+        <section
+          aria-labelledby="purchase-commercial-heading"
+          className="rounded-xl border border-border bg-white p-3 sm:p-4"
+        >
+          <h3
+            id="purchase-commercial-heading"
+            className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-muted"
+          >
+            Condiciones comerciales
+          </h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input
+              label="Condiciones de pago"
+              placeholder="Ej. Crédito a 30 días"
+              value={commercial.paymentTerms}
+              disabled={saving}
+              onChange={(event) => onCommercialChange('paymentTerms', event.target.value)}
+            />
+            <Input
+              label="Método de pago"
+              placeholder="Ej. Transferencia electrónica"
+              value={commercial.paymentMethod}
+              disabled={saving}
+              onChange={(event) => onCommercialChange('paymentMethod', event.target.value)}
+            />
+            <Input
+              label="Fecha de pago"
+              type="date"
+              value={commercial.paymentDueDate}
+              disabled={saving}
+              onChange={(event) => onCommercialChange('paymentDueDate', event.target.value)}
+            />
+            <Input
+              label="Fecha comprometida de entrega"
+              type="date"
+              value={commercial.expectedDeliveryDate}
+              disabled={saving}
+              onChange={(event) => onCommercialChange('expectedDeliveryDate', event.target.value)}
+            />
+            <Input
+              label="Comprador"
+              placeholder="Responsable de la compra"
+              value={commercial.buyerName}
+              disabled={saving}
+              onChange={(event) => onCommercialChange('buyerName', event.target.value)}
+            />
+          </div>
         </section>
 
         <section
