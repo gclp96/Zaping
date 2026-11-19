@@ -67,6 +67,22 @@ function ensureStopped() {
     '--filter', 'label=com.docker.compose.service=api',
   ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   assert.equal(output, '', 'STOP: QA API must be stopped before changing config');
+  const postgres = execFileSync('docker', [
+    'ps', '-q',
+    '--filter', 'label=com.docker.compose.project=' + project,
+    '--filter', 'label=com.docker.compose.service=zaping-qa-postgres',
+  ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  assert.match(postgres, /^[a-f0-9]{12,64}$/,
+    'STOP: expected one running operational PostgreSQL container');
+  const clients = execFileSync('docker', [
+    'exec', '--env', 'PGOPTIONS=-c default_transaction_read_only=on',
+    postgres, 'psql', '-X', '-At', '-v', 'ON_ERROR_STOP=1',
+    '-U', 'zaping_qa', '-d', 'postgres',
+    '-c', "SELECT COUNT(*) FROM pg_stat_activity WHERE datname IN " +
+      "('zaping_qa','zaping_qa_official_candidate_v1') " +
+      "AND backend_type='client backend' AND pid<>pg_backend_pid();",
+  ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  assert.equal(clients, '0', 'STOP: unexpected PostgreSQL clients during QA pause');
 }
 function validateHost() {
   assert.equal(process.platform, 'win32', 'STOP: Windows host required');
