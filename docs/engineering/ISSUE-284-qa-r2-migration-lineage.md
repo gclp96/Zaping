@@ -103,7 +103,7 @@ Compose por inferencia de nombres.
 Desde la raíz de la rama de este PR, con los tres controles de rehearsal ya realizados:
 
 ```powershell
-node --test scripts/qa/*.test.cjs
+node --test scripts/qa/audit-zaping-files-r2-history.test.cjs scripts/qa/rehearse-issue284-official-data.test.cjs
 node scripts/qa/rehearse-issue284-official-data.cjs
 ```
 
