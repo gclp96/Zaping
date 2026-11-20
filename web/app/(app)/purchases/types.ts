@@ -156,7 +156,7 @@ export type Purchase = {
   paymentMethod?: string | null;
   paymentDueDate?: string | null;
   expectedDeliveryDate?: string | null;
-  buyerName?: string | null;
+  createdByDisplayName?: string | null;
   receiptProgress: PurchaseReceiptProgress;
 
   supplier: {
@@ -212,7 +212,6 @@ export type PurchaseCommercialForm = {
   paymentMethod: string;
   paymentDueDate: string;
   expectedDeliveryDate: string;
-  buyerName: string;
 };
 
 export type PurchaseCommercialFormField = keyof PurchaseCommercialForm;
