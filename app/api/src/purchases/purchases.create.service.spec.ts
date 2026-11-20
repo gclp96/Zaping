@@ -299,6 +299,12 @@ describe('Purchase creation authorization contract', () => {
       { user: { companyId: 'company-a' } } as AuthenticatedRequest,
       dto,
     );
-    expect(create).toHaveBeenCalledWith('company-a', dto, undefined, false);
+    expect(create).toHaveBeenCalledWith(
+      'company-a',
+      dto,
+      undefined,
+      false,
+      { companyId: 'company-a' },
+    );
   });
 });
