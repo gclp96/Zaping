@@ -1301,13 +1301,6 @@ async function loadPageData() {
       <PurchaseFormModal
         isOpen={openModal}
         editing={purchaseToEdit !== null}
-        preparedByName={
-          purchaseToEdit
-            ? purchaseToEdit.createdByDisplayName
-            : sessionState.status === 'success'
-              ? [sessionState.user.firstName, sessionState.user.lastName].filter(Boolean).join(' ')
-              : null
-        }
         saving={saving}
         hasUnsavedChanges={hasUnsavedChanges}
         suppliers={suppliers}
@@ -1381,14 +1374,17 @@ async function loadPageData() {
           message={
             <div className="space-y-3">
               <p>
-                ¿Seguro que deseas aprobar la compra{' '}
-                <span className="font-semibold">
-                  {purchaseToApprove?.folio}
-                </span>
-                ? La compra quedará confirmada y podrá
-                recibir mercancía. El inventario no
+                Revisa el proveedor y el importe antes de aprobar la compra{' '}
+                <span className="font-semibold">{purchaseToApprove?.folio}</span>.
+                Una vez confirmada, podrá recibir mercancía. El inventario no
                 cambiará hasta registrar una recepción.
               </p>
+              {purchaseToApprove ? (
+                <div role="group" aria-label="Resumen de aprobación" className="rounded-lg border border-border bg-surface-subtle p-3 text-sm">
+                  <p><span className="font-semibold">Proveedor:</span> {purchaseToApprove.supplier.name}</p>
+                  <p><span className="font-semibold">Importe total:</span> {formatMoney(purchaseToApprove.total)}</p>
+                </div>
+              ) : null}
               {actionError ? (
                 <p role="alert" className="text-sm text-red-700">
                   {actionError}
