@@ -140,50 +140,55 @@ describe('purchase order PDF', () => {
     }) as unknown as Response;
 
     try {
-      renderPurchaseOrderPdf({
-        ...base,
-        commercialSnapshot: {
-          version: 1,
-          issuer: {
-            legalName: base.company.name,
-            tradeName: base.company.tradeName,
-            rfc: base.company.rfc,
-            fiscalAddress: base.company.fiscalAddress,
-            placeOfIssue: base.company.placeOfIssue,
-            timezone: base.company.timezone,
-            currency: base.company.currency,
+      renderPurchaseOrderPdf(
+        {
+          ...base,
+          commercialSnapshot: {
+            version: 1,
+            issuer: {
+              legalName: base.company.name,
+              tradeName: base.company.tradeName,
+              rfc: base.company.rfc,
+              fiscalAddress: base.company.fiscalAddress,
+              placeOfIssue: base.company.placeOfIssue,
+              timezone: base.company.timezone,
+              currency: base.company.currency,
+            },
+            supplier: {
+              name: base.supplier.name,
+              legalName: base.supplier.legalName,
+              rfc: base.supplier.rfc,
+              fiscalAddress: base.supplier.fiscalAddress,
+              code: base.supplier.supplierCode,
+            },
+            terms: {
+              paymentTerms: base.paymentTerms,
+              paymentMethod: base.paymentMethod,
+              paymentDueDate: '2026-12-17',
+              expectedDeliveryDate: '2026-11-17',
+            },
+            preparedBy: {
+              userId: 'actor-1',
+              displayName: 'Ana Compras',
+            },
+            items: base.items.map((item) => ({
+              productId: item.productId,
+              sku: item.product.sku,
+              name: item.product.name,
+              quantity: item.quantity,
+              unitCost: item.price,
+              subtotal: item.subtotal,
+            })),
           },
-          supplier: {
-            name: base.supplier.name,
-            legalName: base.supplier.legalName,
-            rfc: base.supplier.rfc,
-            fiscalAddress: base.supplier.fiscalAddress,
-            code: base.supplier.supplierCode,
-          },
-          terms: {
-            paymentTerms: base.paymentTerms,
-            paymentMethod: base.paymentMethod,
-            paymentDueDate: '2026-12-17',
-            expectedDeliveryDate: '2026-11-17',
-          },
-          preparedBy: {
-            userId: 'actor-1',
-            displayName: 'Ana Compras',
-          },
-          items: base.items.map((item) => ({
-            productId: item.productId,
-            sku: item.product.sku,
-            name: item.product.name,
-            quantity: item.quantity,
-            unitCost: item.price,
-            subtotal: item.subtotal,
-          })),
         },
-      }, response);
+        response,
+      );
       await done;
       const displayed = written.mock.calls.map(([value]) => String(value));
       expect(displayed).toContain('Elaboró: Ana Compras');
-      expect(displayed.some((value) => value.startsWith('Comprador:'))).toBe(false);
+      expect(displayed.some((value) => value.startsWith('Comprador:'))).toBe(
+        false,
+      );
     } finally {
       written.mockRestore();
     }
