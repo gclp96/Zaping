@@ -16,7 +16,6 @@ const emptyCommercial: PurchaseCommercialForm = {
   paymentMethod: '',
   paymentDueDate: '',
   expectedDeliveryDate: '',
-  buyerName: '',
 };
 
 function fromPurchase(purchase: Purchase): PurchaseCommercialForm {
@@ -25,7 +24,6 @@ function fromPurchase(purchase: Purchase): PurchaseCommercialForm {
     paymentMethod: purchase.paymentMethod ?? '',
     paymentDueDate: purchase.paymentDueDate?.slice(0, 10) ?? '',
     expectedDeliveryDate: purchase.expectedDeliveryDate?.slice(0, 10) ?? '',
-    buyerName: purchase.buyerName ?? '',
   };
 }
 

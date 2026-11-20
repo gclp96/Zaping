@@ -99,7 +99,7 @@ export default function SupplierSearchCombobox({
             : 'border-gray-300 focus:border-blue-500 focus:ring-blue-100',
           unavailable ? 'cursor-not-allowed bg-gray-100' : '',
         ].join(' ')}
-        onFocus={beginSearch}
+        onClick={beginSearch}
         onBlur={() => setOpen(false)}
         onChange={(event) => {
           setQuery(event.target.value);

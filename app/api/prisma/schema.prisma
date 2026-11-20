@@ -414,6 +414,7 @@ model Purchase {
   supplierId String
 
   supplier Supplier @relation(fields: [supplierId], references: [id])
+  createdByUser User? @relation("PurchaseCreatedBy", fields: [createdByUserId], references: [id])
 
   subtotal Float
   iva      Float
@@ -423,7 +424,9 @@ model Purchase {
   paymentMethod        String?
   paymentDueDate       DateTime? @db.Date
   expectedDeliveryDate DateTime? @db.Date
-  buyerName            String?
+  buyerName            String? // Legacy: kept for backwards compatibility, never used for attribution.
+  createdByUserId       String?
+  createdByDisplayName  String?
   commercialSnapshot   Json?
 
   status    PurchaseStatus @default(DRAFT)
@@ -441,6 +444,7 @@ model Purchase {
   @@unique([companyId, folio])
   @@index([companyId])
   @@index([supplierId])
+  @@index([createdByUserId])
   @@index([status])
 }
 
@@ -709,6 +713,7 @@ model User {
 
   company Company @relation(fields: [companyId], references: [id])
 
+  createdPurchases Purchase[] @relation("PurchaseCreatedBy")
   receivedPurchaseReceipts PurchaseReceipt[] @relation("PurchaseReceiptReceivedBy")
   supplierAttachmentUploaders SupplierDocumentAttachment[] @relation("SupplierAttachmentUploadedBy")
   supplierAttachmentRemovers SupplierDocumentAttachment[] @relation("SupplierAttachmentRemovedBy")
@@ -1382,6 +1387,7 @@ model Supplier {
 
   @@unique([id, companyId])
   @@unique([companyId, name])
+  @@unique([companyId, supplierCode])
   @@index([companyId])
 }
 

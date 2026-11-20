@@ -95,7 +95,6 @@ describe('purchase order PDF', () => {
           paymentMethod: null,
           paymentDueDate: null,
           expectedDeliveryDate: null,
-          buyerName: null,
         },
         response,
       );
@@ -110,7 +109,7 @@ describe('purchase order PDF', () => {
       expect(displayed).toContain('Método de pago: No aplica');
       expect(displayed).toContain('Fecha de pago: No aplica');
       expect(displayed).toContain('Entrega comprometida: No aplica');
-      expect(displayed).toContain('Comprador: No aplica');
+      expect(displayed).toContain('Elaboró: No registrado');
       expect(displayed).toContain('Documento generado por Zaping ERP');
       expect(displayed).not.toContain('ZAPING');
       expect(displayed.some((value) => value.startsWith('Estado:'))).toBe(
@@ -123,6 +122,73 @@ describe('purchase order PDF', () => {
       const termsTitleIndex = displayed.indexOf('CONDICIONES COMERCIALES');
       expect(issuePlaceIndex).toBeGreaterThanOrEqual(0);
       expect(issuePlaceIndex).toBeLessThan(termsTitleIndex);
+    } finally {
+      written.mockRestore();
+    }
+  });
+
+  it('usa el nombre congelado del autor en el PDF confirmado', async () => {
+    const written = jest.spyOn(PDFDocument.prototype, 'text');
+    const stream = new PassThrough();
+    stream.resume();
+    const done = new Promise<void>((resolve, reject) => {
+      stream.on('end', resolve);
+      stream.on('error', reject);
+    });
+    const response = Object.assign(stream, {
+      setHeader: jest.fn(),
+    }) as unknown as Response;
+
+    try {
+      renderPurchaseOrderPdf(
+        {
+          ...base,
+          commercialSnapshot: {
+            version: 1,
+            issuer: {
+              legalName: base.company.name,
+              tradeName: base.company.tradeName,
+              rfc: base.company.rfc,
+              fiscalAddress: base.company.fiscalAddress,
+              placeOfIssue: base.company.placeOfIssue,
+              timezone: base.company.timezone,
+              currency: base.company.currency,
+            },
+            supplier: {
+              name: base.supplier.name,
+              legalName: base.supplier.legalName,
+              rfc: base.supplier.rfc,
+              fiscalAddress: base.supplier.fiscalAddress,
+              code: base.supplier.supplierCode,
+            },
+            terms: {
+              paymentTerms: base.paymentTerms,
+              paymentMethod: base.paymentMethod,
+              paymentDueDate: '2026-12-17',
+              expectedDeliveryDate: '2026-11-17',
+            },
+            preparedBy: {
+              userId: 'actor-1',
+              displayName: 'Ana Compras',
+            },
+            items: base.items.map((item) => ({
+              productId: item.productId,
+              sku: item.product.sku,
+              name: item.product.name,
+              quantity: item.quantity,
+              unitCost: item.price,
+              subtotal: item.subtotal,
+            })),
+          },
+        },
+        response,
+      );
+      await done;
+      const displayed = written.mock.calls.map(([value]) => String(value));
+      expect(displayed).toContain('Elaboró: Ana Compras');
+      expect(displayed.some((value) => value.startsWith('Comprador:'))).toBe(
+        false,
+      );
     } finally {
       written.mockRestore();
     }

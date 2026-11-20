@@ -39,6 +39,7 @@ export class PurchasesService {
     dto: CreatePurchaseDto,
     actorRole?: UserRole,
     actorCanAdjustPurchaseUnitCost = false,
+    author?: { id: string; firstName: string; lastName: string },
   ) {
     return this.prisma.$transaction(async (tx) => {
       const productIds = dto.items.map((item) => item.productId);
@@ -147,6 +148,14 @@ export class PurchasesService {
           subtotal,
           iva,
           total,
+          ...(author && {
+            createdByUserId: author.id,
+            createdByDisplayName:
+              [author.firstName, author.lastName]
+                .filter(Boolean)
+                .join(' ')
+                .trim() || 'Usuario sin nombre',
+          }),
           ...(dto.paymentTerms !== undefined && {
             paymentTerms: dto.paymentTerms,
           }),
@@ -160,9 +169,6 @@ export class PurchasesService {
             expectedDeliveryDate: parsePurchaseCalendarDate(
               dto.expectedDeliveryDate,
             ),
-          }),
-          ...(dto.buyerName !== undefined && {
-            buyerName: dto.buyerName,
           }),
           items: {
             create: purchaseItems,
@@ -473,9 +479,6 @@ export class PurchasesService {
             expectedDeliveryDate: parsePurchaseCalendarDate(
               dto.expectedDeliveryDate,
             ),
-          }),
-          ...(dto.buyerName !== undefined && {
-            buyerName: dto.buyerName,
           }),
         },
       });

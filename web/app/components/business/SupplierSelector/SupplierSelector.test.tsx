@@ -143,6 +143,24 @@ describe('SupplierSelector', () => {
     ).toBe('Selecciona un proveedor');
   });
 
+  it('no abre la lista al enfocar automáticamente al editar, pero sí al hacer clic', () => {
+    render(
+      <SupplierSelector
+        options={suppliers}
+        value="supplier-1"
+        searchable
+        onChange={() => undefined}
+      />,
+    );
+    const input = screen.getByRole('combobox', { name: 'Proveedor' });
+    fireEvent.focus(input);
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('listbox')).toBeNull();
+    fireEvent.click(input);
+    expect(input.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('listbox')).toBeTruthy();
+  });
+
   it('permite buscar por nombre y correo en modo opt-in', () => {
     const onChange = vi.fn();
     render(<SupplierSelector options={suppliers} value="" searchable onChange={onChange} />);

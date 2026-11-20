@@ -282,10 +282,11 @@ export default function SuppliersPage() {
         (editingSupplier?.fiscalAddress ?? null) && {
         fiscalAddress: normalizeOptionalValue(fiscalAddress) ?? null,
       }),
-      ...((normalizeOptionalValue(supplierCode) ?? null) !==
-        (editingSupplier?.supplierCode ?? null) && {
-        supplierCode: normalizeOptionalValue(supplierCode) ?? null,
-      }),
+      ...(editingSupplier &&
+        normalizeOptionalValue(supplierCode) !==
+          (editingSupplier.supplierCode ?? undefined) && {
+          supplierCode: normalizeOptionalValue(supplierCode) ?? null,
+        }),
       email: normalizeOptionalValue(email),
       phone: normalizeOptionalValue(phone),
       address: normalizeOptionalValue(address),
@@ -581,8 +582,15 @@ export default function SuppliersPage() {
             />
             <Input
               label="Código de proveedor"
-              value={supplierCode}
-              disabled={saving}
+              value={editingSupplier ? supplierCode : 'Automático al registrar'}
+              disabled={saving || !editingSupplier}
+              inputMode="numeric"
+              maxLength={12}
+              helperText={
+                editingSupplier
+                  ? 'Para reemplazar un código anterior, escribe una clave de 4 a 12 dígitos.'
+                  : 'Consecutivo por empresa: 0001, 0002, 0003...'
+              }
               onChange={(event) => setSupplierCode(event.target.value)}
             />
             <Input

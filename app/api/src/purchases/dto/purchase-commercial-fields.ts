@@ -23,9 +23,4 @@ export class PurchaseCommercialFields {
     message: 'La fecha de entrega debe tener formato AAAA-MM-DD',
   })
   expectedDeliveryDate?: string | null;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(150)
-  buyerName?: string | null;
 }

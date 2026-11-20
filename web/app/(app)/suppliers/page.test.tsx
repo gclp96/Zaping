@@ -447,7 +447,9 @@ describe('SuppliersPage', () => {
     await user.type(screen.getByRole('textbox', { name: 'Razón social' }), 'Proveedor Fiscal S.A.');
     await user.type(screen.getByRole('textbox', { name: 'RFC' }), 'HME091016DQ8');
     await user.type(screen.getByRole('textbox', { name: 'Domicilio fiscal completo' }), 'Calle Fiscal 100, México, C.P. 64850');
-    await user.type(screen.getByRole('textbox', { name: 'Código de proveedor' }), '177');
+    const code = screen.getByRole('textbox', { name: 'Código de proveedor' }) as HTMLInputElement;
+    expect(code.disabled).toBe(true);
+    expect(code.value).toBe('Automático al registrar');
     await user.click(screen.getByRole('button', { name: 'Registrar proveedor' }));
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith(
@@ -457,7 +459,6 @@ describe('SuppliersPage', () => {
           legalName: 'Proveedor Fiscal S.A.',
           rfc: 'HME091016DQ8',
           fiscalAddress: 'Calle Fiscal 100, México, C.P. 64850',
-          supplierCode: '177',
         }),
       );
     });

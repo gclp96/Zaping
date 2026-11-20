@@ -101,7 +101,6 @@ function renderModal(
       paymentMethod: '',
       paymentDueDate: '',
       expectedDeliveryDate: '',
-      buyerName: '',
     },
     selectedProductId: '',
     quantity: '1',
@@ -145,15 +144,26 @@ describe('PurchaseFormModal', () => {
         paymentMethod: 'Transferencia electrónica',
         paymentDueDate: '2026-12-17',
         expectedDeliveryDate: '2026-11-17',
-        buyerName: 'Responsable de Compras',
       },
     });
     const terms = screen.getByRole('heading', { name: 'Condiciones comerciales' });
     expect(terms).toBeTruthy();
-    const paymentTerms = screen.getByRole('textbox', { name: 'Condiciones de pago' });
+    const paymentTerms = screen.getByRole('combobox', { name: 'Condiciones de pago' });
     fireEvent.change(paymentTerms, { target: { value: 'Contado' } });
     expect(onCommercialChange).toHaveBeenCalledWith('paymentTerms', 'Contado');
     expect((screen.getByLabelText('Fecha de pago') as HTMLInputElement).value).toBe('2026-12-17');
+  });
+
+  it('muestra catálogos No aplica y autor automático, sin comprador editable', () => {
+    renderModal({ preparedByName: 'Ana Compras' });
+    const payment = screen.getByRole('combobox', { name: 'Condiciones de pago' }) as HTMLSelectElement;
+    const method = screen.getByRole('combobox', { name: 'Método de pago' }) as HTMLSelectElement;
+    expect(payment.value).toBe('');
+    expect(method.value).toBe('');
+    expect(payment.options[0].textContent).toBe('No aplica');
+    expect(method.options[0].textContent).toBe('No aplica');
+    expect(screen.getByText('Ana Compras')).toBeTruthy();
+    expect(screen.queryByRole('textbox', { name: 'Comprador' })).toBeNull();
   });
 
   it('habilita el workspace únicamente para Nueva compra y reubica el footer fuera del scroll', () => {

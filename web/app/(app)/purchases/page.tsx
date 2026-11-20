@@ -1031,7 +1031,7 @@ async function loadPageData() {
       header: 'Acciones',
       align: 'center',
       priority: 'primary',
-      minWidth: 180,
+      minWidth: 208,
       cell: (purchase) => {
         const rowActions: DataTableRowAction<Purchase>[] = [
           ...(canEdit && canApprove && purchase.status === 'DRAFT'
@@ -1074,7 +1074,7 @@ async function loadPageData() {
         ];
 
         return (
-          <div className="relative flex flex-wrap items-center justify-center gap-2">
+          <div className="relative flex flex-wrap items-center justify-center gap-4">
             {purchase.status === 'DRAFT' && canApprove ? (
               <Button
                 variant="success"
@@ -1121,7 +1121,7 @@ async function loadPageData() {
               </span>
             ) : null}
 
-            <div className="inline-flex [&>div>button]:border-transparent [&>div>button]:bg-transparent [&>div>button]:hover:bg-surface-subtle">
+            <div className="ml-1 inline-flex border-l border-border pl-3 [&>div>button]:border-transparent [&>div>button]:bg-transparent [&>div>button]:hover:bg-surface-subtle">
               <RowActionsMenu
                 row={purchase}
                 label={`Acciones de compra ${purchase.folio}`}
@@ -1301,6 +1301,13 @@ async function loadPageData() {
       <PurchaseFormModal
         isOpen={openModal}
         editing={purchaseToEdit !== null}
+        preparedByName={
+          purchaseToEdit
+            ? purchaseToEdit.createdByDisplayName
+            : sessionState.status === 'success'
+              ? [sessionState.user.firstName, sessionState.user.lastName].filter(Boolean).join(' ')
+              : null
+        }
         saving={saving}
         hasUnsavedChanges={hasUnsavedChanges}
         suppliers={suppliers}

@@ -7,6 +7,7 @@ import SupplierSelector from '@/app/components/business/SupplierSelector';
 import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import Input from '@/app/components/ui/Input';
+import Select from '@/app/components/ui/Select';
 import Modal from '@/app/components/ui/Modal';
 
 import type {
@@ -17,9 +18,39 @@ import type {
   Supplier,
 } from '../types';
 
+const paymentTermOptions = [
+  { value: 'Contado', label: 'Contado' },
+  { value: 'Crédito a 8 días', label: 'Crédito a 8 días' },
+  { value: 'Crédito a 15 días', label: 'Crédito a 15 días' },
+  { value: 'Crédito a 30 días', label: 'Crédito a 30 días' },
+  { value: 'Crédito a 45 días', label: 'Crédito a 45 días' },
+  { value: 'Crédito a 60 días', label: 'Crédito a 60 días' },
+  { value: 'Anticipo', label: 'Anticipo' },
+  { value: 'Anticipo + contraentrega', label: 'Anticipo + contraentrega' },
+];
+
+const paymentMethodOptions = [
+  { value: 'Transferencia electrónica', label: 'Transferencia electrónica' },
+  { value: 'Depósito bancario', label: 'Depósito bancario' },
+  { value: 'Cheque', label: 'Cheque' },
+  { value: 'Efectivo', label: 'Efectivo' },
+  { value: 'Tarjeta', label: 'Tarjeta' },
+  { value: 'Crédito interno', label: 'Crédito interno' },
+];
+
+function withLegacyOption(
+  options: { value: string; label: string }[],
+  value: string,
+) {
+  return value && !options.some((option) => option.value === value)
+    ? [...options, { value, label: value }]
+    : options;
+}
+
 type PurchaseFormModalProps = {
   isOpen: boolean;
   editing: boolean;
+  preparedByName?: string | null;
   saving: boolean;
   hasUnsavedChanges: boolean;
 
@@ -77,6 +108,7 @@ function getItemSubtotal(item: PurchaseFormItem): number {
 export default function PurchaseFormModal({
   isOpen,
   editing,
+  preparedByName,
   saving,
   hasUnsavedChanges,
   suppliers,
@@ -246,17 +278,19 @@ export default function PurchaseFormModal({
             Condiciones comerciales
           </h3>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Input
+            <Select
               label="Condiciones de pago"
-              placeholder="Ej. Crédito a 30 días"
+              placeholder="No aplica"
               value={commercial.paymentTerms}
+              options={withLegacyOption(paymentTermOptions, commercial.paymentTerms)}
               disabled={saving}
               onChange={(event) => onCommercialChange('paymentTerms', event.target.value)}
             />
-            <Input
+            <Select
               label="Método de pago"
-              placeholder="Ej. Transferencia electrónica"
+              placeholder="No aplica"
               value={commercial.paymentMethod}
+              options={withLegacyOption(paymentMethodOptions, commercial.paymentMethod)}
               disabled={saving}
               onChange={(event) => onCommercialChange('paymentMethod', event.target.value)}
             />
@@ -274,13 +308,14 @@ export default function PurchaseFormModal({
               disabled={saving}
               onChange={(event) => onCommercialChange('expectedDeliveryDate', event.target.value)}
             />
-            <Input
-              label="Comprador"
-              placeholder="Responsable de la compra"
-              value={commercial.buyerName}
-              disabled={saving}
-              onChange={(event) => onCommercialChange('buyerName', event.target.value)}
-            />
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-gray-700">Elaboró</span>
+              <p className="min-h-12 rounded-lg border border-border bg-surface-subtle px-3 py-3 text-sm text-gray-700">
+                {preparedByName || (editing
+                  ? 'No registrado en esta orden anterior'
+                  : 'Se registrará el usuario que cree la orden')}
+              </p>
+            </div>
           </div>
         </section>
 
