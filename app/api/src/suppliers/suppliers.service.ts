@@ -104,9 +104,14 @@ export class SuppliersService {
 
   async update(companyId: string, supplierId: string, dto: UpdateSupplierDto) {
     const supplier = await this.findOne(companyId, supplierId);
-    if (dto.supplierCode !== undefined && dto.supplierCode !== supplier.supplierCode) {
-      if (!/^\\d{4,12}$/.test(dto.supplierCode)) {
-        throw new BadRequestException('El código debe contener entre 4 y 12 dígitos');
+    if (
+      dto.supplierCode !== undefined &&
+      dto.supplierCode !== supplier.supplierCode
+    ) {
+      if (!/^\d{4,12}$/.test(dto.supplierCode)) {
+        throw new BadRequestException(
+          'El código debe contener entre 4 y 12 dígitos',
+        );
       }
       const assigned = await this.prisma.supplier.findFirst({
         where: {
@@ -116,7 +121,11 @@ export class SuppliersService {
         },
         select: { id: true },
       });
-      if (assigned) throw new ConflictException('El código ya está asignado a otro proveedor');
+      if (assigned) {
+        throw new ConflictException(
+          'El código ya está asignado a otro proveedor',
+        );
+      }
     }
 
     const data = {
