@@ -154,16 +154,31 @@ describe('PurchaseFormModal', () => {
     expect((screen.getByLabelText('Fecha de pago') as HTMLInputElement).value).toBe('2026-12-17');
   });
 
-  it('muestra catálogos No aplica y autor automático, sin comprador editable', () => {
-    renderModal({ preparedByName: 'Ana Compras' });
+  it('muestra catálogos No aplica sin campos editables de autor', () => {
+    renderModal();
     const payment = screen.getByRole('combobox', { name: 'Condiciones de pago' }) as HTMLSelectElement;
     const method = screen.getByRole('combobox', { name: 'Método de pago' }) as HTMLSelectElement;
     expect(payment.value).toBe('');
     expect(method.value).toBe('');
     expect(payment.options[0].textContent).toBe('No aplica');
     expect(method.options[0].textContent).toBe('No aplica');
-    expect(screen.getByText('Ana Compras')).toBeTruthy();
+    expect(screen.queryByText('Ana Compras')).toBeNull();
+    expect(screen.queryByText('Elaboró')).toBeNull();
     expect(screen.queryByRole('textbox', { name: 'Comprador' })).toBeNull();
+  });
+
+  it('al editar muestra el proveedor actual y deja libre el campo de búsqueda', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const onSupplierChange = vi.fn();
+    renderModal({ editing: true, onSupplierChange });
+    const input = screen.getByRole('combobox', { name: 'Proveedor' }) as HTMLInputElement;
+    expect(input.value).toBe('');
+    expect(input.placeholder).toBe('Buscar para cambiar proveedor');
+    expect(screen.getByText('Proveedor actual')).toBeTruthy();
+    expect(screen.getAllByText('Proveedor médico').length).toBeGreaterThan(0);
+    fireEvent.focus(input);
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+    expect(onSupplierChange).not.toHaveBeenCalled();
   });
 
   it('habilita el workspace únicamente para Nueva compra y reubica el footer fuera del scroll', () => {
