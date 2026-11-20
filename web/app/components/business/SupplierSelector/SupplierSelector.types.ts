@@ -18,4 +18,5 @@ export interface SupplierSelectorProps {
     error?: string;
     helperText?: string;
     searchable?: boolean;
+    showSelectedSeparately?: boolean;
 }
