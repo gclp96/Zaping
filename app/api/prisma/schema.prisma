@@ -1387,6 +1387,7 @@ model Supplier {
 
   @@unique([id, companyId])
   @@unique([companyId, name])
+  @@unique([companyId, supplierCode])
   @@index([companyId])
 }
 
