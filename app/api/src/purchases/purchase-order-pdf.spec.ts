@@ -95,7 +95,6 @@ describe('purchase order PDF', () => {
           paymentMethod: null,
           paymentDueDate: null,
           expectedDeliveryDate: null,
-          buyerName: null,
         },
         response,
       );
