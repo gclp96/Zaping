@@ -139,7 +139,6 @@ describe('usePurchaseForm', () => {
       result.current.handleCommercialChange('paymentMethod', 'Transferencia electrónica');
       result.current.handleCommercialChange('paymentDueDate', '2026-12-17');
       result.current.handleCommercialChange('expectedDeliveryDate', '2026-11-17');
-      result.current.handleCommercialChange('buyerName', 'Comprador QA');
     });
     act(() => result.current.handleAddProduct());
 
@@ -155,7 +154,6 @@ describe('usePurchaseForm', () => {
         paymentMethod: 'Transferencia electrónica',
         paymentDueDate: '2026-12-17',
         expectedDeliveryDate: '2026-11-17',
-        buyerName: 'Comprador QA',
       }),
     );
   });
