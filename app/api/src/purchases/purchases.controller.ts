@@ -36,6 +36,7 @@ export class PurchasesController {
       dto,
       req.user.role,
       req.user.canAdjustPurchaseUnitCost === true,
+      req.user,
     );
   }
 
