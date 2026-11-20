@@ -151,8 +151,10 @@ export class PurchasesService {
           ...(author && {
             createdByUserId: author.id,
             createdByDisplayName:
-              [author.firstName, author.lastName].filter(Boolean).join(' ').trim() ||
-              'Usuario sin nombre',
+              [author.firstName, author.lastName]
+                .filter(Boolean)
+                .join(' ')
+                .trim() || 'Usuario sin nombre',
           }),
           ...(dto.paymentTerms !== undefined && {
             paymentTerms: dto.paymentTerms,
