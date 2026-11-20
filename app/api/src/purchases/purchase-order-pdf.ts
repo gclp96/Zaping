@@ -201,7 +201,7 @@ export function renderPurchaseOrderPdf(
     `Método de pago: ${clean(terms.paymentMethod) || 'No aplica'}`,
     `Fecha de pago: ${formatPurchaseCalendarDate(terms.paymentDueDate) || 'No aplica'}`,
     `Entrega comprometida: ${formatPurchaseCalendarDate(terms.expectedDeliveryDate) || 'No aplica'}`,
-    `Comprador: ${clean(terms.buyerName) || 'No aplica'}`,
+    `Elaboró: ${clean(snapshot.preparedBy?.displayName) || 'No registrado'}`,
   ];
   let termsY = y;
   for (const value of termLines) {
