@@ -1148,6 +1148,19 @@ describe('PurchasesPage — normalización de lista', () => {
     },
   );
 
+  it('muestra el proveedor y total antes de autorizar una aprobación', async () => {
+    const user = userEvent.setup();
+    configureApiMocks([draftPurchase]);
+    render(<PurchasesPage />);
+
+    await screen.findByText(draftPurchase.folio);
+    await user.click(screen.getByRole('button', { name: 'Aprobar' }));
+    const summary = screen.getByRole('group', { name: 'Resumen de aprobación' });
+    expect(within(summary).getByText(/Proveedor médico/)).toBeTruthy();
+    expect(within(summary).getByText(/\$1,160\.00/)).toBeTruthy();
+    expect(api.patch).not.toHaveBeenCalled();
+  });
+
   it('muestra un error estructurado cuando falla el PDF', async () => {
     const user = userEvent.setup();
     const defaultGet = vi.mocked(api.get).getMockImplementation();
