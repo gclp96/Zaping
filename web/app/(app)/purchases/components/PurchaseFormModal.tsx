@@ -50,7 +50,6 @@ function withLegacyOption(
 type PurchaseFormModalProps = {
   isOpen: boolean;
   editing: boolean;
-  preparedByName?: string | null;
   saving: boolean;
   hasUnsavedChanges: boolean;
 
@@ -108,7 +107,6 @@ function getItemSubtotal(item: PurchaseFormItem): number {
 export default function PurchaseFormModal({
   isOpen,
   editing,
-  preparedByName,
   saving,
   hasUnsavedChanges,
   suppliers,
@@ -261,6 +259,7 @@ export default function PurchaseFormModal({
             value={supplierId}
             onChange={onSupplierChange}
             searchable={workspaceEnabled}
+            showSelectedSeparately={workspaceEnabled && editing}
             required
             error={supplierError}
             helperText="Proveedor que surtirá la orden de compra."
@@ -308,14 +307,6 @@ export default function PurchaseFormModal({
               disabled={saving}
               onChange={(event) => onCommercialChange('expectedDeliveryDate', event.target.value)}
             />
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-gray-700">Elaboró</span>
-              <p className="min-h-12 rounded-lg border border-border bg-surface-subtle px-3 py-3 text-sm text-gray-700">
-                {preparedByName || (editing
-                  ? 'No registrado en esta orden anterior'
-                  : 'Se registrará el usuario que cree la orden')}
-              </p>
-            </div>
           </div>
         </section>
 
