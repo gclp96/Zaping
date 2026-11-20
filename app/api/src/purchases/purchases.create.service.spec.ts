@@ -77,20 +77,20 @@ describe('PurchasesService — annual folio creation', () => {
     );
   });
   it('records the authenticated author at creation, not an editable buyer field', async () => {
-    await service.create(
-      'company-a',
-      dto,
-      UserRole.ADMIN,
-      false,
-      {
-        id: 'user-1',
-        firstName: 'Ana',
-        lastName: 'Compras',
-      },
-    );
+    await service.create('company-a', dto, UserRole.ADMIN, false, {
+      id: 'user-1',
+      firstName: 'Ana',
+      lastName: 'Compras',
+    });
 
     const [args] = tx.purchase.create.mock.calls[0] as [
-      { data: { createdByUserId?: string; createdByDisplayName?: string; buyerName?: string } },
+      {
+        data: {
+          createdByUserId?: string;
+          createdByDisplayName?: string;
+          buyerName?: string;
+        };
+      },
     ];
     expect(args.data.createdByUserId).toBe('user-1');
     expect(args.data.createdByDisplayName).toBe('Ana Compras');
@@ -299,12 +299,8 @@ describe('Purchase creation authorization contract', () => {
       { user: { companyId: 'company-a' } } as AuthenticatedRequest,
       dto,
     );
-    expect(create).toHaveBeenCalledWith(
-      'company-a',
-      dto,
-      undefined,
-      false,
-      { companyId: 'company-a' },
-    );
+    expect(create).toHaveBeenCalledWith('company-a', dto, undefined, false, {
+      companyId: 'company-a',
+    });
   });
 });
