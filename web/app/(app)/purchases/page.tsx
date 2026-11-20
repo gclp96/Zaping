@@ -1301,6 +1301,13 @@ async function loadPageData() {
       <PurchaseFormModal
         isOpen={openModal}
         editing={purchaseToEdit !== null}
+        preparedByName={
+          purchaseToEdit
+            ? purchaseToEdit.createdByDisplayName
+            : sessionState.status === 'success'
+              ? [sessionState.user.firstName, sessionState.user.lastName].filter(Boolean).join(' ')
+              : null
+        }
         saving={saving}
         hasUnsavedChanges={hasUnsavedChanges}
         suppliers={suppliers}
