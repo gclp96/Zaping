@@ -70,7 +70,8 @@ export type PurchaseCommercialSource = {
   paymentMethod?: string | null;
   paymentDueDate?: Date | null;
   expectedDeliveryDate?: Date | null;
-  buyerName?: string | null;
+  createdByUserId?: string | null;
+  createdByDisplayName?: string | null;
   items: Array<{
     productId: string;
     product: { name: string; sku: string; unitOfMeasure?: string | null };
@@ -105,8 +106,12 @@ export type PurchaseCommercialSnapshotV1 = {
     paymentMethod: string | null;
     paymentDueDate: string | null;
     expectedDeliveryDate: string | null;
-    buyerName: string | null;
   };
+  // Optional because documents confirmed before UX-007G lack an author record.
+  preparedBy?: {
+    userId: string | null;
+    displayName: string | null;
+  } | null;
   items: Array<{
     productId: string;
     sku: string;
@@ -149,8 +154,13 @@ export function buildPurchaseCommercialSnapshot(
         purchase.paymentDueDate?.toISOString().slice(0, 10) ?? null,
       expectedDeliveryDate:
         purchase.expectedDeliveryDate?.toISOString().slice(0, 10) ?? null,
-      buyerName: purchase.buyerName ?? null,
     },
+    preparedBy: purchase.createdByUserId
+      ? {
+          userId: purchase.createdByUserId,
+          displayName: purchase.createdByDisplayName?.trim() || null,
+        }
+      : null,
     items: purchase.items.map((item) => ({
       productId: item.productId,
       sku: item.product.sku,
