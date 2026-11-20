@@ -29,7 +29,8 @@ describe('purchase commercial snapshot', () => {
     paymentMethod: 'Transferencia electrónica',
     paymentDueDate: new Date('2026-12-17T00:00:00.000Z'),
     expectedDeliveryDate: new Date('2026-11-17T00:00:00.000Z'),
-    buyerName: 'Comprador',
+    createdByUserId: 'user-creator-1',
+    createdByDisplayName: 'Ana Compras',
     items: [
       {
         productId: 'product-1',
@@ -59,6 +60,10 @@ describe('purchase commercial snapshot', () => {
         paymentDueDate: '2026-12-17',
         expectedDeliveryDate: '2026-11-17',
       },
+      preparedBy: {
+        userId: 'user-creator-1',
+        displayName: 'Ana Compras',
+      },
       items: [
         {
           sku: 'INS-1',
@@ -70,9 +75,11 @@ describe('purchase commercial snapshot', () => {
         },
       ],
     });
+    purchase.createdByDisplayName = 'Nombre cambiado después';
     purchase.supplier.name = 'Nombre actualizado';
     purchase.items[0].product.name = 'Producto editado';
     purchase.items[0].product.unitOfMeasure = 'cajas';
+    expect(snapshot.preparedBy?.displayName).toBe('Ana Compras');
     expect(snapshot.supplier.name).toBe('Proveedor comercial');
     expect(snapshot.items[0].name).toBe('Instrumental');
     expect(snapshot.items[0].unitOfMeasure).toBe('pzas.');
