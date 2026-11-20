@@ -24,8 +24,4 @@ export class PurchaseCommercialFields {
   })
   expectedDeliveryDate?: string | null;
 
-  @IsOptional()
-  @IsString()
-  @MaxLength(150)
-  buyerName?: string | null;
 }
