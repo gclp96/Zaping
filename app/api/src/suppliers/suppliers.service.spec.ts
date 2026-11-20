@@ -54,8 +54,9 @@ describe('SuppliersService', () => {
           provide: PrismaService,
           useValue: {
             supplier,
-            $transaction: async (fn: (tx: { supplier: typeof supplier }) => Promise<unknown>) =>
-              fn({ supplier }),
+            $transaction: async (
+              fn: (tx: { supplier: typeof supplier }) => Promise<unknown>,
+            ) => fn({ supplier }),
           },
         },
         {
@@ -137,9 +138,7 @@ describe('SuppliersService', () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: 'existing-code' })
       .mockResolvedValueOnce(null);
-    sequence.allocateNext
-      .mockResolvedValueOnce(1)
-      .mockResolvedValueOnce(2);
+    sequence.allocateNext.mockResolvedValueOnce(1).mockResolvedValueOnce(2);
     supplier.create.mockResolvedValue({
       ...activeSupplier,
       supplierCode: '0002',
@@ -150,12 +149,11 @@ describe('SuppliersService', () => {
     });
 
     expect(sequence.allocateNext).toHaveBeenCalledTimes(2);
-    expect(supplier.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        companyId: 'company-1',
-        supplierCode: '0002',
-      }),
-    });
+    const [createArgs] = supplier.create.mock.calls[0] as [
+      { data: { companyId: string; supplierCode: string } },
+    ];
+    expect(createArgs.data.companyId).toBe('company-1');
+    expect(createArgs.data.supplierCode).toBe('0002');
   });
 
   it('does not allow a tenant to assign a supplier code already in use', async () => {
