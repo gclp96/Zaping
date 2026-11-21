@@ -201,7 +201,6 @@ export function renderPurchaseOrderPdf(
     `Método de pago: ${clean(terms.paymentMethod) || 'No aplica'}`,
     `Fecha de pago: ${formatPurchaseCalendarDate(terms.paymentDueDate) || 'No aplica'}`,
     `Entrega comprometida: ${formatPurchaseCalendarDate(terms.expectedDeliveryDate) || 'No aplica'}`,
-    `Elaboró: ${clean(snapshot.preparedBy?.displayName) || 'No registrado'}`,
   ];
   let termsY = y;
   for (const value of termLines) {
@@ -382,6 +381,25 @@ export function renderPurchaseOrderPdf(
     const bottom = textAt(words, left, y, width, 9, true);
     y = bottom + 8;
   }
+
+  // Authorship is document provenance, not a payment condition.
+  // It stays separate from totals and flows safely onto a new page.
+  ensureRoom(75);
+  y += 10;
+  line(y);
+  y += 12;
+  textAt('RESPONSABLE DE ELABORACIÓN', left, y, width, 8, true, MUTED);
+  y += 16;
+  y =
+    textAt(
+      clean(snapshot.preparedBy?.displayName) || 'No registrado',
+      left,
+      y,
+      width,
+      9,
+      true,
+      TEXT,
+    ) + 7;
 
   const pageRange = doc.bufferedPageRange();
   for (let index = 0; index < pageRange.count; index += 1) {

@@ -161,6 +161,38 @@ describe('SupplierSelector', () => {
     expect(screen.getByRole('listbox')).toBeTruthy();
   });
 
+  it('conserva el proveedor al editar con búsqueda vacía hasta elegir otro', () => {
+    const onChange = vi.fn();
+    render(
+      <SupplierSelector
+        options={suppliers}
+        value="supplier-1"
+        searchable
+        showSelectedSeparately
+        onChange={onChange}
+      />,
+    );
+    const input = screen.getByRole('combobox', { name: 'Proveedor' }) as HTMLInputElement;
+    expect(input.value).toBe('');
+    expect(input.placeholder).toBe('Buscar para cambiar proveedor');
+    expect(screen.getByText('Proveedor actual')).toBeTruthy();
+    expect(screen.getByText('Distribuidora Médica del Norte')).toBeTruthy();
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.focus(input);
+    expect(screen.queryByRole('listbox')).toBeNull();
+    fireEvent.click(input);
+    fireEvent.change(input, { target: { value: 'Suministros' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(input.value).toBe('');
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.click(input);
+    fireEvent.change(input, { target: { value: 'Suministros' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onChange).toHaveBeenCalledWith('supplier-2');
+  });
+
   it('permite buscar por nombre y correo en modo opt-in', () => {
     const onChange = vi.fn();
     render(<SupplierSelector options={suppliers} value="" searchable onChange={onChange} />);

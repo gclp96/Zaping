@@ -22,6 +22,7 @@ export default function SupplierSelector({
   error,
   helperText,
   searchable = false,
+  showSelectedSeparately = false,
 }: SupplierSelectorProps) {
   const selectOptions: SelectOption[] = options.map((supplier) => ({
     value: supplier.id,
@@ -67,6 +68,7 @@ export default function SupplierSelector({
         required={required}
         error={error}
         helperText={helperText}
+        showSelectedSeparately={showSelectedSeparately}
       />
     );
   }

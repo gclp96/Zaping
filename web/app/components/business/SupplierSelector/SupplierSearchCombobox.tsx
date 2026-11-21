@@ -23,6 +23,7 @@ export default function SupplierSearchCombobox({
   required = false,
   error,
   helperText,
+  showSelectedSeparately = false,
 }: SupplierSelectorProps) {
   const id = useId();
   const inputId = `${id}-input`;
@@ -67,6 +68,12 @@ export default function SupplierSearchCombobox({
         {required ? <span aria-hidden="true" className="ml-1 text-red-500">*</span> : null}
       </label>
       <input type="hidden" name={name} value={value} />
+      {showSelectedSeparately && selected ? (
+        <div className="rounded-lg border border-border bg-surface-subtle px-3 py-2">
+          <span className="block text-xs font-medium text-text-muted">Proveedor actual</span>
+          <span className="block text-sm font-medium text-text">{selected.name}</span>
+        </div>
+      ) : null}
       <div className="relative">
       <input
         ref={inputRef}
@@ -78,8 +85,10 @@ export default function SupplierSearchCombobox({
           ? 'Cargando proveedores...'
           : options.length === 0
             ? 'No hay proveedores disponibles'
-            : placeholder}
-        value={open ? query : (selected?.name ?? '')}
+            : showSelectedSeparately && selected
+              ? 'Buscar para cambiar proveedor'
+              : placeholder}
+        value={open ? query : (showSelectedSeparately ? '' : (selected?.name ?? ''))}
         disabled={unavailable}
         aria-required={required}
         aria-invalid={Boolean(error)}
