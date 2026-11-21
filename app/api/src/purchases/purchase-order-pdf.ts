@@ -390,15 +390,16 @@ export function renderPurchaseOrderPdf(
   y += 12;
   textAt('RESPONSABLE DE ELABORACIÓN', left, y, width, 8, true, MUTED);
   y += 16;
-  y = textAt(
-    clean(snapshot.preparedBy?.displayName) || 'No registrado',
-    left,
-    y,
-    width,
-    9,
-    true,
-    TEXT,
-  ) + 7;
+  y =
+    textAt(
+      clean(snapshot.preparedBy?.displayName) || 'No registrado',
+      left,
+      y,
+      width,
+      9,
+      true,
+      TEXT,
+    ) + 7;
 
   const pageRange = doc.bufferedPageRange();
   for (let index = 0; index < pageRange.count; index += 1) {

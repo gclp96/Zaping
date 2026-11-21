@@ -111,8 +111,12 @@ describe('purchase order PDF', () => {
       expect(displayed).toContain('Entrega comprometida: No aplica');
       expect(displayed).toContain('RESPONSABLE DE ELABORACIÓN');
       expect(displayed).toContain('No registrado');
-      expect(displayed.indexOf('RESPONSABLE DE ELABORACIÓN')).toBeGreaterThan(displayed.indexOf('TOTAL CON LETRA'));
-      expect(displayed.indexOf('RESPONSABLE DE ELABORACIÓN')).toBeGreaterThan(displayed.indexOf('CONDICIONES COMERCIALES'));
+      expect(displayed.indexOf('RESPONSABLE DE ELABORACIÓN')).toBeGreaterThan(
+        displayed.indexOf('TOTAL CON LETRA'),
+      );
+      expect(displayed.indexOf('RESPONSABLE DE ELABORACIÓN')).toBeGreaterThan(
+        displayed.indexOf('CONDICIONES COMERCIALES'),
+      );
       expect(displayed).toContain('Documento generado por Zaping ERP');
       expect(displayed).not.toContain('ZAPING');
       expect(displayed.some((value) => value.startsWith('Estado:'))).toBe(
@@ -190,7 +194,9 @@ describe('purchase order PDF', () => {
       const displayed = written.mock.calls.map(([value]) => String(value));
       expect(displayed).toContain('RESPONSABLE DE ELABORACIÓN');
       expect(displayed).toContain('Ana Compras');
-      expect(displayed.indexOf('RESPONSABLE DE ELABORACIÓN')).toBeGreaterThan(displayed.indexOf('TOTAL CON LETRA'));
+      expect(displayed.indexOf('RESPONSABLE DE ELABORACIÓN')).toBeGreaterThan(
+        displayed.indexOf('TOTAL CON LETRA'),
+      );
       expect(displayed.some((value) => value.startsWith('Comprador:'))).toBe(
         false,
       );
