@@ -410,12 +410,18 @@ describe('usePurchaseForm', () => {
     });
     act(() => result.current.handleAddProduct());
     act(() => result.current.handleItemUnitCostChange('product-1', '12.3456'));
+    expect(result.current.requiresCostAdjustmentReason).toBe(true);
+    await act(async () => { await result.current.handleCreatePurchase(); });
+    expect(api.post).not.toHaveBeenCalled();
+    expect(result.current.itemsError).toMatch(/motivo del ajuste/);
+    act(() => result.current.setCostAdjustmentReason('  Precio acordado con el proveedor  '));
     expect(result.current.items[0].unitCost).toBe(12.3456);
     expect(result.current.subtotal).toBe(24.69);
     expect(result.current.iva).toBe(3.95);
     expect(result.current.total).toBe(28.64);
     await act(async () => { await result.current.handleCreatePurchase(); });
     expect(api.post).toHaveBeenCalledWith('/purchases', {
+      costAdjustmentReason: 'Precio acordado con el proveedor',
       supplierId: 'supplier-1',
       items: [{ productId: 'product-1', quantity: 2, unitCost: 12.3456 }],
     });
@@ -432,11 +438,14 @@ describe('usePurchaseForm', () => {
     expect(api.patch).not.toHaveBeenCalled();
 
     act(() => result.current.handleItemUnitCostChange('product-1', '99.9999'));
+    expect(result.current.requiresCostAdjustmentReason).toBe(true);
+    act(() => result.current.setCostAdjustmentReason('  Precio acordado con el proveedor  '));
     expect(result.current.itemUnitCostErrors).toEqual({});
     expect(result.current.hasUnsavedChanges).toBe(true);
     vi.mocked(api.patch).mockResolvedValue({ data: { id: 'purchase-1' } } as never);
     await act(async () => { await result.current.handleCreatePurchase(); });
     expect(api.patch).toHaveBeenCalledWith('/purchases/purchase-1', {
+      costAdjustmentReason: 'Precio acordado con el proveedor',
       supplierId: 'supplier-1',
       items: [{ productId: 'product-1', quantity: 10, unitCost: 99.9999 }],
     });
@@ -465,6 +474,8 @@ describe('usePurchaseForm', () => {
     act(() => result.current.handleAddProduct());
     act(() => result.current.handleItemUnitCostChange('product-1', '85.5'));
     act(() => result.current.handleItemDiscountChange('product-1', '10'));
+    expect(result.current.requiresCostAdjustmentReason).toBe(true);
+    act(() => result.current.setCostAdjustmentReason('  Precio acordado con el proveedor  '));
     expect(result.current.items[0].unitCost).toBe(76.95);
     expect(result.current.items[0].baseUnitCost).toBe(85.5);
     expect(result.current.subtotal).toBe(769.5);
@@ -473,6 +484,7 @@ describe('usePurchaseForm', () => {
 
     await act(async () => { await result.current.handleCreatePurchase(); });
     expect(api.post).toHaveBeenCalledWith('/purchases', {
+      costAdjustmentReason: 'Precio acordado con el proveedor',
       supplierId: 'supplier-1',
       items: [{
         productId: 'product-1',

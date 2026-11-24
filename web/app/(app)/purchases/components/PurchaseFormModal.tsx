@@ -72,6 +72,9 @@ type PurchaseFormModalProps = {
   itemDiscountErrors?: Record<string, string>;
   canAdjustUnitCost?: boolean;
   itemsError: string;
+  costAdjustmentReason?: string;
+  requiresCostAdjustmentReason?: boolean;
+  onCostAdjustmentReasonChange?: (value: string) => void;
 
   subtotal: number;
   iva: number;
@@ -126,6 +129,9 @@ export default function PurchaseFormModal({
   itemDiscountErrors = {},
   canAdjustUnitCost = false,
   itemsError,
+  costAdjustmentReason,
+  requiresCostAdjustmentReason,
+  onCostAdjustmentReasonChange,
   subtotal,
   iva,
   total,
@@ -179,6 +185,21 @@ export default function PurchaseFormModal({
           : 'sticky bottom-0 z-10 -mx-6 mt-6 border-t border-gray-200 bg-white/95 px-6 pb-2 pt-4 shadow-[0_-4px_12px_rgba(15,23,42,0.08)] backdrop-blur'
       }
     >
+      {requiresCostAdjustmentReason ? (
+        <label className="mb-3 block text-sm font-medium text-text">
+          Motivo del ajuste de costo o descuento
+          <textarea
+            className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2"
+            rows={2}
+            maxLength={500}
+            required
+            disabled={saving}
+            value={costAdjustmentReason}
+            onChange={(event) => onCostAdjustmentReasonChange?.(event.target.value)}
+            placeholder="Describe el motivo (mínimo 8 caracteres)"
+          />
+        </label>
+      ) : null}
       {itemsError ? (
         <p role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {itemsError}

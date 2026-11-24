@@ -447,6 +447,9 @@ const {
   itemDiscountDrafts,
   itemDiscountErrors,
   itemsError,
+  costAdjustmentReason,
+  requiresCostAdjustmentReason,
+  setCostAdjustmentReason,
 
   subtotal,
   iva,
@@ -470,7 +473,7 @@ const {
 } = usePurchaseForm({
   products,
   onPurchaseSaved: loadPurchases,
-  canAdjustUnitCost: canApprove || Boolean(sessionState.status === 'success' && sessionState.user.canAdjustPurchaseUnitCost),
+  canAdjustUnitCost: canApprove || Boolean(currentUserRole === 'WAREHOUSE' && sessionState.status === 'success' && sessionState.user.canAdjustPurchaseUnitCost),
 });
 
   //propiedades de recepcion
@@ -1318,8 +1321,11 @@ async function loadPageData() {
         itemUnitCostErrors={itemUnitCostErrors}
         itemDiscountDrafts={itemDiscountDrafts}
         itemDiscountErrors={itemDiscountErrors}
-        canAdjustUnitCost={canApprove || Boolean(sessionState.status === 'success' && sessionState.user.canAdjustPurchaseUnitCost)}
+        canAdjustUnitCost={canApprove || Boolean(currentUserRole === 'WAREHOUSE' && sessionState.status === 'success' && sessionState.user.canAdjustPurchaseUnitCost)}
         itemsError={itemsError}
+        costAdjustmentReason={costAdjustmentReason}
+        requiresCostAdjustmentReason={requiresCostAdjustmentReason}
+        onCostAdjustmentReasonChange={setCostAdjustmentReason}
         subtotal={subtotal}
         iva={iva}
         total={total}

@@ -74,6 +74,19 @@ export class PurchasesController {
       dto,
       req.user.role,
       req.user.canAdjustPurchaseUnitCost === true,
+      req.user,
+    );
+  }
+
+  @Get(':id/cost-audit')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE)
+  findCostAudit(@Request() req: AuthenticatedRequest, @Param('id') id: string) {
+    const { companyId, role, canAdjustPurchaseUnitCost } = req.user;
+    return this.purchasesService.findCostAudit(
+      companyId,
+      id,
+      role,
+      canAdjustPurchaseUnitCost === true,
     );
   }
 

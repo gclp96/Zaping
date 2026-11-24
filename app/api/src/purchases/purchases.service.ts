@@ -6,7 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 
-import { UserRole } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 
 import { Response } from 'express';
 
@@ -27,6 +27,24 @@ type PurchaseWithReceiptItems = {
   }>;
 };
 
+type PurchaseActor = { id: string; firstName: string; lastName: string };
+type CostAuditEntry = Omit<
+  Prisma.PurchaseCostAuditCreateManyInput,
+  | 'companyId'
+  | 'purchaseId'
+  | 'actorUserId'
+  | 'actorDisplayName'
+  | 'actorRole'
+  | 'reason'
+>;
+
+function actorDisplayName(actor: PurchaseActor): string {
+  return (
+    [actor.firstName, actor.lastName].filter(Boolean).join(' ').trim() ||
+    'Usuario sin nombre'
+  );
+}
+
 @Injectable()
 export class PurchasesService {
   constructor(
@@ -39,7 +57,7 @@ export class PurchasesService {
     dto: CreatePurchaseDto,
     actorRole?: UserRole,
     actorCanAdjustPurchaseUnitCost = false,
-    author?: { id: string; firstName: string; lastName: string },
+    author?: PurchaseActor,
   ) {
     return this.prisma.$transaction(async (tx) => {
       const productIds = dto.items.map((item) => item.productId);
@@ -85,6 +103,7 @@ export class PurchasesService {
         );
       }
 
+      const costAudits: CostAuditEntry[] = [];
       const purchaseItems: Array<{
         productId: string;
         quantity: number;
@@ -105,9 +124,10 @@ export class PurchasesService {
           );
         }
 
+        const previousGrossUnitCost = product.cost;
         const baseCost = this.resolvePurchaseItemUnitCost(
           item.unitCost,
-          product.cost,
+          previousGrossUnitCost,
           actorRole,
           actorCanAdjustPurchaseUnitCost,
         );
@@ -120,6 +140,16 @@ export class PurchasesService {
         // Inventory receipts use PurchaseItem.price, so it stores the
         // effective (discounted) unit cost, never the list price.
         const unitCost = this.roundUnitCost(baseCost * (1 - discount / 100));
+        this.collectCostAudit(
+          costAudits,
+          product,
+          {
+            gross: previousGrossUnitCost,
+            discount: 0,
+            net: this.roundUnitCost(previousGrossUnitCost),
+          },
+          { gross: baseCost, discount, net: unitCost },
+        );
         const itemSubtotal = this.roundMoney(item.quantity * unitCost);
 
         subtotal = this.roundMoney(subtotal + itemSubtotal);
@@ -138,9 +168,15 @@ export class PurchasesService {
 
       const iva = this.roundMoney(subtotal * 0.16);
       const total = this.roundMoney(subtotal + iva);
+      const auditActor = this.getCostAuditActor(
+        costAudits,
+        dto.costAdjustmentReason,
+        actorRole,
+        author,
+      );
       const folio = await this.folios.allocateNextAvailableFolio(tx, companyId);
 
-      return tx.purchase.create({
+      const purchase = await tx.purchase.create({
         data: {
           companyId,
           supplierId: dto.supplierId,
@@ -150,11 +186,7 @@ export class PurchasesService {
           total,
           ...(author && {
             createdByUserId: author.id,
-            createdByDisplayName:
-              [author.firstName, author.lastName]
-                .filter(Boolean)
-                .join(' ')
-                .trim() || 'Usuario sin nombre',
+            createdByDisplayName: actorDisplayName(author),
           }),
           ...(dto.paymentTerms !== undefined && {
             paymentTerms: dto.paymentTerms,
@@ -183,6 +215,17 @@ export class PurchasesService {
           },
         },
       });
+      if (auditActor) {
+        await tx.purchaseCostAudit.createMany({
+          data: costAudits.map((entry) => ({
+            ...entry,
+            ...auditActor,
+            companyId,
+            purchaseId: purchase.id,
+          })),
+        });
+      }
+      return purchase;
     });
   }
 
@@ -322,8 +365,19 @@ export class PurchasesService {
     dto: UpdatePurchaseDto,
     actorRole?: UserRole,
     actorCanAdjustPurchaseUnitCost = false,
+    author?: PurchaseActor,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const updateDraft = async (tx: Prisma.TransactionClient) => {
+      // Serialize edits before reading the lines that this transaction will replace.
+      const locked = await tx.$queryRaw<{ id: string }[]>`
+        SELECT "id" FROM "Purchase"
+        WHERE "id" = ${purchaseId} AND "companyId" = ${companyId}
+        FOR NO KEY UPDATE
+      `;
+      if (locked.length === 0) {
+        throw new NotFoundException('Compra no encontrada');
+      }
+
       const purchase = await tx.purchase.findFirst({
         where: {
           id: purchaseId,
@@ -400,6 +454,7 @@ export class PurchasesService {
         );
       }
 
+      const costAudits: CostAuditEntry[] = [];
       const purchaseItems: Array<{
         productId: string;
         quantity: number;
@@ -423,19 +478,37 @@ export class PurchasesService {
         const previous = purchase.items?.find(
           (line) => line.productId === product.id,
         );
+        const previousGrossUnitCost =
+          previous?.listUnitCost ?? previous?.price ?? product.cost;
+        const previousDiscount = previous?.discountPercent ?? 0;
         const baseCost = this.resolvePurchaseItemUnitCost(
           item.unitCost,
-          previous?.listUnitCost ?? previous?.price ?? product.cost,
+          previousGrossUnitCost,
           actorRole,
           actorCanAdjustPurchaseUnitCost,
         );
         const discount = this.resolvePurchaseItemDiscount(
           item.discountPercent,
-          previous?.discountPercent ?? 0,
+          previousDiscount,
           actorRole,
           actorCanAdjustPurchaseUnitCost,
         );
-        const unitCost = this.roundUnitCost(baseCost * (1 - discount / 100));
+        const unchanged =
+          baseCost === previousGrossUnitCost && discount === previousDiscount;
+        const unitCost =
+          unchanged && previous
+            ? previous.price
+            : this.roundUnitCost(baseCost * (1 - discount / 100));
+        this.collectCostAudit(
+          costAudits,
+          product,
+          {
+            gross: previousGrossUnitCost,
+            discount: previousDiscount,
+            net: previous?.price ?? this.roundUnitCost(previousGrossUnitCost),
+          },
+          { gross: baseCost, discount, net: unitCost },
+        );
         const itemSubtotal = this.roundMoney(item.quantity * unitCost);
 
         subtotal = this.roundMoney(subtotal + itemSubtotal);
@@ -454,6 +527,13 @@ export class PurchasesService {
 
       const iva = this.roundMoney(subtotal * 0.16);
       const total = this.roundMoney(subtotal + iva);
+
+      const auditActor = this.getCostAuditActor(
+        costAudits,
+        dto.costAdjustmentReason,
+        actorRole,
+        author,
+      );
 
       const updateResult = await tx.purchase.updateMany({
         where: {
@@ -519,6 +599,17 @@ export class PurchasesService {
         })),
       });
 
+      if (auditActor) {
+        await tx.purchaseCostAudit.createMany({
+          data: costAudits.map((entry) => ({
+            ...entry,
+            ...auditActor,
+            companyId,
+            purchaseId,
+          })),
+        });
+      }
+
       return tx.purchase.findFirst({
         where: {
           id: purchaseId,
@@ -533,7 +624,87 @@ export class PurchasesService {
           },
         },
       });
+    };
+    return this.prisma.$transaction(updateDraft, {
+      isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
     });
+  }
+
+  async findCostAudit(
+    companyId: string,
+    purchaseId: string,
+    role: UserRole,
+    delegated: boolean,
+  ) {
+    if (
+      role !== UserRole.ADMIN &&
+      role !== UserRole.MANAGER &&
+      !(role === UserRole.WAREHOUSE && delegated)
+    ) {
+      throw new ForbiddenException(
+        'No tienes permiso para consultar el historial de costos',
+      );
+    }
+
+    const purchase = await this.prisma.purchase.findFirst({
+      where: { id: purchaseId, companyId },
+      select: { id: true },
+    });
+    if (!purchase) throw new NotFoundException('Compra no encontrada');
+
+    return this.prisma.purchaseCostAudit.findMany({
+      where: { companyId, purchaseId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      omit: { companyId: true, purchaseId: true },
+    });
+  }
+
+  private collectCostAudit(
+    entries: CostAuditEntry[],
+    product: { id: string; name: string },
+    previous: { gross: number; discount: number; net: number },
+    next: { gross: number; discount: number; net: number },
+  ) {
+    if (previous.gross === next.gross && previous.discount === next.discount)
+      return;
+
+    entries.push({
+      productId: product.id,
+      productDisplayName: product.name,
+      previousGrossUnitCost: previous.gross,
+      newGrossUnitCost: next.gross,
+      previousDiscountPercent: previous.discount,
+      newDiscountPercent: next.discount,
+      previousNetUnitCost: previous.net,
+      newNetUnitCost: next.net,
+    });
+  }
+
+  private getCostAuditActor(
+    entries: CostAuditEntry[],
+    requestedReason: string | undefined,
+    role: UserRole | undefined,
+    actor: PurchaseActor | undefined,
+  ) {
+    if (entries.length === 0) return null;
+    const reason = requestedReason?.trim();
+    if (!reason || reason.length < 8 || reason.length > 500) {
+      throw new BadRequestException(
+        'Describe el motivo del ajuste de costo o descuento (8 a 500 caracteres)',
+      );
+    }
+    if (!actor?.id || !role) {
+      throw new ForbiddenException(
+        'No se pudo identificar a quien realiza el ajuste',
+      );
+    }
+
+    return {
+      reason,
+      actorUserId: actor.id,
+      actorDisplayName: actorDisplayName(actor),
+      actorRole: role,
+    };
   }
 
   async findInventoryMovements(companyId: string, purchaseId: string) {
@@ -789,7 +960,9 @@ export class PurchasesService {
       );
     }
 
-    return requestedCost;
+    return requestedCost === this.roundUnitCost(fallbackCost)
+      ? fallbackCost
+      : requestedCost;
   }
 
   private roundMoney(value: number): number {

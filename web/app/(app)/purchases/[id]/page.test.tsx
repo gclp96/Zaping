@@ -203,10 +203,12 @@ function setupApi({
   receiptsResponse = [receipt],
   movementsResponse = [movement],
   role = 'ADMIN',
+  auditResponse = [],
 }: {
   purchaseResponse?: Purchase;
   receiptsResponse?: PurchaseReceipt[];
   movementsResponse?: InventoryMovement[];
+  auditResponse?: object[];
   role?: 'ADMIN' | 'MANAGER' | 'SALES' | 'WAREHOUSE';
 } = {}) {
   vi.mocked(api.get).mockImplementation((endpoint: string) => {
@@ -232,6 +234,10 @@ function setupApi({
 
     if (endpoint === '/purchase-receipts/purchase/purchase-1') {
       return Promise.resolve({ data: receiptsResponse }) as never;
+    }
+
+    if (endpoint === '/purchases/purchase-1/cost-audit') {
+      return Promise.resolve({ data: auditResponse }) as never;
     }
 
     if (endpoint === '/purchases/purchase-1/inventory-movements') {
@@ -298,6 +304,33 @@ describe('Purchase360Page', () => {
     linkClickSpy.mockRestore();
   });
 
+  it('muestra los valores de auditoría, el responsable histórico y su rol', async () => {
+    setupApi({ auditResponse: [{
+      id: 'event-1',
+      productDisplayName: 'Producto histórico',
+      actorDisplayName: 'Ana Compras',
+      actorRole: 'WAREHOUSE',
+      createdAt: '2026-11-23T18:00:00Z',
+      reason: 'Precio acordado con el proveedor',
+      previousGrossUnitCost: '100',
+      newGrossUnitCost: '85.5555',
+      previousDiscountPercent: '0',
+      newDiscountPercent: '10',
+      previousNetUnitCost: '100',
+      newNetUnitCost: '77',
+    }] });
+    render(<Purchase360Page />);
+
+    expect(await screen.findByText('Ana Compras')).toBeTruthy();
+    const history = screen.getByRole('region', { name: 'Historial de costos y descuentos' });
+    expect(within(history).getByText('Almacén')).toBeTruthy();
+    expect(screen.getByText('Producto histórico')).toBeTruthy();
+    expect(screen.getByText('Precio acordado con el proveedor')).toBeTruthy();
+    expect(screen.getByText('$100.00 → $85.5555')).toBeTruthy();
+    expect(screen.getByText('0% → 10%')).toBeTruthy();
+    expect(api.get).toHaveBeenCalledWith('/purchases/purchase-1/cost-audit');
+  });
+
   it('loads the purchase directly from the route and renders the main hierarchy', async () => {
     render(<Purchase360Page />);
 
@@ -349,7 +382,7 @@ describe('Purchase360Page', () => {
     render(<Purchase360Page />);
     await screen.findByRole('heading', { name: 'Compra OC-0001', level: 1 });
     expect(screen.getAllByRole('heading', { level: 2 }).map((el) => el.textContent))
-      .toEqual(['Resumen', 'Partidas', 'Resumen financiero', 'Recepciones', 'Trazabilidad']);
+      .toEqual(['Resumen', 'Partidas', 'Resumen financiero', 'Historial de costos y descuentos', 'Recepciones', 'Trazabilidad']);
     const financial = screen.getByRole('heading', { name: 'Resumen financiero' }).closest('section')!;
     expect(within(financial).getByText('$1,000.00')).toBeTruthy();
     expect(within(financial).getByText('$160.00')).toBeTruthy();
@@ -409,6 +442,10 @@ describe('Purchase360Page', () => {
         return Promise.reject(new Error('Receipts unavailable')) as never;
       }
 
+      if (endpoint === '/purchases/purchase-1/cost-audit') {
+        return Promise.resolve({ data: [] }) as never;
+      }
+
       if (endpoint === '/purchases/purchase-1/inventory-movements') {
         return Promise.resolve({ data: [movement] }) as never;
       }
@@ -451,6 +488,10 @@ describe('Purchase360Page', () => {
       }
 
       if (endpoint === '/purchase-receipts/purchase/purchase-1') {
+        return Promise.resolve({ data: [] }) as never;
+      }
+
+      if (endpoint === '/purchases/purchase-1/cost-audit') {
         return Promise.resolve({ data: [] }) as never;
       }
 

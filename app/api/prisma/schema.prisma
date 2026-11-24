@@ -435,17 +435,42 @@ model Purchase {
 
   company  Company           @relation(fields: [companyId], references: [id])
   items    PurchaseItem[]
+  costAudits PurchaseCostAudit[]
   receipts PurchaseReceipt[]
   supplierDocumentAllocations PurchaseReceiptDocument[]
   supplierDocumentApprovals PurchaseReceiptReconciliationApproval[]
   documentLinks PurchaseReceiptSupplierDocumentLink[]
 
+  @@unique([id, companyId])
   @@unique([id, companyId, supplierId])
   @@unique([companyId, folio])
   @@index([companyId])
   @@index([supplierId])
   @@index([createdByUserId])
   @@index([status])
+}
+
+model PurchaseCostAudit {
+  id                      String   @id @default(uuid())
+  companyId               String
+  purchaseId              String
+  productId               String
+  productDisplayName      String
+  actorUserId             String
+  actorDisplayName        String
+  actorRole               UserRole
+  createdAt               DateTime @default(dbgenerated("clock_timestamp()"))
+  reason                  String   @db.VarChar(500)
+  previousGrossUnitCost   Decimal  @db.Decimal(20, 4)
+  newGrossUnitCost        Decimal  @db.Decimal(20, 4)
+  previousDiscountPercent Decimal @db.Decimal(5, 2)
+  newDiscountPercent      Decimal  @db.Decimal(5, 2)
+  previousNetUnitCost     Decimal  @db.Decimal(20, 4)
+  newNetUnitCost          Decimal  @db.Decimal(20, 4)
+
+  purchase Purchase @relation(fields: [purchaseId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([companyId, purchaseId, createdAt, id])
 }
 
 model PurchaseItem {

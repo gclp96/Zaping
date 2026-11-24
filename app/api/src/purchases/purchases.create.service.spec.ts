@@ -14,12 +14,14 @@ describe('PurchasesService — annual folio creation', () => {
     supplier: { findFirst: jest.fn() },
     product: { findMany: jest.fn() },
     purchase: { create: jest.fn() },
+    purchaseCostAudit: { createMany: jest.fn() },
   };
   const prisma = { $transaction: jest.fn() };
   const service = new PurchasesService(
     prisma as unknown as PrismaService,
     folios as unknown as PurchasesFolioService,
   );
+  const actor = { id: 'user-1', firstName: 'Ana', lastName: 'Compras' };
   const dto = {
     supplierId: 'supplier-a',
     items: [{ productId: 'product-a', quantity: 2 }],
@@ -30,7 +32,9 @@ describe('PurchasesService — annual folio creation', () => {
       (work: (client: typeof tx) => Promise<unknown>) => work(tx),
     );
     tx.supplier.findFirst.mockResolvedValue({ id: 'supplier-a' });
-    tx.product.findMany.mockResolvedValue([{ id: 'product-a', cost: 100 }]);
+    tx.product.findMany.mockResolvedValue([
+      { id: 'product-a', name: 'Producto A', cost: 100 },
+    ]);
     folios.allocateNextAvailableFolio.mockResolvedValue('OC-26-00001');
     tx.purchase.create.mockResolvedValue({
       id: 'purchase-a',
@@ -102,9 +106,12 @@ describe('PurchasesService — annual folio creation', () => {
       'company-a',
       {
         ...dto,
+        costAdjustmentReason: 'Precio acordado con el proveedor',
         items: [{ productId: 'product-a', quantity: 2, unitCost: 11.2345 }],
       },
       UserRole.ADMIN,
+      false,
+      actor,
     );
 
     expect(tx.purchase.create).toHaveBeenCalledWith({
@@ -112,6 +119,8 @@ describe('PurchasesService — annual folio creation', () => {
         companyId: 'company-a',
         supplierId: 'supplier-a',
         folio: 'OC-26-00001',
+        createdByUserId: actor.id,
+        createdByDisplayName: 'Ana Compras',
         subtotal: 22.47,
         iva: 3.6,
         total: 26.07,
@@ -139,6 +148,7 @@ describe('PurchasesService — annual folio creation', () => {
       'company-a',
       {
         ...dto,
+        costAdjustmentReason: 'Precio acordado con el proveedor',
         items: [
           {
             productId: 'product-a',
@@ -149,6 +159,8 @@ describe('PurchasesService — annual folio creation', () => {
         ],
       },
       UserRole.ADMIN,
+      false,
+      actor,
     );
     const [createArgs] = tx.purchase.create.mock.calls[0] as [
       {
@@ -194,10 +206,12 @@ describe('PurchasesService — annual folio creation', () => {
       'company-a',
       {
         ...dto,
+        costAdjustmentReason: 'Precio acordado con el proveedor',
         items: [{ productId: 'product-a', quantity: 2, discountPercent: 5 }],
       },
       UserRole.WAREHOUSE,
       true,
+      actor,
     );
     const [createArgs] = tx.purchase.create.mock.calls[0] as [
       {

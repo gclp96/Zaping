@@ -13,11 +13,14 @@ describe('PurchasesService — tenant-safe mutations', () => {
   const supplierId = '33333333-3333-4333-8333-333333333333';
   const productId = '44444444-4444-4444-8444-444444444444';
 
+  const actor = { id: 'user-1', firstName: 'Ana', lastName: 'Compras' };
   let service: PurchasesService;
   let prisma: {
     $transaction: jest.Mock;
   };
   let transactionClient: {
+    $queryRaw: jest.Mock;
+    purchaseCostAudit: { createMany: jest.Mock };
     purchase: {
       findFirst: jest.Mock;
       updateMany: jest.Mock;
@@ -36,6 +39,8 @@ describe('PurchasesService — tenant-safe mutations', () => {
 
   beforeEach(() => {
     transactionClient = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: purchaseId }]),
+      purchaseCostAudit: { createMany: jest.fn() },
       purchase: {
         findFirst: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -48,6 +53,7 @@ describe('PurchasesService — tenant-safe mutations', () => {
           {
             id: productId,
             cost: 100,
+            name: 'Producto A',
           },
         ]),
       },
@@ -190,9 +196,12 @@ describe('PurchasesService — tenant-safe mutations', () => {
       purchaseId,
       {
         ...updateDto,
+        costAdjustmentReason: 'Precio acordado con el proveedor',
         items: [{ productId, quantity: 2, unitCost: 12.3456 }],
       },
       UserRole.MANAGER,
+      false,
+      actor,
     );
 
     expect(transactionClient.purchaseItem.createMany).toHaveBeenCalledWith({
@@ -222,10 +231,12 @@ describe('PurchasesService — tenant-safe mutations', () => {
       purchaseId,
       {
         ...updateDto,
+        costAdjustmentReason: 'Precio acordado con el proveedor',
         items: [{ productId, quantity: 2, unitCost: 43.125 }],
       },
       UserRole.WAREHOUSE,
       true,
+      actor,
     );
 
     expect(transactionClient.purchaseItem.createMany).toHaveBeenCalledWith({
@@ -295,6 +306,9 @@ describe('PurchasesService — tenant-safe mutations', () => {
         },
       ],
     });
+    expect(
+      transactionClient.purchaseCostAudit.createMany,
+    ).not.toHaveBeenCalled();
   });
 
   it('permite al comprador delegado cambiar descuento del borrador', async () => {
@@ -311,10 +325,12 @@ describe('PurchasesService — tenant-safe mutations', () => {
       purchaseId,
       {
         ...updateDto,
+        costAdjustmentReason: 'Precio acordado con el proveedor',
         items: [{ productId, quantity: 2, discountPercent: 10 }],
       },
       UserRole.WAREHOUSE,
       true,
+      actor,
     );
     expect(transactionClient.purchaseItem.createMany).toHaveBeenCalledWith({
       data: [

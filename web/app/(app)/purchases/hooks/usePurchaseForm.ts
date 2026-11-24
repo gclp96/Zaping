@@ -94,6 +94,30 @@ export function usePurchaseForm({
   const [itemDiscountDrafts, setItemDiscountDrafts] = useState<Record<string, string>>({});
   const [itemDiscountErrors, setItemDiscountErrors] = useState<Record<string, string>>({});
   const [itemsError, setItemsError] = useState('');
+  const [costAdjustmentReason, setCostAdjustmentReason] = useState('');
+
+  const itemsToSave = items.map((item) => {
+    const catalogCost = products.find((product) => product.id === item.productId)?.cost;
+    const previous = purchaseToEdit?.items.find((line) => line.productId === item.productId);
+    const baseCost = item.baseUnitCost ?? item.unitCost;
+    const previousCost = previous?.listUnitCost ?? previous?.price;
+    const originalCost = previousCost ?? catalogCost;
+    const overrideNeeded = canAdjustUnitCost &&
+      originalCost !== undefined &&
+      baseCost !== originalCost && baseCost !== roundUnitCost(originalCost);
+    const discountPercent = item.discountPercent ?? 0;
+    const discountChanged = canAdjustUnitCost &&
+      discountPercent !== (previous?.discountPercent ?? 0);
+    return {
+      productId: item.productId,
+      quantity: Number(item.quantity),
+      ...(overrideNeeded ? { unitCost: baseCost } : {}),
+      ...(discountChanged ? { discountPercent } : {}),
+    };
+  });
+  const requiresCostAdjustmentReason = itemsToSave.some(
+    (item) => item.unitCost !== undefined || item.discountPercent !== undefined,
+  );
 
   const subtotal = useMemo(() => {
     return items.reduce((total, item) => {
@@ -167,6 +191,7 @@ export function usePurchaseForm({
     setItemDiscountDrafts({});
     setItemDiscountErrors({});
     setItemsError('');
+    setCostAdjustmentReason('');
   }
 
   function openCreateModal() {
@@ -209,6 +234,7 @@ export function usePurchaseForm({
     setItemDiscountDrafts({});
     setItemDiscountErrors({});
     setItemsError('');
+    setCostAdjustmentReason('');
 
     setOpenModal(true);
   }
@@ -295,6 +321,7 @@ export function usePurchaseForm({
       return;
     }
 
+    const previous = purchaseToEdit?.items.find((item) => item.productId === product.id);
     setItems((currentItems) => [
       ...currentItems,
       {
@@ -302,9 +329,9 @@ export function usePurchaseForm({
         sku: product.sku,
         name: product.name,
         quantity: String(parsedQuantity),
-        unitCost: product.cost,
-        baseUnitCost: product.cost,
-        discountPercent: 0,
+        unitCost: previous?.price ?? product.cost,
+        baseUnitCost: previous?.listUnitCost ?? previous?.price ?? product.cost,
+        discountPercent: previous?.discountPercent ?? 0,
         unitOfMeasure: product.unitOfMeasure ?? null,
       },
     ]);
@@ -492,6 +519,10 @@ export function usePurchaseForm({
       valid = false;
     }
 
+    if (valid && requiresCostAdjustmentReason && costAdjustmentReason.trim().length < 8) {
+      setItemsError('Describe el motivo del ajuste de costo o descuento (mínimo 8 caracteres).');
+      valid = false;
+    }
     if (!valid) {
       return;
     }
@@ -513,24 +544,8 @@ export function usePurchaseForm({
       const payload = {
         supplierId,
         ...commercialChanges,
-        items: items.map((item) => {
-          const catalogCost = products.find((product) => product.id === item.productId)?.cost;
-          const previous = purchaseToEdit?.items.find((line) => line.productId === item.productId);
-          const baseCost = item.baseUnitCost ?? item.unitCost;
-          const previousCost = previous?.listUnitCost ?? previous?.price;
-          const originalCost = previousCost ?? catalogCost;
-          const overrideNeeded = canAdjustUnitCost &&
-            originalCost !== undefined && baseCost !== originalCost;
-          const discountPercent = item.discountPercent ?? 0;
-          const discountChanged = canAdjustUnitCost &&
-            discountPercent !== (previous?.discountPercent ?? 0);
-          return {
-            productId: item.productId,
-            quantity: Number(item.quantity),
-            ...(overrideNeeded ? { unitCost: baseCost } : {}),
-            ...(discountChanged ? { discountPercent } : {}),
-          };
-        }),
+        ...(requiresCostAdjustmentReason && { costAdjustmentReason: costAdjustmentReason.trim() }),
+        items: itemsToSave,
       };
 
       if (purchaseToEdit) {
@@ -581,6 +596,9 @@ export function usePurchaseForm({
     itemDiscountDrafts,
     itemDiscountErrors,
     itemsError,
+    costAdjustmentReason,
+    requiresCostAdjustmentReason,
+    setCostAdjustmentReason,
 
     subtotal,
     iva,

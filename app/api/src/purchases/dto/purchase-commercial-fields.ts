@@ -1,4 +1,10 @@
-import { Matches, MaxLength, IsOptional, IsString } from 'class-validator';
+import {
+  Matches,
+  MaxLength,
+  IsOptional,
+  IsString,
+  ValidateIf,
+} from 'class-validator';
 
 export class PurchaseCommercialFields {
   @IsOptional()
@@ -23,4 +29,9 @@ export class PurchaseCommercialFields {
     message: 'La fecha de entrega debe tener formato AAAA-MM-DD',
   })
   expectedDeliveryDate?: string | null;
+
+  @ValidateIf((_object, value: unknown) => value !== undefined)
+  @IsString()
+  @MaxLength(500)
+  costAdjustmentReason?: string;
 }

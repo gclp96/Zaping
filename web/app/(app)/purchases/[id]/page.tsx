@@ -30,6 +30,7 @@ import ForbiddenState from '@/app/components/ui/ForbiddenState';
 import { api } from '@/services/api';
 import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 
+import PurchaseCostAuditHistory from '../components/PurchaseCostAuditHistory';
 import PurchaseFormModal from '../components/PurchaseFormModal';
 import PurchaseInventoryMovements from '../components/PurchaseInventoryMovements';
 import PurchaseReceiptModal from '../components/PurchaseReceiptModal';
@@ -241,7 +242,7 @@ function usePurchase360(purchaseId: string) {
     notFound,
     forbidden,
     currentUserRole,
-    delegatedCostEditing: sessionState.status === 'success' &&
+    delegatedCostEditing: currentUserRole === 'WAREHOUSE' && sessionState.status === 'success' &&
       sessionState.user.canAdjustPurchaseUnitCost === true,
     receipts,
     receiptsLoading,
@@ -338,7 +339,12 @@ export default function Purchase360Page() {
     itemQuantityErrors,
     itemUnitCostDrafts,
     itemUnitCostErrors,
+    itemDiscountDrafts,
+    itemDiscountErrors,
     itemsError,
+    costAdjustmentReason,
+    requiresCostAdjustmentReason,
+    setCostAdjustmentReason,
     subtotal,
     iva,
     total,
@@ -351,6 +357,7 @@ export default function Purchase360Page() {
     handleAddProduct,
     handleItemQuantityChange,
     handleItemUnitCostChange,
+    handleItemDiscountChange,
     handleRemoveItem,
     handleCreatePurchase,
   } = usePurchaseForm({
@@ -755,6 +762,8 @@ export default function Purchase360Page() {
           </dl>
         </Section>
 
+        {canAdjustUnitCost && <PurchaseCostAuditHistory purchase={purchase} />}
+
         <div className="rounded-xl border border-border bg-surface p-4 sm:p-6">
           <Section title="Recepciones">
             <PurchaseReceiptsHistory
@@ -800,8 +809,13 @@ export default function Purchase360Page() {
         itemQuantityErrors={itemQuantityErrors}
         itemUnitCostDrafts={itemUnitCostDrafts}
         itemUnitCostErrors={itemUnitCostErrors}
+        itemDiscountDrafts={itemDiscountDrafts}
+        itemDiscountErrors={itemDiscountErrors}
         canAdjustUnitCost={canAdjustUnitCost}
         itemsError={itemsError}
+        costAdjustmentReason={costAdjustmentReason}
+        requiresCostAdjustmentReason={requiresCostAdjustmentReason}
+        onCostAdjustmentReasonChange={setCostAdjustmentReason}
         subtotal={subtotal}
         iva={iva}
         total={total}
@@ -816,6 +830,7 @@ export default function Purchase360Page() {
         onQuantityChange={handleFormQuantityChange}
         onItemQuantityChange={handleItemQuantityChange}
         onItemUnitCostChange={handleItemUnitCostChange}
+        onItemDiscountChange={handleItemDiscountChange}
       />
 
       <PurchaseReceiptModal
