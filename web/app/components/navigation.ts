@@ -1,5 +1,6 @@
 import {
   Boxes,
+  Building2,
   ClipboardList,
   FileText,
   Hospital,
@@ -156,6 +157,12 @@ export const navigationGroups: NavigationGroup[] = [
         label: "Usuarios",
         href: "/users",
         icon: UsersRound,
+        visibleForRoles: ["ADMIN"],
+      },
+      {
+        label: "Datos fiscales de empresa",
+        href: "/company-settings",
+        icon: Building2,
         visibleForRoles: ["ADMIN"],
       },
     ],

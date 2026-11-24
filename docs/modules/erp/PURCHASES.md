@@ -1955,7 +1955,31 @@ antes de considerar definitivo el uso de recursos en nuevas Purchases.
 
 ---
 
-# 74. Audit — TARGET
+# 74. Historial de costos y descuentos
+
+`POST /purchases` y `PATCH /purchases/:id` aceptan `costAdjustmentReason`.
+Es obligatorio cuando cambia el costo bruto o el porcentaje de descuento de alguna
+partida. El motivo admite de 8 a 500 caracteres después de recortar espacios y se
+comparte entre las partidas ajustadas en la misma operación.
+
+Cada partida ajustada agrega un evento en la misma transacción del borrador.
+Para una partida nueva, la referencia es el costo del catálogo con descuento cero.
+Para una partida existente, se comparan el costo bruto y el descuento guardados al
+inicio de la edición, después de bloquear la compra. Los cambios de cantidad, las
+partidas retiradas y los valores iguales no generan eventos. La migración no crea
+eventos retroactivos. El costo neto sigue en `PurchaseItem.price` para Recepciones.
+
+`GET /purchases/:id/cost-audit` devuelve los eventos de la compra de la empresa
+autenticada, del más reciente al más antiguo, con desempate por ID descendente.
+El historial incluye motivo, fecha, identificadores de producto y usuario, nombres
+históricos, rol y los valores anterior y nuevo de costo bruto, descuento y costo
+neto. Los valores decimales se devuelven como cadenas.
+
+Los ajustes y la consulta se permiten a ADMIN, MANAGER y WAREHOUSE con permiso
+delegado de costos. Una compra de otra empresa devuelve 404 a un usuario autorizado
+para la consulta. El historial solo admite inserciones en la aplicación.
+
+## Auditoría transversal — TARGET
 
 Una futura plataforma transversal de Audit podrá registrar eventos como:
 

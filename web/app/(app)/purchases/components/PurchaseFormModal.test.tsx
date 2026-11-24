@@ -96,6 +96,12 @@ function renderModal(
     suppliers: [supplier],
     products: [product],
     supplierId: supplier.id,
+    commercial: {
+      paymentTerms: '',
+      paymentMethod: '',
+      paymentDueDate: '',
+      expectedDeliveryDate: '',
+    },
     selectedProductId: '',
     quantity: '1',
     items: [item],
@@ -113,6 +119,7 @@ function renderModal(
     onAddProduct: vi.fn(),
     onRemoveItem: vi.fn(),
     onSupplierChange: vi.fn(),
+    onCommercialChange: vi.fn(),
     onSelectedProductChange: vi.fn(),
     onQuantityChange: vi.fn(),
     onItemQuantityChange: vi.fn(),
@@ -126,6 +133,52 @@ describe('PurchaseFormModal', () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllEnvs();
+  });
+
+  it('edita las condiciones comerciales sin afectar las partidas', () => {
+    const onCommercialChange = vi.fn();
+    renderModal({
+      onCommercialChange,
+      commercial: {
+        paymentTerms: 'Crédito 30 días',
+        paymentMethod: 'Transferencia electrónica',
+        paymentDueDate: '2026-12-17',
+        expectedDeliveryDate: '2026-11-17',
+      },
+    });
+    const terms = screen.getByRole('heading', { name: 'Condiciones comerciales' });
+    expect(terms).toBeTruthy();
+    const paymentTerms = screen.getByRole('combobox', { name: 'Condiciones de pago' });
+    fireEvent.change(paymentTerms, { target: { value: 'Contado' } });
+    expect(onCommercialChange).toHaveBeenCalledWith('paymentTerms', 'Contado');
+    expect((screen.getByLabelText('Fecha de pago') as HTMLInputElement).value).toBe('2026-12-17');
+  });
+
+  it('muestra catálogos No aplica sin campos editables de autor', () => {
+    renderModal();
+    const payment = screen.getByRole('combobox', { name: 'Condiciones de pago' }) as HTMLSelectElement;
+    const method = screen.getByRole('combobox', { name: 'Método de pago' }) as HTMLSelectElement;
+    expect(payment.value).toBe('');
+    expect(method.value).toBe('');
+    expect(payment.options[0].textContent).toBe('No aplica');
+    expect(method.options[0].textContent).toBe('No aplica');
+    expect(screen.queryByText('Ana Compras')).toBeNull();
+    expect(screen.queryByText('Elaboró')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Comprador' })).toBeNull();
+  });
+
+  it('al editar muestra el proveedor actual y deja libre el campo de búsqueda', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const onSupplierChange = vi.fn();
+    renderModal({ editing: true, onSupplierChange });
+    const input = screen.getByRole('combobox', { name: 'Proveedor' }) as HTMLInputElement;
+    expect(input.value).toBe('');
+    expect(input.placeholder).toBe('Buscar para cambiar proveedor');
+    expect(screen.getByText('Proveedor actual')).toBeTruthy();
+    expect(screen.getAllByText('Proveedor médico').length).toBeGreaterThan(0);
+    fireEvent.focus(input);
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+    expect(onSupplierChange).not.toHaveBeenCalled();
   });
 
   it('habilita el workspace únicamente para Nueva compra y reubica el footer fuera del scroll', () => {
@@ -275,6 +328,82 @@ describe('PurchaseFormModal', () => {
     expect(onItemQuantityChange).toHaveBeenCalledWith('product-1', '5');
     fireEvent.click(within(footer).getByRole('button', { name: 'Guardar cambios' }));
     expect(onSubmit).toHaveBeenCalledOnce();
+  });
+
+  it('permite ajustar el costo en desktop y móvil solo a usuarios autorizados', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const onItemUnitCostChange = vi.fn();
+    const view = renderModal({
+      canAdjustUnitCost: true,
+      onItemUnitCostChange,
+      itemUnitCostDrafts: { 'product-1': '12.3456' },
+    });
+    const table = screen.getByTestId('purchase-form-items-table');
+    const input = within(table).getByRole('textbox', {
+      name: 'Costo unitario de Producto médico',
+    }) as HTMLInputElement;
+    expect(input.value).toBe('12.3456');
+    fireEvent.change(input, { target: { value: '13.2222' } });
+    expect(onItemUnitCostChange).toHaveBeenCalledWith('product-1', '13.2222');
+    const mobile = screen.getByTestId('purchase-form-mobile-items');
+    expect(within(mobile).getByRole('textbox', {
+      name: 'Costo unitario de Producto médico',
+    })).toBeTruthy();
+    view.unmount();
+    renderModal({ canAdjustUnitCost: false });
+    expect(screen.queryByRole('textbox', { name: 'Costo unitario de Producto médico' })).toBeNull();
+    expect(screen.getAllByText('$100.00').length).toBeGreaterThan(0);
+  });
+
+  it('muestra y valida descuentos por partida en desktop y móvil', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const onItemDiscountChange = vi.fn();
+    renderModal({
+      canAdjustUnitCost: true,
+      onItemDiscountChange,
+      items: [{
+        ...item,
+        unitOfMeasure: 'pzas.',
+        baseUnitCost: 85.5,
+        unitCost: 76.95,
+        discountPercent: 10,
+      }],
+      itemDiscountDrafts: { 'product-1': '10' },
+    });
+    const table = screen.getByTestId('purchase-form-items-table');
+    expect(within(table).getByText(/pzas./i)).toBeTruthy();
+    const discount = within(table).getByRole('spinbutton', {
+      name: 'Descuento de Producto médico',
+    });
+    fireEvent.change(discount, { target: { value: '12.50' } });
+    expect(onItemDiscountChange).toHaveBeenCalledWith('product-1', '12.50');
+    const mobile = screen.getByTestId('purchase-form-mobile-items');
+    expect(within(mobile).getByRole('spinbutton', {
+      name: 'Descuento de Producto médico',
+    })).toBeTruthy();
+  });
+
+  it('desactiva guardar si el descuento es inválido', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    renderModal({
+      canAdjustUnitCost: true,
+      itemDiscountDrafts: { 'product-1': '110' },
+      itemDiscountErrors: { 'product-1': 'Descuento inválido' },
+    });
+    const footer = screen.getByTestId('purchase-form-footer');
+    const save = within(footer).getByRole('button', { name: 'Crear compra' });
+    expect((save as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('bloquea guardar cuando se ingresa un costo inválido', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    renderModal({
+      canAdjustUnitCost: true,
+      itemUnitCostDrafts: { 'product-1': '' },
+      itemUnitCostErrors: { 'product-1': 'Costo inválido' },
+    });
+    const footer = screen.getByTestId('purchase-form-footer');
+    expect((within(footer).getByRole('button', { name: 'Crear compra' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('abre la confirmación solo si el borrador editado tiene cambios', () => {

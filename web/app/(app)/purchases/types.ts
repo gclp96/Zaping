@@ -122,12 +122,15 @@ export type PurchaseItem = {
   productId: string;
   quantity: number;
   price: number;
+  listUnitCost?: number | null;
+  discountPercent?: number;
   subtotal: number;
 
   product: {
     id: string;
     sku: string;
     name: string;
+    unitOfMeasure?: string | null;
     inventoryTracking: ProductInventoryTracking;
     lotTracking: ProductLotTracking;
   };
@@ -149,6 +152,11 @@ export type Purchase = {
   iva: number;
   total: number;
   createdAt: string;
+  paymentTerms?: string | null;
+  paymentMethod?: string | null;
+  paymentDueDate?: string | null;
+  expectedDeliveryDate?: string | null;
+  createdByDisplayName?: string | null;
   receiptProgress: PurchaseReceiptProgress;
 
   supplier: {
@@ -179,6 +187,7 @@ export type Product = {
   id: string;
   sku: string;
   name: string;
+  unitOfMeasure?: string | null;
   cost: number;
   stock: number;
   minStock: number;
@@ -193,4 +202,16 @@ export type PurchaseFormItem = {
   name: string;
   quantity: string;
   unitCost: number;
+  baseUnitCost?: number;
+  discountPercent?: number;
+  unitOfMeasure?: string | null;
 };
+
+export type PurchaseCommercialForm = {
+  paymentTerms: string;
+  paymentMethod: string;
+  paymentDueDate: string;
+  expectedDeliveryDate: string;
+};
+
+export type PurchaseCommercialFormField = keyof PurchaseCommercialForm;

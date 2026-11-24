@@ -40,6 +40,7 @@ model Product {
 
   category                   Category?                   @relation(fields: [categoryId], references: [id])
   barcode                    String?
+  unitOfMeasure              String?
   cost                       Float                       @default(0)
   price                      Float                       @default(0)
   stock                      Int                         @default(0)
@@ -413,10 +414,20 @@ model Purchase {
   supplierId String
 
   supplier Supplier @relation(fields: [supplierId], references: [id])
+  createdByUser User? @relation("PurchaseCreatedBy", fields: [createdByUserId], references: [id])
 
   subtotal Float
   iva      Float
   total    Float
+
+  paymentTerms         String?
+  paymentMethod        String?
+  paymentDueDate       DateTime? @db.Date
+  expectedDeliveryDate DateTime? @db.Date
+  buyerName            String? // Legacy: kept for backwards compatibility, never used for attribution.
+  createdByUserId       String?
+  createdByDisplayName  String?
+  commercialSnapshot   Json?
 
   status    PurchaseStatus @default(DRAFT)
   createdAt DateTime       @default(now())
@@ -424,16 +435,42 @@ model Purchase {
 
   company  Company           @relation(fields: [companyId], references: [id])
   items    PurchaseItem[]
+  costAudits PurchaseCostAudit[]
   receipts PurchaseReceipt[]
   supplierDocumentAllocations PurchaseReceiptDocument[]
   supplierDocumentApprovals PurchaseReceiptReconciliationApproval[]
   documentLinks PurchaseReceiptSupplierDocumentLink[]
 
+  @@unique([id, companyId])
   @@unique([id, companyId, supplierId])
   @@unique([companyId, folio])
   @@index([companyId])
   @@index([supplierId])
+  @@index([createdByUserId])
   @@index([status])
+}
+
+model PurchaseCostAudit {
+  id                      String   @id @default(uuid())
+  companyId               String
+  purchaseId              String
+  productId               String
+  productDisplayName      String
+  actorUserId             String
+  actorDisplayName        String
+  actorRole               UserRole
+  createdAt               DateTime @default(dbgenerated("clock_timestamp()"))
+  reason                  String   @db.VarChar(500)
+  previousGrossUnitCost   Decimal  @db.Decimal(20, 4)
+  newGrossUnitCost        Decimal  @db.Decimal(20, 4)
+  previousDiscountPercent Decimal @db.Decimal(5, 2)
+  newDiscountPercent      Decimal  @db.Decimal(5, 2)
+  previousNetUnitCost     Decimal  @db.Decimal(20, 4)
+  newNetUnitCost          Decimal  @db.Decimal(20, 4)
+
+  purchase Purchase @relation(fields: [purchaseId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([companyId, purchaseId, createdAt, id])
 }
 
 model PurchaseItem {
@@ -442,6 +479,8 @@ model PurchaseItem {
   productId  String
   quantity   Int
   price      Float
+  listUnitCost Float?
+  discountPercent Float @default(0)
   subtotal   Float
 
   product  Product  @relation(fields: [productId], references: [id])
@@ -533,6 +572,8 @@ model Company {
   rfc                                   String                                          @unique
   email                                 String?
   phone                                 String?
+  fiscalAddress                        String?
+  placeOfIssue                         String?
   language                              String                                          @default("es")
   timezone                              String                                          @default("America/Hermosillo")
   createdAt                             DateTime                                        @default(now())
@@ -693,9 +734,11 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   role         UserRole
+  canAdjustPurchaseUnitCost Boolean @default(false)
 
   company Company @relation(fields: [companyId], references: [id])
 
+  createdPurchases Purchase[] @relation("PurchaseCreatedBy")
   receivedPurchaseReceipts PurchaseReceipt[] @relation("PurchaseReceiptReceivedBy")
   supplierAttachmentUploaders SupplierDocumentAttachment[] @relation("SupplierAttachmentUploadedBy")
   supplierAttachmentRemovers SupplierDocumentAttachment[] @relation("SupplierAttachmentRemovedBy")
@@ -1347,6 +1390,10 @@ model Supplier {
   companyId String
 
   name        String
+  legalName   String?
+  rfc         String?
+  fiscalAddress String?
+  supplierCode String?
   email       String?
   phone       String?
   address     String?
@@ -1365,6 +1412,7 @@ model Supplier {
 
   @@unique([id, companyId])
   @@unique([companyId, name])
+  @@unique([companyId, supplierCode])
   @@index([companyId])
 }
 

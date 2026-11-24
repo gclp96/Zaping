@@ -7,16 +7,62 @@ import type {
   Product,
   Purchase,
   PurchaseFormItem,
+  PurchaseCommercialForm,
+  PurchaseCommercialFormField,
 } from '../types';
+
+const emptyCommercial: PurchaseCommercialForm = {
+  paymentTerms: '',
+  paymentMethod: '',
+  paymentDueDate: '',
+  expectedDeliveryDate: '',
+};
+
+function fromPurchase(purchase: Purchase): PurchaseCommercialForm {
+  return {
+    paymentTerms: purchase.paymentTerms ?? '',
+    paymentMethod: purchase.paymentMethod ?? '',
+    paymentDueDate: purchase.paymentDueDate?.slice(0, 10) ?? '',
+    expectedDeliveryDate: purchase.expectedDeliveryDate?.slice(0, 10) ?? '',
+  };
+}
 
 type UsePurchaseFormParams = {
   products: Product[];
   onPurchaseSaved: () => Promise<void>;
+  canAdjustUnitCost?: boolean;
 };
+
+function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function roundUnitCost(value: number): number {
+  return Math.round((value + Number.EPSILON) * 10_000) / 10_000;
+}
+
+function isValidDiscount(value: string): boolean {
+  if (!value.trim()) return false;
+  const parsed = Number(value);
+  const scaled = parsed * 100;
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 100 &&
+    Number.isSafeInteger(Math.round(scaled)) &&
+    Math.abs(scaled - Math.round(scaled)) <= 0.000001;
+}
+
+function isValidUnitCost(value: string): boolean {
+  if (!value.trim()) return false;
+  const parsed = Number(value);
+  const scaled = parsed * 10_000;
+  return Number.isFinite(parsed) && parsed >= 0 &&
+    Number.isSafeInteger(Math.round(scaled)) &&
+    Math.abs(scaled - Math.round(scaled)) <= 0.000001;
+}
 
 export function usePurchaseForm({
   products,
   onPurchaseSaved,
+  canAdjustUnitCost = false,
 }: UsePurchaseFormParams) {
   const [openModal, setOpenModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -25,6 +71,8 @@ export function usePurchaseForm({
     useState<Purchase | null>(null);
 
   const [supplierId, setSupplierId] = useState('');
+  const [commercial, setCommercial] =
+    useState<PurchaseCommercialForm>({ ...emptyCommercial });
   const [selectedProductId, setSelectedProductId] =
     useState('');
   const [quantity, setQuantity] = useState('1');
@@ -41,7 +89,35 @@ export function usePurchaseForm({
     useState('');
   const [itemQuantityErrors, setItemQuantityErrors] =
     useState<Record<string, string>>({});
+  const [itemUnitCostDrafts, setItemUnitCostDrafts] = useState<Record<string, string>>({});
+  const [itemUnitCostErrors, setItemUnitCostErrors] = useState<Record<string, string>>({});
+  const [itemDiscountDrafts, setItemDiscountDrafts] = useState<Record<string, string>>({});
+  const [itemDiscountErrors, setItemDiscountErrors] = useState<Record<string, string>>({});
   const [itemsError, setItemsError] = useState('');
+  const [costAdjustmentReason, setCostAdjustmentReason] = useState('');
+
+  const itemsToSave = items.map((item) => {
+    const catalogCost = products.find((product) => product.id === item.productId)?.cost;
+    const previous = purchaseToEdit?.items.find((line) => line.productId === item.productId);
+    const baseCost = item.baseUnitCost ?? item.unitCost;
+    const previousCost = previous?.listUnitCost ?? previous?.price;
+    const originalCost = previousCost ?? catalogCost;
+    const overrideNeeded = canAdjustUnitCost &&
+      originalCost !== undefined &&
+      baseCost !== originalCost && baseCost !== roundUnitCost(originalCost);
+    const discountPercent = item.discountPercent ?? 0;
+    const discountChanged = canAdjustUnitCost &&
+      discountPercent !== (previous?.discountPercent ?? 0);
+    return {
+      productId: item.productId,
+      quantity: Number(item.quantity),
+      ...(overrideNeeded ? { unitCost: baseCost } : {}),
+      ...(discountChanged ? { discountPercent } : {}),
+    };
+  });
+  const requiresCostAdjustmentReason = itemsToSave.some(
+    (item) => item.unitCost !== undefined || item.discountPercent !== undefined,
+  );
 
   const subtotal = useMemo(() => {
     return items.reduce((total, item) => {
@@ -51,31 +127,37 @@ export function usePurchaseForm({
         return total;
       }
 
-      return (
-        total +
-        parsedQuantity * item.unitCost
-      );
+      return roundMoney(total + roundMoney(parsedQuantity * item.unitCost));
     }, 0);
   }, [items]);
 
-  const iva = subtotal * 0.16;
-  const total = subtotal + iva;
+  const iva = roundMoney(subtotal * 0.16);
+  const total = roundMoney(subtotal + iva);
 
   // A draft's preloaded supplier and lines are the baseline, not new edits.
   // The existing hook stays responsible for form state and POST/PATCH payloads.
   const hasUnsavedChanges = useMemo(() => {
-    if (selectedProductId !== '' || quantity !== '1') {
+    if (selectedProductId !== '' || quantity !== '1' ||
+      Object.keys(itemUnitCostErrors).length > 0 ||
+      Object.keys(itemDiscountErrors).length > 0) {
       return true;
     }
 
     if (!purchaseToEdit) {
-      return supplierId !== '' || items.length > 0;
+      return supplierId !== '' || items.length > 0 ||
+        Object.values(commercial).some((value) => value.trim() !== '');
     }
 
     if (
       supplierId !== purchaseToEdit.supplier.id ||
       items.length !== purchaseToEdit.items.length
     ) {
+      return true;
+    }
+
+    if (Object.entries(commercial).some(([field, value]) =>
+      value !== fromPurchase(purchaseToEdit)[field as PurchaseCommercialFormField],
+    )) {
       return true;
     }
 
@@ -86,13 +168,16 @@ export function usePurchaseForm({
         !originalItem ||
         item.productId !== originalItem.productId ||
         item.quantity !== String(originalItem.quantity) ||
-        item.unitCost !== originalItem.price
+        item.unitCost !== originalItem.price ||
+        (item.baseUnitCost ?? item.unitCost) !== (originalItem.listUnitCost ?? originalItem.price) ||
+        (item.discountPercent ?? 0) !== (originalItem.discountPercent ?? 0)
       );
     });
-  }, [items, purchaseToEdit, quantity, selectedProductId, supplierId]);
+  }, [items, itemUnitCostErrors, itemDiscountErrors, purchaseToEdit, quantity, selectedProductId, supplierId, commercial]);
 
   function resetForm() {
     setSupplierId('');
+    setCommercial({ ...emptyCommercial });
     setSelectedProductId('');
     setQuantity('1');
     setItems([]);
@@ -101,7 +186,12 @@ export function usePurchaseForm({
     setProductError('');
     setQuantityError('');
     setItemQuantityErrors({});
+    setItemUnitCostDrafts({});
+    setItemUnitCostErrors({});
+    setItemDiscountDrafts({});
+    setItemDiscountErrors({});
     setItemsError('');
+    setCostAdjustmentReason('');
   }
 
   function openCreateModal() {
@@ -118,6 +208,7 @@ export function usePurchaseForm({
     setPurchaseToEdit(purchase);
 
     setSupplierId(purchase.supplier.id);
+    setCommercial(fromPurchase(purchase));
     setSelectedProductId('');
     setQuantity('1');
 
@@ -128,6 +219,9 @@ export function usePurchaseForm({
         name: item.product.name,
         quantity: String(item.quantity),
         unitCost: item.price,
+        baseUnitCost: item.listUnitCost ?? item.price,
+        discountPercent: item.discountPercent ?? 0,
+        unitOfMeasure: item.product.unitOfMeasure ?? null,
       })),
     );
 
@@ -135,7 +229,12 @@ export function usePurchaseForm({
     setProductError('');
     setQuantityError('');
     setItemQuantityErrors({});
+    setItemUnitCostDrafts({});
+    setItemUnitCostErrors({});
+    setItemDiscountDrafts({});
+    setItemDiscountErrors({});
     setItemsError('');
+    setCostAdjustmentReason('');
 
     setOpenModal(true);
   }
@@ -153,6 +252,13 @@ export function usePurchaseForm({
   function handleSupplierChange(value: string) {
     setSupplierId(value);
     setSupplierError('');
+  }
+
+  function handleCommercialChange(
+    field: PurchaseCommercialFormField,
+    value: string,
+  ) {
+    setCommercial((current) => ({ ...current, [field]: value }));
   }
 
   function handleSelectedProductChange(
@@ -215,6 +321,7 @@ export function usePurchaseForm({
       return;
     }
 
+    const previous = purchaseToEdit?.items.find((item) => item.productId === product.id);
     setItems((currentItems) => [
       ...currentItems,
       {
@@ -222,7 +329,10 @@ export function usePurchaseForm({
         sku: product.sku,
         name: product.name,
         quantity: String(parsedQuantity),
-        unitCost: product.cost,
+        unitCost: previous?.price ?? product.cost,
+        baseUnitCost: previous?.listUnitCost ?? previous?.price ?? product.cost,
+        discountPercent: previous?.discountPercent ?? 0,
+        unitOfMeasure: product.unitOfMeasure ?? null,
       },
     ]);
 
@@ -267,6 +377,54 @@ export function usePurchaseForm({
     });
   }
 
+  function handleItemUnitCostChange(productId: string, value: string) {
+    if (!canAdjustUnitCost) return;
+    setItemUnitCostDrafts((current) => ({ ...current, [productId]: value }));
+    const valid = isValidUnitCost(value);
+    setItemUnitCostErrors((current) => {
+      const next = { ...current };
+      if (!valid) next[productId] = 'El costo debe ser no negativo, con máximo 4 decimales.';
+      else delete next[productId];
+      return next;
+    });
+    if (valid) {
+      setItems((current) => current.map((item) => {
+        if (item.productId !== productId) return item;
+        const baseUnitCost = Number(value);
+        return {
+          ...item,
+          baseUnitCost,
+          unitCost: roundUnitCost(baseUnitCost * (1 - (item.discountPercent ?? 0) / 100)),
+        };
+      }));
+    }
+    setItemsError('');
+  }
+
+  function handleItemDiscountChange(productId: string, value: string) {
+    if (!canAdjustUnitCost) return;
+    setItemDiscountDrafts((current) => ({ ...current, [productId]: value }));
+    const valid = isValidDiscount(value);
+    setItemDiscountErrors((current) => {
+      const next = { ...current };
+      if (!valid) next[productId] = 'El descuento debe estar entre 0 y 100%, con máximo 2 decimales.';
+      else delete next[productId];
+      return next;
+    });
+    if (valid) {
+      setItems((current) => current.map((item) => {
+        if (item.productId !== productId) return item;
+        const discountPercent = Number(value);
+        return {
+          ...item,
+          discountPercent,
+          unitCost: roundUnitCost((item.baseUnitCost ?? item.unitCost) * (1 - discountPercent / 100)),
+        };
+      }));
+    }
+    setItemsError('');
+  }
+
   function handleRemoveItem(productId: string) {
     setItems((currentItems) =>
       currentItems.filter(
@@ -275,6 +433,26 @@ export function usePurchaseForm({
     );
 
     setItemsError('');
+    setItemUnitCostDrafts((current) => {
+      const next = { ...current };
+      delete next[productId];
+      return next;
+    });
+    setItemUnitCostErrors((current) => {
+      const next = { ...current };
+      delete next[productId];
+      return next;
+    });
+    setItemDiscountDrafts((current) => {
+      const next = { ...current };
+      delete next[productId];
+      return next;
+    });
+    setItemDiscountErrors((current) => {
+      const next = { ...current };
+      delete next[productId];
+      return next;
+    });
     setItemQuantityErrors((currentErrors) => {
       if (!currentErrors[productId]) {
         return currentErrors;
@@ -332,7 +510,19 @@ export function usePurchaseForm({
       );
       valid = false;
     }
+    if (Object.keys(itemUnitCostErrors).length > 0) {
+      setItemsError('Corrige los costos unitarios antes de guardar.');
+      valid = false;
+    }
+    if (Object.keys(itemDiscountErrors).length > 0) {
+      setItemsError('Corrige los descuentos antes de guardar.');
+      valid = false;
+    }
 
+    if (valid && requiresCostAdjustmentReason && costAdjustmentReason.trim().length < 8) {
+      setItemsError('Describe el motivo del ajuste de costo o descuento (mínimo 8 caracteres).');
+      valid = false;
+    }
     if (!valid) {
       return;
     }
@@ -340,12 +530,22 @@ export function usePurchaseForm({
     try {
       setSaving(true);
 
+      const existingCommercial = purchaseToEdit
+        ? fromPurchase(purchaseToEdit)
+        : emptyCommercial;
+      const commercialChanges: Partial<Record<PurchaseCommercialFormField, string | null>> = {};
+      for (const field of Object.keys(commercial) as PurchaseCommercialFormField[]) {
+        const value = commercial[field].trim();
+        if (value !== existingCommercial[field]) {
+          commercialChanges[field] = value || null;
+        }
+      }
+
       const payload = {
         supplierId,
-        items: items.map((item) => ({
-          productId: item.productId,
-          quantity: Number(item.quantity),
-        })),
+        ...commercialChanges,
+        ...(requiresCostAdjustmentReason && { costAdjustmentReason: costAdjustmentReason.trim() }),
+        items: itemsToSave,
       };
 
       if (purchaseToEdit) {
@@ -382,6 +582,7 @@ export function usePurchaseForm({
     hasUnsavedChanges,
 
     supplierId,
+    commercial,
     selectedProductId,
     quantity,
     items,
@@ -390,7 +591,14 @@ export function usePurchaseForm({
     productError,
     quantityError,
     itemQuantityErrors,
+    itemUnitCostDrafts,
+    itemUnitCostErrors,
+    itemDiscountDrafts,
+    itemDiscountErrors,
     itemsError,
+    costAdjustmentReason,
+    requiresCostAdjustmentReason,
+    setCostAdjustmentReason,
 
     subtotal,
     iva,
@@ -401,11 +609,14 @@ export function usePurchaseForm({
     closeCreateModal,
 
     handleSupplierChange,
+    handleCommercialChange,
     handleSelectedProductChange,
     handleFormQuantityChange,
 
     handleAddProduct,
     handleItemQuantityChange,
+    handleItemUnitCostChange,
+    handleItemDiscountChange,
     handleRemoveItem,
     handleCreatePurchase,
   };

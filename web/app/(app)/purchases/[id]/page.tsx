@@ -30,6 +30,7 @@ import ForbiddenState from '@/app/components/ui/ForbiddenState';
 import { api } from '@/services/api';
 import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 
+import PurchaseCostAuditHistory from '../components/PurchaseCostAuditHistory';
 import PurchaseFormModal from '../components/PurchaseFormModal';
 import PurchaseInventoryMovements from '../components/PurchaseInventoryMovements';
 import PurchaseReceiptModal from '../components/PurchaseReceiptModal';
@@ -241,6 +242,8 @@ function usePurchase360(purchaseId: string) {
     notFound,
     forbidden,
     currentUserRole,
+    delegatedCostEditing: currentUserRole === 'WAREHOUSE' && sessionState.status === 'success' &&
+      sessionState.user.canAdjustPurchaseUnitCost === true,
     receipts,
     receiptsLoading,
     receiptsError,
@@ -275,9 +278,11 @@ export default function Purchase360Page() {
     loadReceipts,
     loadMovements,
     currentUserRole,
+    delegatedCostEditing,
   } = usePurchase360(id);
   const canEdit = canEditPurchases(currentUserRole);
   const canApprove = canApprovePurchases(currentUserRole);
+  const canAdjustUnitCost = canApprove || delegatedCostEditing;
   const sessionForbidsAccess = Boolean(
     currentUserRole && !hasRole(currentUserRole, WAREHOUSE_ROLES),
   );
@@ -324,6 +329,7 @@ export default function Purchase360Page() {
     purchaseToEdit,
     hasUnsavedChanges,
     supplierId,
+    commercial,
     selectedProductId,
     quantity,
     items,
@@ -331,22 +337,33 @@ export default function Purchase360Page() {
     productError,
     quantityError,
     itemQuantityErrors,
+    itemUnitCostDrafts,
+    itemUnitCostErrors,
+    itemDiscountDrafts,
+    itemDiscountErrors,
     itemsError,
+    costAdjustmentReason,
+    requiresCostAdjustmentReason,
+    setCostAdjustmentReason,
     subtotal,
     iva,
     total,
     openEditModal,
     closeCreateModal,
     handleSupplierChange,
+    handleCommercialChange,
     handleSelectedProductChange,
     handleFormQuantityChange,
     handleAddProduct,
     handleItemQuantityChange,
+    handleItemUnitCostChange,
+    handleItemDiscountChange,
     handleRemoveItem,
     handleCreatePurchase,
   } = usePurchaseForm({
     products,
     onPurchaseSaved: reloadPurchase360,
+    canAdjustUnitCost,
   });
 
   const {
@@ -745,6 +762,8 @@ export default function Purchase360Page() {
           </dl>
         </Section>
 
+        {canAdjustUnitCost && <PurchaseCostAuditHistory purchase={purchase} />}
+
         <div className="rounded-xl border border-border bg-surface p-4 sm:p-6">
           <Section title="Recepciones">
             <PurchaseReceiptsHistory
@@ -780,6 +799,7 @@ export default function Purchase360Page() {
         suppliers={suppliers}
         products={products}
         supplierId={supplierId}
+        commercial={commercial}
         selectedProductId={selectedProductId}
         quantity={quantity}
         items={items}
@@ -787,7 +807,15 @@ export default function Purchase360Page() {
         productError={productError}
         quantityError={quantityError}
         itemQuantityErrors={itemQuantityErrors}
+        itemUnitCostDrafts={itemUnitCostDrafts}
+        itemUnitCostErrors={itemUnitCostErrors}
+        itemDiscountDrafts={itemDiscountDrafts}
+        itemDiscountErrors={itemDiscountErrors}
+        canAdjustUnitCost={canAdjustUnitCost}
         itemsError={itemsError}
+        costAdjustmentReason={costAdjustmentReason}
+        requiresCostAdjustmentReason={requiresCostAdjustmentReason}
+        onCostAdjustmentReasonChange={setCostAdjustmentReason}
         subtotal={subtotal}
         iva={iva}
         total={total}
@@ -797,9 +825,12 @@ export default function Purchase360Page() {
         onAddProduct={handleAddProduct}
         onRemoveItem={handleRemoveItem}
         onSupplierChange={handleSupplierChange}
+        onCommercialChange={handleCommercialChange}
         onSelectedProductChange={handleSelectedProductChange}
         onQuantityChange={handleFormQuantityChange}
         onItemQuantityChange={handleItemQuantityChange}
+        onItemUnitCostChange={handleItemUnitCostChange}
+        onItemDiscountChange={handleItemDiscountChange}
       />
 
       <PurchaseReceiptModal

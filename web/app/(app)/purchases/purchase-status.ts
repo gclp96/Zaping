@@ -13,7 +13,7 @@ export function getPurchaseStatusDescriptor(
   if (status === 'CONFIRMED') {
     return {
       label: 'Confirmada',
-      tone: 'success',
+      tone: 'info',
     };
   }
 
@@ -41,7 +41,7 @@ export function getPurchaseStatusDescriptor(
   if (status === 'DRAFT') {
     return {
       label: 'Borrador',
-      tone: 'warning',
+      tone: 'neutral',
     };
   }
 

@@ -433,6 +433,7 @@ const {
   hasUnsavedChanges,
 
   supplierId,
+  commercial,
   selectedProductId,
   quantity,
   items,
@@ -441,7 +442,14 @@ const {
   productError,
   quantityError,
   itemQuantityErrors,
+  itemUnitCostDrafts,
+  itemUnitCostErrors,
+  itemDiscountDrafts,
+  itemDiscountErrors,
   itemsError,
+  costAdjustmentReason,
+  requiresCostAdjustmentReason,
+  setCostAdjustmentReason,
 
   subtotal,
   iva,
@@ -452,16 +460,20 @@ const {
   closeCreateModal,
 
   handleSupplierChange,
+  handleCommercialChange,
   handleSelectedProductChange,
   handleFormQuantityChange,
 
   handleAddProduct,
   handleItemQuantityChange,
+  handleItemUnitCostChange,
+  handleItemDiscountChange,
   handleRemoveItem,
   handleCreatePurchase,
 } = usePurchaseForm({
   products,
   onPurchaseSaved: loadPurchases,
+  canAdjustUnitCost: canApprove || Boolean(currentUserRole === 'WAREHOUSE' && sessionState.status === 'success' && sessionState.user.canAdjustPurchaseUnitCost),
 });
 
   //propiedades de recepcion
@@ -737,11 +749,11 @@ async function loadPageData() {
             ? 'grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6'
             : 'grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6'}>
           <Input
-            label={purchasesWorkspaceEnabled ? 'Buscar por folio, proveedor o SKU' : 'Buscar compras'}
+            label={purchasesWorkspaceEnabled ? 'Buscar por folio, proveedor o producto' : 'Buscar compras'}
             type="search"
             value={search}
             placeholder="Folio, proveedor o producto"
-            helperText="También puedes buscar por contacto, email o SKU."
+            helperText={purchasesWorkspaceEnabled ? undefined : 'También puedes buscar por contacto, email o SKU.'}
             startAdornment={<Search size={17} />}
             containerClassName="sm:col-span-2"
             onChange={(event) => {
@@ -935,6 +947,7 @@ async function loadPageData() {
     {
       id: 'items',
       header: 'Partidas',
+      align: 'center',
       sortable: true,
       priority: 'tertiary',
       minWidth: 80,
@@ -1019,9 +1032,9 @@ async function loadPageData() {
     {
       id: 'actions',
       header: 'Acciones',
-      align: 'end',
+      align: 'center',
       priority: 'primary',
-      minWidth: 180,
+      minWidth: 208,
       cell: (purchase) => {
         const rowActions: DataTableRowAction<Purchase>[] = [
           ...(canEdit && canApprove && purchase.status === 'DRAFT'
@@ -1034,6 +1047,12 @@ async function loadPageData() {
                 },
               ]
             : []),
+          {
+            id: 'view',
+            label: 'Ver',
+            onSelect: (selectedPurchase) =>
+              router.push(`/purchases/${encodeURIComponent(selectedPurchase.id)}`),
+          },
           {
             id: 'download-pdf',
             label:
@@ -1058,7 +1077,7 @@ async function loadPageData() {
         ];
 
         return (
-          <div className="relative flex flex-wrap items-center justify-end gap-2">
+          <div className="relative flex flex-wrap items-center justify-center gap-4">
             {purchase.status === 'DRAFT' && canApprove ? (
               <Button
                 variant="success"
@@ -1105,7 +1124,7 @@ async function loadPageData() {
               </span>
             ) : null}
 
-            <div className="inline-flex [&>div>button]:border-transparent [&>div>button]:bg-transparent [&>div>button]:hover:bg-surface-subtle">
+            <div className="ml-1 inline-flex border-l border-border pl-3 [&>div>button]:border-transparent [&>div>button]:bg-transparent [&>div>button]:hover:bg-surface-subtle">
               <RowActionsMenu
                 row={purchase}
                 label={`Acciones de compra ${purchase.folio}`}
@@ -1290,6 +1309,7 @@ async function loadPageData() {
         suppliers={suppliers}
         products={products}
         supplierId={supplierId}
+        commercial={commercial}
         selectedProductId={selectedProductId}
         quantity={quantity}
         items={items}
@@ -1297,7 +1317,15 @@ async function loadPageData() {
         productError={productError}
         quantityError={quantityError}
         itemQuantityErrors={itemQuantityErrors}
+        itemUnitCostDrafts={itemUnitCostDrafts}
+        itemUnitCostErrors={itemUnitCostErrors}
+        itemDiscountDrafts={itemDiscountDrafts}
+        itemDiscountErrors={itemDiscountErrors}
+        canAdjustUnitCost={canApprove || Boolean(currentUserRole === 'WAREHOUSE' && sessionState.status === 'success' && sessionState.user.canAdjustPurchaseUnitCost)}
         itemsError={itemsError}
+        costAdjustmentReason={costAdjustmentReason}
+        requiresCostAdjustmentReason={requiresCostAdjustmentReason}
+        onCostAdjustmentReasonChange={setCostAdjustmentReason}
         subtotal={subtotal}
         iva={iva}
         total={total}
@@ -1307,6 +1335,7 @@ async function loadPageData() {
         onAddProduct={handleAddProduct}
         onRemoveItem={handleRemoveItem}
         onSupplierChange={handleSupplierChange}
+        onCommercialChange={handleCommercialChange}
         onSelectedProductChange={
           handleSelectedProductChange
         }
@@ -1314,6 +1343,8 @@ async function loadPageData() {
         onItemQuantityChange={
           handleItemQuantityChange
         }
+        onItemUnitCostChange={handleItemUnitCostChange}
+        onItemDiscountChange={handleItemDiscountChange}
         />
       <PurchaseReceiptModal
         isOpen={purchaseToReceive !== null || createdReceipt !== null}
@@ -1349,14 +1380,17 @@ async function loadPageData() {
           message={
             <div className="space-y-3">
               <p>
-                ¿Seguro que deseas aprobar la compra{' '}
-                <span className="font-semibold">
-                  {purchaseToApprove?.folio}
-                </span>
-                ? La compra quedará confirmada y podrá
-                recibir mercancía. El inventario no
+                Revisa el proveedor y el importe antes de aprobar la compra{' '}
+                <span className="font-semibold">{purchaseToApprove?.folio}</span>.
+                Una vez confirmada, podrá recibir mercancía. El inventario no
                 cambiará hasta registrar una recepción.
               </p>
+              {purchaseToApprove ? (
+                <div role="group" aria-label="Resumen de aprobación" className="rounded-lg border border-border bg-surface-subtle p-3 text-sm">
+                  <p><span className="font-semibold">Proveedor:</span> {purchaseToApprove.supplier.name}</p>
+                  <p><span className="font-semibold">Importe total:</span> {formatMoney(purchaseToApprove.total)}</p>
+                </div>
+              ) : null}
               {actionError ? (
                 <p role="alert" className="text-sm text-red-700">
                   {actionError}

@@ -3,15 +3,22 @@ import {
   BadRequestException,
   NotFoundException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 
-import PDFDocument from 'pdfkit';
+import { Prisma, UserRole } from '@prisma/client';
+
 import { Response } from 'express';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto';
 import { PurchasesFolioService } from './purchases-folio.service';
+import { renderPurchaseOrderPdf } from './purchase-order-pdf';
+import {
+  buildPurchaseCommercialSnapshot,
+  parsePurchaseCalendarDate,
+} from './purchase-commercial';
 
 type PurchaseWithReceiptItems = {
   items: Array<{
@@ -20,6 +27,24 @@ type PurchaseWithReceiptItems = {
   }>;
 };
 
+type PurchaseActor = { id: string; firstName: string; lastName: string };
+type CostAuditEntry = Omit<
+  Prisma.PurchaseCostAuditCreateManyInput,
+  | 'companyId'
+  | 'purchaseId'
+  | 'actorUserId'
+  | 'actorDisplayName'
+  | 'actorRole'
+  | 'reason'
+>;
+
+function actorDisplayName(actor: PurchaseActor): string {
+  return (
+    [actor.firstName, actor.lastName].filter(Boolean).join(' ').trim() ||
+    'Usuario sin nombre'
+  );
+}
+
 @Injectable()
 export class PurchasesService {
   constructor(
@@ -27,7 +52,13 @@ export class PurchasesService {
     private readonly folios: PurchasesFolioService,
   ) {}
 
-  async create(companyId: string, dto: CreatePurchaseDto) {
+  async create(
+    companyId: string,
+    dto: CreatePurchaseDto,
+    actorRole?: UserRole,
+    actorCanAdjustPurchaseUnitCost = false,
+    author?: PurchaseActor,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const productIds = dto.items.map((item) => item.productId);
       const uniqueProductIds = new Set(productIds);
@@ -72,10 +103,13 @@ export class PurchasesService {
         );
       }
 
+      const costAudits: CostAuditEntry[] = [];
       const purchaseItems: Array<{
         productId: string;
         quantity: number;
         price: number;
+        listUnitCost?: number;
+        discountPercent?: number;
         subtotal: number;
       }> = [];
 
@@ -90,24 +124,59 @@ export class PurchasesService {
           );
         }
 
-        const itemSubtotal = this.roundMoney(item.quantity * product.cost);
+        const previousGrossUnitCost = product.cost;
+        const baseCost = this.resolvePurchaseItemUnitCost(
+          item.unitCost,
+          previousGrossUnitCost,
+          actorRole,
+          actorCanAdjustPurchaseUnitCost,
+        );
+        const discount = this.resolvePurchaseItemDiscount(
+          item.discountPercent,
+          0,
+          actorRole,
+          actorCanAdjustPurchaseUnitCost,
+        );
+        // Inventory receipts use PurchaseItem.price, so it stores the
+        // effective (discounted) unit cost, never the list price.
+        const unitCost = this.roundUnitCost(baseCost * (1 - discount / 100));
+        this.collectCostAudit(
+          costAudits,
+          product,
+          {
+            gross: previousGrossUnitCost,
+            discount: 0,
+            net: this.roundUnitCost(previousGrossUnitCost),
+          },
+          { gross: baseCost, discount, net: unitCost },
+        );
+        const itemSubtotal = this.roundMoney(item.quantity * unitCost);
 
         subtotal = this.roundMoney(subtotal + itemSubtotal);
 
         purchaseItems.push({
           productId: product.id,
-
           quantity: item.quantity,
-          price: product.cost,
+          price: unitCost,
+          ...(discount > 0 && {
+            listUnitCost: baseCost,
+            discountPercent: discount,
+          }),
           subtotal: itemSubtotal,
         });
       }
 
       const iva = this.roundMoney(subtotal * 0.16);
       const total = this.roundMoney(subtotal + iva);
+      const auditActor = this.getCostAuditActor(
+        costAudits,
+        dto.costAdjustmentReason,
+        actorRole,
+        author,
+      );
       const folio = await this.folios.allocateNextAvailableFolio(tx, companyId);
 
-      return tx.purchase.create({
+      const purchase = await tx.purchase.create({
         data: {
           companyId,
           supplierId: dto.supplierId,
@@ -115,6 +184,24 @@ export class PurchasesService {
           subtotal,
           iva,
           total,
+          ...(author && {
+            createdByUserId: author.id,
+            createdByDisplayName: actorDisplayName(author),
+          }),
+          ...(dto.paymentTerms !== undefined && {
+            paymentTerms: dto.paymentTerms,
+          }),
+          ...(dto.paymentMethod !== undefined && {
+            paymentMethod: dto.paymentMethod,
+          }),
+          ...(dto.paymentDueDate !== undefined && {
+            paymentDueDate: parsePurchaseCalendarDate(dto.paymentDueDate),
+          }),
+          ...(dto.expectedDeliveryDate !== undefined && {
+            expectedDeliveryDate: parsePurchaseCalendarDate(
+              dto.expectedDeliveryDate,
+            ),
+          }),
           items: {
             create: purchaseItems,
           },
@@ -128,6 +215,17 @@ export class PurchasesService {
           },
         },
       });
+      if (auditActor) {
+        await tx.purchaseCostAudit.createMany({
+          data: costAudits.map((entry) => ({
+            ...entry,
+            ...auditActor,
+            companyId,
+            purchaseId: purchase.id,
+          })),
+        });
+      }
+      return purchase;
     });
   }
 
@@ -261,8 +359,25 @@ export class PurchasesService {
     };
   }
 
-  async update(companyId: string, purchaseId: string, dto: UpdatePurchaseDto) {
-    return this.prisma.$transaction(async (tx) => {
+  async update(
+    companyId: string,
+    purchaseId: string,
+    dto: UpdatePurchaseDto,
+    actorRole?: UserRole,
+    actorCanAdjustPurchaseUnitCost = false,
+    author?: PurchaseActor,
+  ) {
+    const updateDraft = async (tx: Prisma.TransactionClient) => {
+      // Serialize edits before reading the lines that this transaction will replace.
+      const locked = await tx.$queryRaw<{ id: string }[]>`
+        SELECT "id" FROM "Purchase"
+        WHERE "id" = ${purchaseId} AND "companyId" = ${companyId}
+        FOR NO KEY UPDATE
+      `;
+      if (locked.length === 0) {
+        throw new NotFoundException('Compra no encontrada');
+      }
+
       const purchase = await tx.purchase.findFirst({
         where: {
           id: purchaseId,
@@ -271,6 +386,14 @@ export class PurchasesService {
         select: {
           id: true,
           status: true,
+          items: {
+            select: {
+              productId: true,
+              price: true,
+              listUnitCost: true,
+              discountPercent: true,
+            },
+          },
         },
       });
 
@@ -331,10 +454,13 @@ export class PurchasesService {
         );
       }
 
+      const costAudits: CostAuditEntry[] = [];
       const purchaseItems: Array<{
         productId: string;
         quantity: number;
         price: number;
+        listUnitCost?: number;
+        discountPercent?: number;
         subtotal: number;
       }> = [];
 
@@ -349,21 +475,65 @@ export class PurchasesService {
           );
         }
 
-        const itemSubtotal = this.roundMoney(item.quantity * product.cost);
+        const previous = purchase.items?.find(
+          (line) => line.productId === product.id,
+        );
+        const previousGrossUnitCost =
+          previous?.listUnitCost ?? previous?.price ?? product.cost;
+        const previousDiscount = previous?.discountPercent ?? 0;
+        const baseCost = this.resolvePurchaseItemUnitCost(
+          item.unitCost,
+          previousGrossUnitCost,
+          actorRole,
+          actorCanAdjustPurchaseUnitCost,
+        );
+        const discount = this.resolvePurchaseItemDiscount(
+          item.discountPercent,
+          previousDiscount,
+          actorRole,
+          actorCanAdjustPurchaseUnitCost,
+        );
+        const unchanged =
+          baseCost === previousGrossUnitCost && discount === previousDiscount;
+        const unitCost =
+          unchanged && previous
+            ? previous.price
+            : this.roundUnitCost(baseCost * (1 - discount / 100));
+        this.collectCostAudit(
+          costAudits,
+          product,
+          {
+            gross: previousGrossUnitCost,
+            discount: previousDiscount,
+            net: previous?.price ?? this.roundUnitCost(previousGrossUnitCost),
+          },
+          { gross: baseCost, discount, net: unitCost },
+        );
+        const itemSubtotal = this.roundMoney(item.quantity * unitCost);
 
         subtotal = this.roundMoney(subtotal + itemSubtotal);
 
         purchaseItems.push({
           productId: product.id,
-
           quantity: item.quantity,
-          price: product.cost,
+          price: unitCost,
+          ...(discount > 0 && {
+            listUnitCost: baseCost,
+            discountPercent: discount,
+          }),
           subtotal: itemSubtotal,
         });
       }
 
       const iva = this.roundMoney(subtotal * 0.16);
       const total = this.roundMoney(subtotal + iva);
+
+      const auditActor = this.getCostAuditActor(
+        costAudits,
+        dto.costAdjustmentReason,
+        actorRole,
+        author,
+      );
 
       const updateResult = await tx.purchase.updateMany({
         where: {
@@ -376,6 +546,20 @@ export class PurchasesService {
           subtotal,
           iva,
           total,
+          ...(dto.paymentTerms !== undefined && {
+            paymentTerms: dto.paymentTerms,
+          }),
+          ...(dto.paymentMethod !== undefined && {
+            paymentMethod: dto.paymentMethod,
+          }),
+          ...(dto.paymentDueDate !== undefined && {
+            paymentDueDate: parsePurchaseCalendarDate(dto.paymentDueDate),
+          }),
+          ...(dto.expectedDeliveryDate !== undefined && {
+            expectedDeliveryDate: parsePurchaseCalendarDate(
+              dto.expectedDeliveryDate,
+            ),
+          }),
         },
       });
 
@@ -415,6 +599,17 @@ export class PurchasesService {
         })),
       });
 
+      if (auditActor) {
+        await tx.purchaseCostAudit.createMany({
+          data: costAudits.map((entry) => ({
+            ...entry,
+            ...auditActor,
+            companyId,
+            purchaseId,
+          })),
+        });
+      }
+
       return tx.purchase.findFirst({
         where: {
           id: purchaseId,
@@ -429,7 +624,87 @@ export class PurchasesService {
           },
         },
       });
+    };
+    return this.prisma.$transaction(updateDraft, {
+      isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
     });
+  }
+
+  async findCostAudit(
+    companyId: string,
+    purchaseId: string,
+    role: UserRole,
+    delegated: boolean,
+  ) {
+    if (
+      role !== UserRole.ADMIN &&
+      role !== UserRole.MANAGER &&
+      !(role === UserRole.WAREHOUSE && delegated)
+    ) {
+      throw new ForbiddenException(
+        'No tienes permiso para consultar el historial de costos',
+      );
+    }
+
+    const purchase = await this.prisma.purchase.findFirst({
+      where: { id: purchaseId, companyId },
+      select: { id: true },
+    });
+    if (!purchase) throw new NotFoundException('Compra no encontrada');
+
+    return this.prisma.purchaseCostAudit.findMany({
+      where: { companyId, purchaseId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      omit: { companyId: true, purchaseId: true },
+    });
+  }
+
+  private collectCostAudit(
+    entries: CostAuditEntry[],
+    product: { id: string; name: string },
+    previous: { gross: number; discount: number; net: number },
+    next: { gross: number; discount: number; net: number },
+  ) {
+    if (previous.gross === next.gross && previous.discount === next.discount)
+      return;
+
+    entries.push({
+      productId: product.id,
+      productDisplayName: product.name,
+      previousGrossUnitCost: previous.gross,
+      newGrossUnitCost: next.gross,
+      previousDiscountPercent: previous.discount,
+      newDiscountPercent: next.discount,
+      previousNetUnitCost: previous.net,
+      newNetUnitCost: next.net,
+    });
+  }
+
+  private getCostAuditActor(
+    entries: CostAuditEntry[],
+    requestedReason: string | undefined,
+    role: UserRole | undefined,
+    actor: PurchaseActor | undefined,
+  ) {
+    if (entries.length === 0) return null;
+    const reason = requestedReason?.trim();
+    if (!reason || reason.length < 8 || reason.length > 500) {
+      throw new BadRequestException(
+        'Describe el motivo del ajuste de costo o descuento (8 a 500 caracteres)',
+      );
+    }
+    if (!actor?.id || !role) {
+      throw new ForbiddenException(
+        'No se pudo identificar a quien realiza el ajuste',
+      );
+    }
+
+    return {
+      reason,
+      actorUserId: actor.id,
+      actorDisplayName: actorDisplayName(actor),
+      actorRole: role,
+    };
   }
 
   async findInventoryMovements(companyId: string, purchaseId: string) {
@@ -519,6 +794,7 @@ export class PurchasesService {
           companyId,
         },
         include: {
+          company: true,
           supplier: true,
           items: {
             include: {
@@ -538,7 +814,20 @@ export class PurchasesService {
         );
       }
 
-      return purchase;
+      // The snapshot and status transition are in the same DB transaction.
+      // Later edits to Company, Supplier or Product cannot rewrite this PDF.
+      const commercialSnapshot = buildPurchaseCommercialSnapshot(purchase);
+      const frozen = await tx.purchase.updateMany({
+        where: { id: purchaseId, companyId, status: 'CONFIRMED' },
+        data: {
+          commercialSnapshot,
+        },
+      });
+      if (frozen.count !== 1) {
+        throw new ConflictException('No fue posible congelar la compra');
+      }
+
+      return { ...purchase, commercialSnapshot };
     });
   }
 
@@ -600,23 +889,94 @@ export class PurchasesService {
     });
   }
 
+  private roundUnitCost(value: number): number {
+    return Math.round((value + Number.EPSILON) * 10_000) / 10_000;
+  }
+
+  private resolvePurchaseItemDiscount(
+    requested: number | undefined,
+    fallback: number,
+    role?: UserRole,
+    delegated = false,
+  ): number {
+    if (requested === undefined) return fallback;
+
+    if (
+      role !== UserRole.ADMIN &&
+      role !== UserRole.MANAGER &&
+      !(role === UserRole.WAREHOUSE && delegated)
+    ) {
+      throw new ForbiddenException(
+        'No tienes permiso para modificar descuentos de compra',
+      );
+    }
+
+    const hundredths = requested * 100;
+    if (
+      !Number.isFinite(requested) ||
+      requested < 0 ||
+      requested > 100 ||
+      !Number.isSafeInteger(Math.round(hundredths)) ||
+      Math.abs(hundredths - Math.round(hundredths)) > 0.000001
+    ) {
+      throw new BadRequestException(
+        'El descuento debe ser un porcentaje entre 0 y 100 con máximo 2 decimales',
+      );
+    }
+
+    return requested;
+  }
+
+  private resolvePurchaseItemUnitCost(
+    requestedCost: number | undefined,
+    fallbackCost: number,
+    actorRole?: UserRole,
+    actorCanAdjustPurchaseUnitCost = false,
+  ): number {
+    if (requestedCost === undefined) {
+      return fallbackCost;
+    }
+
+    const roleAllowsEdit =
+      actorRole === UserRole.ADMIN || actorRole === UserRole.MANAGER;
+    const delegatedBuyer =
+      actorRole === UserRole.WAREHOUSE && actorCanAdjustPurchaseUnitCost;
+
+    if (!roleAllowsEdit && !delegatedBuyer) {
+      throw new ForbiddenException(
+        'No tienes permiso para modificar el costo unitario de la compra',
+      );
+    }
+
+    const inTenThousandths = requestedCost * 10_000;
+    if (
+      !Number.isFinite(requestedCost) ||
+      requestedCost < 0 ||
+      !Number.isSafeInteger(Math.round(inTenThousandths)) ||
+      Math.abs(inTenThousandths - Math.round(inTenThousandths)) > 0.000001
+    ) {
+      throw new BadRequestException(
+        'El costo unitario debe ser no negativo y tener como máximo 4 decimales',
+      );
+    }
+
+    return requestedCost === this.roundUnitCost(fallbackCost)
+      ? fallbackCost
+      : requestedCost;
+  }
+
   private roundMoney(value: number): number {
     return Math.round((value + Number.EPSILON) * 100) / 100;
   }
 
   async generatePDF(companyId: string, purchaseId: string, res: Response) {
     const purchase = await this.prisma.purchase.findFirst({
-      where: {
-        id: purchaseId,
-        companyId,
-      },
+      where: { id: purchaseId, companyId },
       include: {
         company: true,
         supplier: true,
         items: {
-          include: {
-            product: true,
-          },
+          include: { product: true },
         },
       },
     });
@@ -625,338 +985,6 @@ export class PurchasesService {
       throw new NotFoundException('Compra no encontrada');
     }
 
-    const formatMoney = (value: number) =>
-      new Intl.NumberFormat('es-MX', {
-        style: 'currency',
-        currency: purchase.company.currency,
-      }).format(value);
-
-    const formatDate = (date: Date) =>
-      new Intl.DateTimeFormat('es-MX', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      }).format(date);
-
-    const getStatusLabel = (status: string) => {
-      if (status === 'DRAFT') return 'Borrador';
-      if (status === 'CONFIRMED') return 'Confirmada';
-      if (status === 'PARTIALLY_RECEIVED') {
-        return 'Recibida partcialmente';
-      }
-      if (status === 'RECEIVED') return 'Recibida';
-      if (status === 'CANCELLED') return 'Cancelada';
-
-      return status;
-    };
-
-    const getValue = (value?: string | null) =>
-      value && value.trim().length > 0 ? value : 'No especificado';
-
-    const fileName = `compra-${purchase.folio.replace(/[^a-zA-Z0-9-_]/g, '-')}.pdf`;
-
-    const doc = new PDFDocument({
-      margin: 50,
-      size: 'LETTER',
-    });
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
-
-    doc.pipe(res);
-
-    const left = doc.page.margins.left;
-    const right = doc.page.width - doc.page.margins.right;
-    const pageWidth = right - left;
-
-    const addPageIfNeeded = (requiredSpace: number) => {
-      if (doc.y + requiredSpace > doc.page.height - doc.page.margins.bottom) {
-        doc.addPage();
-        return true;
-      }
-
-      return false;
-    };
-
-    const drawDivider = () => {
-      doc
-        .moveTo(left, doc.y)
-        .lineTo(right, doc.y)
-        .strokeColor('#E5E7EB')
-        .stroke();
-
-      doc.moveDown();
-    };
-
-    const companyName = purchase.company.tradeName || purchase.company.name;
-
-    // Encabezado
-    doc
-      .fillColor('#111827')
-      .font('Helvetica-Bold')
-      .fontSize(20)
-      .text(companyName, {
-        align: 'left',
-      });
-
-    doc
-      .font('Helvetica')
-      .fontSize(9)
-      .fillColor('#4B5563')
-      .text(`RFC: ${purchase.company.rfc}`)
-      .text(`Correo: ${getValue(purchase.company.email)}`)
-      .text(`Teléfono: ${getValue(purchase.company.phone)}`);
-
-    doc.moveDown();
-
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(18)
-      .fillColor('#111827')
-      .text('ORDEN DE COMPRA', {
-        align: 'right',
-      });
-
-    doc
-      .font('Helvetica')
-      .fontSize(10)
-      .fillColor('#374151')
-      .text(`Folio: ${purchase.folio}`, {
-        align: 'right',
-      })
-      .text(`Fecha: ${formatDate(purchase.createdAt)}`, {
-        align: 'right',
-      })
-      .text(`Estado: ${getStatusLabel(purchase.status)}`, {
-        align: 'right',
-      });
-
-    doc.moveDown();
-    drawDivider();
-
-    // Proveedor
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(13)
-      .fillColor('#111827')
-      .text('Proveedor');
-
-    doc.moveDown(0.5);
-
-    doc
-      .font('Helvetica')
-      .fontSize(10)
-      .fillColor('#374151')
-      .text(`Nombre: ${purchase.supplier.name}`)
-      .text(`Contacto: ${getValue(purchase.supplier.contactName)}`)
-      .text(`Correo: ${getValue(purchase.supplier.email)}`)
-      .text(`Teléfono: ${getValue(purchase.supplier.phone)}`)
-      .text(`Dirección: ${getValue(purchase.supplier.address)}`);
-
-    doc.moveDown();
-    drawDivider();
-
-    // Tabla
-    doc
-      .font('Helvetica-Bold')
-      .fontSize(13)
-      .fillColor('#111827')
-      .text('Productos');
-
-    doc.moveDown(0.75);
-
-    const columns = {
-      sku: {
-        x: left,
-        width: 70,
-      },
-      product: {
-        x: left + 75,
-        width: 205,
-      },
-      quantity: {
-        x: left + 285,
-        width: 55,
-      },
-      price: {
-        x: left + 345,
-        width: 80,
-      },
-      subtotal: {
-        x: left + 430,
-        width: pageWidth - 430,
-      },
-    };
-
-    const drawTableHeader = () => {
-      const y = doc.y;
-
-      doc.rect(left, y, pageWidth, 24).fillColor('#F3F4F6').fill();
-
-      doc.font('Helvetica-Bold').fontSize(9).fillColor('#111827');
-
-      doc.text('SKU', columns.sku.x + 4, y + 7, {
-        width: columns.sku.width,
-      });
-
-      doc.text('Producto', columns.product.x, y + 7, {
-        width: columns.product.width,
-      });
-
-      doc.text('Cant.', columns.quantity.x, y + 7, {
-        width: columns.quantity.width,
-        align: 'right',
-      });
-
-      doc.text('Costo', columns.price.x, y + 7, {
-        width: columns.price.width,
-        align: 'right',
-      });
-
-      doc.text('Subtotal', columns.subtotal.x, y + 7, {
-        width: columns.subtotal.width,
-        align: 'right',
-      });
-
-      doc.y = y + 30;
-    };
-
-    drawTableHeader();
-
-    purchase.items.forEach((item) => {
-      const productName = item.product.name;
-      const productHeight = doc.heightOfString(productName, {
-        width: columns.product.width,
-      });
-
-      const rowHeight = Math.max(30, productHeight + 14);
-
-      const addedPage = addPageIfNeeded(rowHeight + 20);
-
-      if (addedPage) {
-        drawTableHeader();
-      }
-
-      const y = doc.y;
-
-      doc.font('Helvetica').fontSize(9).fillColor('#374151');
-
-      doc.text(item.product.sku, columns.sku.x + 4, y + 7, {
-        width: columns.sku.width,
-      });
-
-      doc.text(productName, columns.product.x, y + 7, {
-        width: columns.product.width,
-      });
-
-      doc.text(String(item.quantity), columns.quantity.x, y + 7, {
-        width: columns.quantity.width,
-        align: 'right',
-      });
-
-      doc.text(formatMoney(item.price), columns.price.x, y + 7, {
-        width: columns.price.width,
-        align: 'right',
-      });
-
-      doc.text(formatMoney(item.subtotal), columns.subtotal.x, y + 7, {
-        width: columns.subtotal.width,
-        align: 'right',
-      });
-
-      doc
-        .moveTo(left, y + rowHeight)
-        .lineTo(right, y + rowHeight)
-        .strokeColor('#E5E7EB')
-        .stroke();
-
-      doc.y = y + rowHeight + 6;
-    });
-
-    // Totales
-    addPageIfNeeded(110);
-
-    doc.moveDown();
-
-    const totalsX = right - 220;
-    const totalsLabelWidth = 100;
-    const totalsValueWidth = 120;
-
-    doc.font('Helvetica').fontSize(10).fillColor('#374151');
-
-    doc.text('Subtotal', totalsX, doc.y, {
-      width: totalsLabelWidth,
-    });
-
-    doc.text(
-      formatMoney(purchase.subtotal),
-      totalsX + totalsLabelWidth,
-      doc.y - 12,
-      {
-        width: totalsValueWidth,
-        align: 'right',
-      },
-    );
-
-    doc.moveDown(0.75);
-
-    doc.text('IVA (16%)', totalsX, doc.y, {
-      width: totalsLabelWidth,
-    });
-
-    doc.text(
-      formatMoney(purchase.iva),
-      totalsX + totalsLabelWidth,
-      doc.y - 12,
-      {
-        width: totalsValueWidth,
-        align: 'right',
-      },
-    );
-
-    doc.moveDown(0.75);
-
-    doc
-      .moveTo(totalsX, doc.y)
-      .lineTo(right, doc.y)
-      .strokeColor('#D1D5DB')
-      .stroke();
-
-    doc.moveDown(0.5);
-
-    doc.font('Helvetica-Bold').fontSize(12).fillColor('#111827');
-
-    doc.text('Total', totalsX, doc.y, {
-      width: totalsLabelWidth,
-    });
-
-    doc.text(
-      formatMoney(purchase.total),
-      totalsX + totalsLabelWidth,
-      doc.y - 14,
-      {
-        width: totalsValueWidth,
-        align: 'right',
-      },
-    );
-
-    // Pie
-    doc.moveDown(3);
-
-    doc
-      .font('Helvetica')
-      .fontSize(8)
-      .fillColor('#6B7280')
-      .text(
-        'Documento generado por Zaping ERP. Esta orden de compra es para control operativo interno.',
-        left,
-        doc.page.height - 70,
-        {
-          width: pageWidth,
-          align: 'center',
-        },
-      );
-
-    doc.end();
+    renderPurchaseOrderPdf(purchase, res);
   }
 }

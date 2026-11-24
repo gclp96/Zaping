@@ -1,18 +1,51 @@
 import { useState } from 'react';
 
 import ProductSelector from '@/app/components/business/ProductSelector';
+import MoneyInput from '@/app/components/business/MoneyInput';
 import SupplierSelector from '@/app/components/business/SupplierSelector';
 
 import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import Input from '@/app/components/ui/Input';
+import Select from '@/app/components/ui/Select';
 import Modal from '@/app/components/ui/Modal';
 
 import type {
   Product,
   PurchaseFormItem,
+  PurchaseCommercialForm,
+  PurchaseCommercialFormField,
   Supplier,
 } from '../types';
+
+const paymentTermOptions = [
+  { value: 'Contado', label: 'Contado' },
+  { value: 'Crédito a 8 días', label: 'Crédito a 8 días' },
+  { value: 'Crédito a 15 días', label: 'Crédito a 15 días' },
+  { value: 'Crédito a 30 días', label: 'Crédito a 30 días' },
+  { value: 'Crédito a 45 días', label: 'Crédito a 45 días' },
+  { value: 'Crédito a 60 días', label: 'Crédito a 60 días' },
+  { value: 'Anticipo', label: 'Anticipo' },
+  { value: 'Anticipo + contraentrega', label: 'Anticipo + contraentrega' },
+];
+
+const paymentMethodOptions = [
+  { value: 'Transferencia electrónica', label: 'Transferencia electrónica' },
+  { value: 'Depósito bancario', label: 'Depósito bancario' },
+  { value: 'Cheque', label: 'Cheque' },
+  { value: 'Efectivo', label: 'Efectivo' },
+  { value: 'Tarjeta', label: 'Tarjeta' },
+  { value: 'Crédito interno', label: 'Crédito interno' },
+];
+
+function withLegacyOption(
+  options: { value: string; label: string }[],
+  value: string,
+) {
+  return value && !options.some((option) => option.value === value)
+    ? [...options, { value, label: value }]
+    : options;
+}
 
 type PurchaseFormModalProps = {
   isOpen: boolean;
@@ -24,6 +57,7 @@ type PurchaseFormModalProps = {
   products: Product[];
 
   supplierId: string;
+  commercial: PurchaseCommercialForm;
   selectedProductId: string;
   quantity: string;
   items: PurchaseFormItem[];
@@ -32,7 +66,15 @@ type PurchaseFormModalProps = {
   productError: string;
   quantityError: string;
   itemQuantityErrors: Record<string, string>;
+  itemUnitCostDrafts?: Record<string, string>;
+  itemUnitCostErrors?: Record<string, string>;
+  itemDiscountDrafts?: Record<string, string>;
+  itemDiscountErrors?: Record<string, string>;
+  canAdjustUnitCost?: boolean;
   itemsError: string;
+  costAdjustmentReason?: string;
+  requiresCostAdjustmentReason?: boolean;
+  onCostAdjustmentReasonChange?: (value: string) => void;
 
   subtotal: number;
   iva: number;
@@ -46,12 +88,15 @@ type PurchaseFormModalProps = {
   onRemoveItem: (productId: string) => void;
 
   onSupplierChange: (value: string) => void;
+  onCommercialChange: (field: PurchaseCommercialFormField, value: string) => void;
   onSelectedProductChange: (value: string) => void;
   onQuantityChange: (value: string) => void;
   onItemQuantityChange: (
     productId: string,
     value: string,
   ) => void;
+  onItemUnitCostChange?: (productId: string, value: string) => void;
+  onItemDiscountChange?: (productId: string, value: string) => void;
 };
 
 function getItemSubtotal(item: PurchaseFormItem): number {
@@ -70,6 +115,7 @@ export default function PurchaseFormModal({
   suppliers,
   products,
   supplierId,
+  commercial,
   selectedProductId,
   quantity,
   items,
@@ -77,7 +123,15 @@ export default function PurchaseFormModal({
   productError,
   quantityError,
   itemQuantityErrors,
+  itemUnitCostDrafts = {},
+  itemUnitCostErrors = {},
+  itemDiscountDrafts = {},
+  itemDiscountErrors = {},
+  canAdjustUnitCost = false,
   itemsError,
+  costAdjustmentReason,
+  requiresCostAdjustmentReason,
+  onCostAdjustmentReasonChange,
   subtotal,
   iva,
   total,
@@ -87,9 +141,12 @@ export default function PurchaseFormModal({
   onAddProduct,
   onRemoveItem,
   onSupplierChange,
+  onCommercialChange,
   onSelectedProductChange,
   onQuantityChange,
   onItemQuantityChange,
+  onItemUnitCostChange,
+  onItemDiscountChange,
 }: PurchaseFormModalProps) {
   // PUR-UX-02C: create and DRAFT edit use the same visual workspace.
   // Edit eligibility and POST/PATCH behavior stay in the purchase hook.
@@ -128,6 +185,21 @@ export default function PurchaseFormModal({
           : 'sticky bottom-0 z-10 -mx-6 mt-6 border-t border-gray-200 bg-white/95 px-6 pb-2 pt-4 shadow-[0_-4px_12px_rgba(15,23,42,0.08)] backdrop-blur'
       }
     >
+      {requiresCostAdjustmentReason ? (
+        <label className="mb-3 block text-sm font-medium text-text">
+          Motivo del ajuste de costo o descuento
+          <textarea
+            className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2"
+            rows={2}
+            maxLength={500}
+            required
+            disabled={saving}
+            value={costAdjustmentReason}
+            onChange={(event) => onCostAdjustmentReasonChange?.(event.target.value)}
+            placeholder="Describe el motivo (mínimo 8 caracteres)"
+          />
+        </label>
+      ) : null}
       {itemsError ? (
         <p role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {itemsError}
@@ -158,7 +230,7 @@ export default function PurchaseFormModal({
           type="button"
           loading={saving}
           loadingText={editing ? 'Guardando cambios...' : 'Guardando...'}
-          disabled={saving || !supplierId || items.length === 0}
+          disabled={saving || !supplierId || items.length === 0 || Object.keys(itemUnitCostErrors).length > 0 || Object.keys(itemDiscountErrors).length > 0}
           className="w-full sm:min-w-40 sm:w-auto"
           onClick={onSubmit}
         >
@@ -207,10 +279,56 @@ export default function PurchaseFormModal({
             options={suppliers}
             value={supplierId}
             onChange={onSupplierChange}
+            searchable={workspaceEnabled}
+            showSelectedSeparately={workspaceEnabled && editing}
             required
             error={supplierError}
             helperText="Proveedor que surtirá la orden de compra."
           />
+        </section>
+
+        <section
+          aria-labelledby="purchase-commercial-heading"
+          className="rounded-xl border border-border bg-white p-3 sm:p-4"
+        >
+          <h3
+            id="purchase-commercial-heading"
+            className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-muted"
+          >
+            Condiciones comerciales
+          </h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Select
+              label="Condiciones de pago"
+              placeholder="No aplica"
+              value={commercial.paymentTerms}
+              options={withLegacyOption(paymentTermOptions, commercial.paymentTerms)}
+              disabled={saving}
+              onChange={(event) => onCommercialChange('paymentTerms', event.target.value)}
+            />
+            <Select
+              label="Método de pago"
+              placeholder="No aplica"
+              value={commercial.paymentMethod}
+              options={withLegacyOption(paymentMethodOptions, commercial.paymentMethod)}
+              disabled={saving}
+              onChange={(event) => onCommercialChange('paymentMethod', event.target.value)}
+            />
+            <Input
+              label="Fecha de pago"
+              type="date"
+              value={commercial.paymentDueDate}
+              disabled={saving}
+              onChange={(event) => onCommercialChange('paymentDueDate', event.target.value)}
+            />
+            <Input
+              label="Fecha comprometida de entrega"
+              type="date"
+              value={commercial.expectedDeliveryDate}
+              disabled={saving}
+              onChange={(event) => onCommercialChange('expectedDeliveryDate', event.target.value)}
+            />
+          </div>
         </section>
 
         <section
@@ -330,7 +448,10 @@ export default function PurchaseFormModal({
                         Cantidad
                       </th>
                       <th className="px-3 py-2 text-right" scope="col">
-                        Costo
+                        Costo unitario
+                      </th>
+                      <th className="px-3 py-2 text-right" scope="col">
+                        Descuento (%)
                       </th>
                       <th className="px-3 py-2 text-right" scope="col">
                         Subtotal
@@ -353,6 +474,7 @@ export default function PurchaseFormModal({
                           </p>
                           <p className="mt-1 text-xs text-gray-500">
                             {item.sku}
+                            {item.unitOfMeasure ? ` · ${item.unitOfMeasure}` : ''}
                           </p>
                         </td>
 
@@ -374,8 +496,35 @@ export default function PurchaseFormModal({
                           />
                         </td>
 
-                        <td className="px-3 py-3 text-right text-gray-700">
-                          {formatMoney(item.unitCost)}
+                        <td className="min-w-40 px-3 py-3 text-right text-gray-700">
+                          {workspaceEnabled && canAdjustUnitCost ? (
+                            <MoneyInput
+                              id={`purchase-item-unit-cost-${item.productId}-table`}
+                              aria-label={`Costo unitario de ${item.name}`}
+                              value={itemUnitCostDrafts[item.productId] ?? String(item.baseUnitCost ?? item.unitCost)}
+                              maxDecimals={4}
+                              error={itemUnitCostErrors[item.productId]}
+                              onValueChange={(value) => onItemUnitCostChange?.(item.productId, value)}
+                            />
+                          ) : formatMoney(item.baseUnitCost ?? item.unitCost)}
+                        </td>
+
+                        <td className="min-w-28 px-3 py-3 text-right">
+                          {workspaceEnabled && canAdjustUnitCost ? (
+                            <Input
+                              id={`purchase-item-discount-${item.productId}-table`}
+                              aria-label={`Descuento de ${item.name}`}
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={0.01}
+                              value={itemDiscountDrafts[item.productId] ?? String(item.discountPercent ?? 0)}
+                              error={itemDiscountErrors[item.productId]}
+                              onChange={(event) => onItemDiscountChange?.(item.productId, event.target.value)}
+                            />
+                          ) : (item.discountPercent ?? 0) > 0
+                            ? `${(item.discountPercent ?? 0).toFixed(2)}%`
+                            : '—'}
                         </td>
 
                         <td className="px-3 py-3 text-right font-medium text-gray-900">
@@ -425,6 +574,7 @@ export default function PurchaseFormModal({
                           </h4>
                           <p className="mt-1 text-xs text-gray-500">
                             SKU: {item.sku}
+                            {item.unitOfMeasure ? ` · ${item.unitOfMeasure}` : ''}
                           </p>
                         </div>
 
@@ -443,10 +593,47 @@ export default function PurchaseFormModal({
 
                       <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-3 text-sm">
                         <div>
-                          <dt className="text-gray-500">Costo</dt>
-                          <dd className="mt-1 font-medium text-gray-900">
-                            {formatMoney(item.unitCost)}
-                          </dd>
+                          {workspaceEnabled && canAdjustUnitCost ? (
+                            <MoneyInput
+                              id={`purchase-item-unit-cost-${item.productId}-mobile`}
+                              label={`Costo unitario de ${item.name}`}
+                              value={itemUnitCostDrafts[item.productId] ?? String(item.baseUnitCost ?? item.unitCost)}
+                              maxDecimals={4}
+                              error={itemUnitCostErrors[item.productId]}
+                              onValueChange={(value) => onItemUnitCostChange?.(item.productId, value)}
+                            />
+                          ) : (
+                            <>
+                              <dt className="text-gray-500">Costo</dt>
+                              <dd className="mt-1 font-medium text-gray-900">
+                                {formatMoney(item.baseUnitCost ?? item.unitCost)}
+                              </dd>
+                            </>
+                          )}
+                        </div>
+                        <div>
+                          {workspaceEnabled && canAdjustUnitCost ? (
+                            <Input
+                              id={`purchase-item-discount-${item.productId}-mobile`}
+                              label={`Descuento de ${item.name}`}
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={0.01}
+                              value={itemDiscountDrafts[item.productId] ?? String(item.discountPercent ?? 0)}
+                              error={itemDiscountErrors[item.productId]}
+                              onChange={(event) => onItemDiscountChange?.(item.productId, event.target.value)}
+                            />
+                          ) : (
+                            <>
+                              <dt className="text-gray-500">Descuento</dt>
+                              <dd className="mt-1 font-medium text-gray-900">
+                                {(item.discountPercent ?? 0) > 0
+                                  ? `${(item.discountPercent ?? 0).toFixed(2)}%`
+                                  : 'No aplica'}
+                              </dd>
+                            </>
+                          )}
                         </div>
                         <div>
                           <dt className="text-gray-500">Subtotal</dt>

@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { PurchaseStatus } from '@prisma/client';
+import { PurchaseStatus, UserRole } from '@prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto';
@@ -13,11 +13,14 @@ describe('PurchasesService — tenant-safe mutations', () => {
   const supplierId = '33333333-3333-4333-8333-333333333333';
   const productId = '44444444-4444-4444-8444-444444444444';
 
+  const actor = { id: 'user-1', firstName: 'Ana', lastName: 'Compras' };
   let service: PurchasesService;
   let prisma: {
     $transaction: jest.Mock;
   };
   let transactionClient: {
+    $queryRaw: jest.Mock;
+    purchaseCostAudit: { createMany: jest.Mock };
     purchase: {
       findFirst: jest.Mock;
       updateMany: jest.Mock;
@@ -36,6 +39,8 @@ describe('PurchasesService — tenant-safe mutations', () => {
 
   beforeEach(() => {
     transactionClient = {
+      $queryRaw: jest.fn().mockResolvedValue([{ id: purchaseId }]),
+      purchaseCostAudit: { createMany: jest.fn() },
       purchase: {
         findFirst: jest.fn(),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -48,6 +53,7 @@ describe('PurchasesService — tenant-safe mutations', () => {
           {
             id: productId,
             cost: 100,
+            name: 'Producto A',
           },
         ]),
       },
@@ -146,6 +152,219 @@ describe('PurchasesService — tenant-safe mutations', () => {
         },
       },
     });
+  });
+
+  it('preserva el costo pactado de una partida al editar únicamente la cantidad', async () => {
+    transactionClient.purchase.findFirst
+      .mockResolvedValueOnce({
+        id: purchaseId,
+        status: PurchaseStatus.DRAFT,
+        items: [{ productId, price: 72.125 }],
+      })
+      .mockResolvedValueOnce({ id: purchaseId, status: PurchaseStatus.DRAFT });
+
+    await service.update(companyId, purchaseId, updateDto, UserRole.WAREHOUSE);
+
+    expect(transactionClient.purchase.updateMany).toHaveBeenCalledWith({
+      where: { id: purchaseId, companyId, status: PurchaseStatus.DRAFT },
+      data: { supplierId, subtotal: 144.25, iva: 23.08, total: 167.33 },
+    });
+    expect(transactionClient.purchaseItem.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          purchaseId,
+          productId,
+          quantity: 2,
+          price: 72.125,
+          subtotal: 144.25,
+        },
+      ],
+    });
+  });
+
+  it('permite cambiar el costo del borrador con rol autorizado', async () => {
+    transactionClient.purchase.findFirst
+      .mockResolvedValueOnce({
+        id: purchaseId,
+        status: PurchaseStatus.DRAFT,
+        items: [{ productId, price: 100 }],
+      })
+      .mockResolvedValueOnce({ id: purchaseId, status: PurchaseStatus.DRAFT });
+
+    await service.update(
+      companyId,
+      purchaseId,
+      {
+        ...updateDto,
+        costAdjustmentReason: 'Precio acordado con el proveedor',
+        items: [{ productId, quantity: 2, unitCost: 12.3456 }],
+      },
+      UserRole.MANAGER,
+      false,
+      actor,
+    );
+
+    expect(transactionClient.purchaseItem.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          purchaseId,
+          productId,
+          quantity: 2,
+          price: 12.3456,
+          subtotal: 24.69,
+        },
+      ],
+    });
+  });
+
+  it('permite al responsable de Compras delegado ajustar costos sin concederle aprobación', async () => {
+    transactionClient.purchase.findFirst
+      .mockResolvedValueOnce({
+        id: purchaseId,
+        status: PurchaseStatus.DRAFT,
+        items: [{ productId, price: 100 }],
+      })
+      .mockResolvedValueOnce({ id: purchaseId, status: PurchaseStatus.DRAFT });
+
+    await service.update(
+      companyId,
+      purchaseId,
+      {
+        ...updateDto,
+        costAdjustmentReason: 'Precio acordado con el proveedor',
+        items: [{ productId, quantity: 2, unitCost: 43.125 }],
+      },
+      UserRole.WAREHOUSE,
+      true,
+      actor,
+    );
+
+    expect(transactionClient.purchaseItem.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          purchaseId,
+          productId,
+          quantity: 2,
+          price: 43.125,
+          subtotal: 86.25,
+        },
+      ],
+    });
+  });
+
+  it('rechaza modificaciones de costo de un usuario de almacén sin mutación final', async () => {
+    transactionClient.purchase.findFirst.mockResolvedValue({
+      id: purchaseId,
+      status: PurchaseStatus.DRAFT,
+      items: [{ productId, price: 100 }],
+    });
+
+    await expect(
+      service.update(
+        companyId,
+        purchaseId,
+        {
+          ...updateDto,
+          items: [{ productId, quantity: 2, unitCost: 50 }],
+        },
+        UserRole.WAREHOUSE,
+      ),
+    ).rejects.toThrow();
+
+    expect(transactionClient.purchase.updateMany).not.toHaveBeenCalled();
+    expect(transactionClient.purchaseItem.createMany).not.toHaveBeenCalled();
+  });
+
+  it('conserva costo bruto y descuento cuando solo edita cantidad WAREHOUSE', async () => {
+    transactionClient.purchase.findFirst
+      .mockResolvedValueOnce({
+        id: purchaseId,
+        status: PurchaseStatus.DRAFT,
+        items: [
+          {
+            productId,
+            price: 76.95,
+            listUnitCost: 85.5,
+            discountPercent: 10,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ id: purchaseId, status: PurchaseStatus.DRAFT });
+
+    await service.update(companyId, purchaseId, updateDto, UserRole.WAREHOUSE);
+
+    expect(transactionClient.purchaseItem.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          purchaseId,
+          productId,
+          quantity: 2,
+          price: 76.95,
+          listUnitCost: 85.5,
+          discountPercent: 10,
+          subtotal: 153.9,
+        },
+      ],
+    });
+    expect(
+      transactionClient.purchaseCostAudit.createMany,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('permite al comprador delegado cambiar descuento del borrador', async () => {
+    transactionClient.purchase.findFirst
+      .mockResolvedValueOnce({
+        id: purchaseId,
+        status: PurchaseStatus.DRAFT,
+        items: [{ productId, price: 100, discountPercent: 0 }],
+      })
+      .mockResolvedValueOnce({ id: purchaseId, status: PurchaseStatus.DRAFT });
+
+    await service.update(
+      companyId,
+      purchaseId,
+      {
+        ...updateDto,
+        costAdjustmentReason: 'Precio acordado con el proveedor',
+        items: [{ productId, quantity: 2, discountPercent: 10 }],
+      },
+      UserRole.WAREHOUSE,
+      true,
+      actor,
+    );
+    expect(transactionClient.purchaseItem.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          purchaseId,
+          productId,
+          quantity: 2,
+          price: 90,
+          listUnitCost: 100,
+          discountPercent: 10,
+          subtotal: 180,
+        },
+      ],
+    });
+  });
+
+  it('impide cambio de descuento no autorizado sin mutar compra', async () => {
+    transactionClient.purchase.findFirst.mockResolvedValue({
+      id: purchaseId,
+      status: PurchaseStatus.DRAFT,
+      items: [{ productId, price: 100, discountPercent: 0 }],
+    });
+    await expect(
+      service.update(
+        companyId,
+        purchaseId,
+        {
+          ...updateDto,
+          items: [{ productId, quantity: 2, discountPercent: 10 }],
+        },
+        UserRole.WAREHOUSE,
+      ),
+    ).rejects.toThrow();
+    expect(transactionClient.purchase.updateMany).not.toHaveBeenCalled();
   });
 
   it('rechaza un proveedor de otro tenant antes de mutar compra o partidas', async () => {

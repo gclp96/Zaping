@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { CompanySequenceAllocatorService } from '../company-sequences/company-sequence-allocator.service';
 import { SuppliersService } from './suppliers.service';
 
 const activeSupplier = {
@@ -26,6 +27,7 @@ const inactiveSupplier = {
 
 describe('SuppliersService', () => {
   let service: SuppliersService;
+  const sequence = { allocateNext: jest.fn() };
   let supplier: {
     findFirst: jest.Mock;
     findMany: jest.Mock;
@@ -35,6 +37,8 @@ describe('SuppliersService', () => {
   };
 
   beforeEach(async () => {
+    jest.resetAllMocks();
+    sequence.allocateNext.mockResolvedValue(1);
     supplier = {
       findFirst: jest.fn(),
       findMany: jest.fn(),
@@ -48,7 +52,16 @@ describe('SuppliersService', () => {
         SuppliersService,
         {
           provide: PrismaService,
-          useValue: { supplier },
+          useValue: {
+            supplier,
+            $transaction: async (
+              fn: (tx: { supplier: typeof supplier }) => Promise<unknown>,
+            ) => fn({ supplier }),
+          },
+        },
+        {
+          provide: CompanySequenceAllocatorService,
+          useValue: sequence,
         },
       ],
     }).compile();
@@ -101,9 +114,15 @@ describe('SuppliersService', () => {
       phone: activeSupplier.phone,
     });
 
+    expect(sequence.allocateNext).toHaveBeenCalledWith(
+      expect.objectContaining({ supplier }),
+      'company-1',
+      'SUPPLIER_CODE',
+    );
     expect(supplier.create).toHaveBeenCalledWith({
       data: {
         companyId: 'company-1',
+        supplierCode: '0001',
         name: activeSupplier.name,
         email: activeSupplier.email,
         phone: activeSupplier.phone,
@@ -112,6 +131,56 @@ describe('SuppliersService', () => {
         notes: undefined,
       },
     });
+  });
+
+  it('skips an already used numeric code without renumbering its owner', async () => {
+    supplier.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'existing-code' })
+      .mockResolvedValueOnce(null);
+    sequence.allocateNext.mockResolvedValueOnce(1).mockResolvedValueOnce(2);
+    supplier.create.mockResolvedValue({
+      ...activeSupplier,
+      supplierCode: '0002',
+    });
+
+    await service.create('company-1', {
+      name: 'Proveedor con consecutivo',
+    });
+
+    expect(sequence.allocateNext).toHaveBeenCalledTimes(2);
+    const [createArgs] = supplier.create.mock.calls[0] as [
+      { data: { companyId: string; supplierCode: string } },
+    ];
+    expect(createArgs.data.companyId).toBe('company-1');
+    expect(createArgs.data.supplierCode).toBe('0002');
+  });
+
+  it('does not allow a tenant to assign a supplier code already in use', async () => {
+    supplier.findFirst
+      .mockResolvedValueOnce({ ...activeSupplier, supplierCode: '0001' })
+      .mockResolvedValueOnce({ id: 'other-supplier' });
+
+    await expect(
+      service.update('company-1', activeSupplier.id, {
+        supplierCode: '0002',
+      }),
+    ).rejects.toThrow('El código ya está asignado a otro proveedor');
+    expect(supplier.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid manual numeric conversion of a legacy supplier code', async () => {
+    supplier.findFirst.mockResolvedValue({
+      ...activeSupplier,
+      supplierCode: 'PROV-UX007-001',
+    });
+
+    await expect(
+      service.update('company-1', activeSupplier.id, {
+        supplierCode: 'AB001',
+      }),
+    ).rejects.toThrow('El código debe contener entre 4 y 12 dígitos');
+    expect(supplier.updateMany).not.toHaveBeenCalled();
   });
 
   it('updates through a tenant-scoped mutation without accepting lifecycle fields', async () => {

@@ -522,7 +522,7 @@ describe('PurchasesPage — normalización de lista', () => {
     const actions = await screen.findByRole('button', { name: 'Acciones de compra OC-0001' });
     actions.focus();
     await user.keyboard('{Enter}');
-    expect(screen.getByRole('menuitem', { name: 'Descargar PDF' })).toBe(document.activeElement);
+    expect(screen.getByRole('menuitem', { name: 'Ver' })).toBe(document.activeElement);
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('menu')).toBeNull();
     expect(document.activeElement).toBe(actions);
@@ -1147,6 +1147,19 @@ describe('PurchasesPage — normalización de lista', () => {
       );
     },
   );
+
+  it('muestra el proveedor y total antes de autorizar una aprobación', async () => {
+    const user = userEvent.setup();
+    configureApiMocks([draftPurchase]);
+    render(<PurchasesPage />);
+
+    await screen.findByText(draftPurchase.folio);
+    await user.click(screen.getByRole('button', { name: 'Aprobar' }));
+    const summary = screen.getByRole('group', { name: 'Resumen de aprobación' });
+    expect(within(summary).getByText(/Proveedor médico/)).toBeTruthy();
+    expect(within(summary).getByText(/\$1,160\.00/)).toBeTruthy();
+    expect(api.patch).not.toHaveBeenCalled();
+  });
 
   it('muestra un error estructurado cuando falla el PDF', async () => {
     const user = userEvent.setup();
@@ -2660,35 +2673,35 @@ describe('PurchasesPage — formulario de compra', () => {
       purchaseForStatus: draftPurchase,
       primaryAction: /^aprobar$/i,
       hiddenPrimaryAction: /recibir/i,
-      menuActions: [/^editar$/i, /descargar pdf/i, /cancelar/i],
+      menuActions: [/^ver$/i, /^editar$/i, /descargar pdf/i, /cancelar/i],
       omittedMenuActions: [/ver detalle/i],
     },
     {
       purchaseForStatus: purchase,
       primaryAction: /recibir/i,
       hiddenPrimaryAction: /^aprobar$/i,
-      menuActions: [/descargar pdf/i],
+      menuActions: [/^ver$/i, /descargar pdf/i],
       omittedMenuActions: [/^editar$/i, /cancelar/i, /ver detalle/i],
     },
     {
       purchaseForStatus: partialPurchase,
       primaryAction: /recibir/i,
       hiddenPrimaryAction: /^aprobar$/i,
-      menuActions: [/descargar pdf/i],
+      menuActions: [/^ver$/i, /descargar pdf/i],
       omittedMenuActions: [/^editar$/i, /cancelar/i, /ver detalle/i],
     },
     {
       purchaseForStatus: receivedPurchase,
       primaryAction: null,
       hiddenPrimaryAction: /recibir|aprobar/i,
-      menuActions: [/descargar pdf/i],
+      menuActions: [/^ver$/i, /descargar pdf/i],
       omittedMenuActions: [/^editar$/i, /cancelar/i, /ver detalle/i],
     },
     {
       purchaseForStatus: cancelledPurchase,
       primaryAction: null,
       hiddenPrimaryAction: /recibir|aprobar/i,
-      menuActions: [/descargar pdf/i],
+      menuActions: [/^ver$/i, /descargar pdf/i],
       omittedMenuActions: [/^editar$/i, /cancelar/i, /ver detalle/i],
     },
   ])(
@@ -2761,7 +2774,7 @@ describe('PurchasesPage — formulario de compra', () => {
     },
   );
 
-  it('muestra Editar como acción primaria para WAREHOUSE y deja solo PDF en el menú del borrador', async () => {
+  it('muestra Editar como acción primaria para WAREHOUSE y conserva Ver/PDF en el menú del borrador', async () => {
     const user = userEvent.setup();
     clearAuthenticatedSessionCache();
     configureApiMocks([draftPurchase], { role: 'WAREHOUSE' });
@@ -2783,6 +2796,7 @@ describe('PurchasesPage — formulario de compra', () => {
 
     const menu = await openActionsMenu(user, draftPurchase.folio);
 
+    expect(within(menu).getByRole('menuitem', { name: /^ver$/i })).toBeTruthy();
     expect(
       within(menu).getByRole('menuitem', { name: /descargar pdf/i }),
     ).toBeTruthy();
@@ -2792,6 +2806,16 @@ describe('PurchasesPage — formulario de compra', () => {
     expect(
       within(menu).queryByRole('menuitem', { name: /^cancelar$/i }),
     ).toBeNull();
+  });
+
+  it('abre el detalle completo desde Ver sin ejecutar mutaciones', async () => {
+    const user = userEvent.setup();
+    render(<PurchasesPage />);
+    await screen.findByRole('link', { name: 'OC-0001' });
+    await clickRowAction(user, /^ver$/i);
+    expect(routerMock.push).toHaveBeenCalledWith('/purchases/purchase-1');
+    expect(api.post).not.toHaveBeenCalled();
+    expect(api.patch).not.toHaveBeenCalled();
   });
 
   it('aprueba una compra en borrador y recarga las compras', async () => {
@@ -3184,8 +3208,9 @@ describe('PUR-UX-01B — lista visual de Compras con flag reversible', () => {
     expect(screen.getByText('2 de 2 órdenes')).toBeTruthy();
 
     const search = screen.getByRole('searchbox', {
-      name: 'Buscar por folio, proveedor o SKU',
+      name: 'Buscar por folio, proveedor o producto',
     });
+    expect(screen.queryByText('También puedes buscar por contacto, email o SKU.')).toBeNull();
     await user.type(search, 'RX-200');
     expect(screen.getByText('1 de 2 órdenes')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Abrir detalle de compra OC-0002' })).toBeTruthy();
@@ -3258,7 +3283,7 @@ describe('PUR-UX-01C — integración del panel contextual desde el listado', ()
     const user = userEvent.setup();
     render(<PurchasesPage />);
     await screen.findByRole('button', { name: 'Abrir detalle de compra OC-0001' });
-    const search = screen.getByRole('searchbox', { name: 'Buscar por folio, proveedor o SKU' });
+    const search = screen.getByRole('searchbox', { name: 'Buscar por folio, proveedor o producto' });
     await user.type(search, 'OC-0001');
     const folio = screen.getByRole('button', { name: 'Abrir detalle de compra OC-0001' });
     folio.focus();

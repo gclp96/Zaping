@@ -46,6 +46,7 @@ type Product = {
     name: string;
   } | null;
   barcode?: string | null;
+  unitOfMeasure?: string | null;
   cost: number;
   price: number;
   stock: number;
@@ -203,6 +204,7 @@ export default function ProductsPage() {
   const [description, setDescription] = useState('');
   const [brand, setBrand] = useState('');
   const [barcode, setBarcode] = useState('');
+  const [unitOfMeasure, setUnitOfMeasure] = useState('');
   const [cost, setCost] = useState('');
   const [price, setPrice] = useState('');
   const [minStock, setMinStock] = useState('');
@@ -432,6 +434,7 @@ export default function ProductsPage() {
     setDescription('');
     setBrand('');
     setBarcode('');
+    setUnitOfMeasure('');
     setCost('');
     setPrice('');
     setMinStock('');
@@ -453,6 +456,7 @@ export default function ProductsPage() {
     setDescription(product.description || '');
     setBrand(product.brand || '');
     setBarcode(product.barcode || '');
+    setUnitOfMeasure(product.unitOfMeasure || '');
     setCost(product.cost.toString());
     setPrice(product.price.toString());
     setMinStock(product.minStock.toString());
@@ -507,6 +511,11 @@ export default function ProductsPage() {
         brand: brand.trim() || undefined,
         categoryId: categoryId || null,
         barcode: barcode.trim() || undefined,
+        ...(unitOfMeasure.trim()
+          ? { unitOfMeasure: unitOfMeasure.trim() }
+          : editingProduct?.unitOfMeasure
+            ? { unitOfMeasure: '' }
+            : {}),
         cost: costValue,
         price: priceValue,
         minStock: minStockValue,
@@ -802,6 +811,15 @@ export default function ProductsPage() {
                 : 'Opcional.'
             }
             disabled={Boolean(categoryError)}
+          />
+
+          <Input
+            label="Unidad de medida"
+            value={unitOfMeasure}
+            placeholder="Ej. pzas., cajas, kg"
+            maxLength={20}
+            helperText="Se mostrará en las cantidades de las órdenes de compra."
+            onChange={(event) => setUnitOfMeasure(event.target.value)}
           />
 
           <MoneyInput

@@ -514,6 +514,7 @@ describe("UsersPage", () => {
         lastName: "Ventas",
         email: "laura@zaping.test",
         role: "MANAGER",
+        canAdjustPurchaseUnitCost: false,
         password: "secure-password",
       });
     });
@@ -574,9 +575,28 @@ describe("UsersPage", () => {
         lastName: "Gerente",
         email: "mario@zaping.test",
         role: "WAREHOUSE",
+        canAdjustPurchaseUnitCost: false,
       });
     });
     expect(await screen.findByText("Marco Gerente")).toBeTruthy();
+  });
+
+  it("allows an ADMIN to delegate purchase cost editing to a warehouse buyer", async () => {
+    const user = userEvent.setup();
+    await renderUsersPage();
+    await openActionsMenu(user, "Walter Almacen");
+    await user.click(screen.getByRole("menuitem", { name: "Editar" }));
+    const dialog = getDialog();
+    const control = within(dialog).getByRole("checkbox", { name: /Responsable de Compras: permitir ajustar costo unitario/i });
+    expect((control as HTMLInputElement).checked).toBe(false);
+    await user.click(control);
+    await user.click(within(dialog).getByRole("button", { name: "Guardar cambios" }));
+    await waitFor(() => {
+      expect(api.patch).toHaveBeenCalledWith("/users/warehouse-1", expect.objectContaining({
+        role: "WAREHOUSE",
+        canAdjustPurchaseUnitCost: true,
+      }));
+    });
   });
 
   it("shows edit API errors without closing the modal", async () => {
