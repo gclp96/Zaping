@@ -13,6 +13,7 @@ import {
   vi,
 } from 'vitest';
 
+import { canApprovePurchases } from '@/app/erp-role-access';
 import { api } from '@/services/api';
 
 import type { Purchase } from '../types';
@@ -448,6 +449,50 @@ describe('usePurchaseForm', () => {
       costAdjustmentReason: 'Precio acordado con el proveedor',
       supplierId: 'supplier-1',
       items: [{ productId: 'product-1', quantity: 10, unitCost: 99.9999 }],
+    });
+  });
+
+  it('exige motivo a MANAGER antes de enviar un ajuste de costo de una compra existente', async () => {
+    const { result } = setupHook(canApprovePurchases('MANAGER'));
+    vi.mocked(api.patch).mockResolvedValue({ data: { id: draftPurchase.id } } as never);
+    act(() => result.current.openEditModal(draftPurchase));
+    act(() => result.current.handleItemUnitCostChange(product.id, '90.125'));
+
+    expect(result.current.items[0].unitCost).toBe(90.125);
+    expect(result.current.requiresCostAdjustmentReason).toBe(true);
+    await act(async () => {
+      await result.current.handleCreatePurchase();
+    });
+    expect(result.current.itemsError).toBe(
+      'Describe el motivo del ajuste de costo o descuento (mínimo 8 caracteres).',
+    );
+    expect(api.patch).not.toHaveBeenCalled();
+
+    act(() => result.current.setCostAdjustmentReason('  Flete QA  '));
+    await act(async () => {
+      await result.current.handleCreatePurchase();
+    });
+    expect(api.patch).toHaveBeenCalledExactlyOnceWith('/purchases/purchase-1', {
+      supplierId: draftPurchase.supplier.id,
+      costAdjustmentReason: 'Flete QA',
+      items: [{ productId: product.id, quantity: 10, unitCost: 90.125 }],
+    });
+  });
+
+  it('guarda una edición exclusiva de cantidad sin exigir motivo de ajuste', async () => {
+    const { result } = setupHook(canApprovePurchases('MANAGER'));
+    vi.mocked(api.patch).mockResolvedValue({ data: { id: draftPurchase.id } } as never);
+    act(() => result.current.openEditModal(draftPurchase));
+    act(() => result.current.handleItemQuantityChange(product.id, '12'));
+
+    expect(result.current.requiresCostAdjustmentReason).toBe(false);
+    await act(async () => {
+      await result.current.handleCreatePurchase();
+    });
+    expect(result.current.itemsError).toBe('');
+    expect(api.patch).toHaveBeenCalledExactlyOnceWith('/purchases/purchase-1', {
+      supplierId: draftPurchase.supplier.id,
+      items: [{ productId: product.id, quantity: 12 }],
     });
   });
 
