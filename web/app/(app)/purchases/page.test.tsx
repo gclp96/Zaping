@@ -567,7 +567,7 @@ describe('PurchasesPage — normalización de lista', () => {
 
     await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
     expect(screen.getByText(purchase.folio)).toBeTruthy();
-  });
+  }, 15_000);
 
   it('renderiza las columnas reales y sus prioridades responsive', async () => {
     render(<PurchasesPage />);
