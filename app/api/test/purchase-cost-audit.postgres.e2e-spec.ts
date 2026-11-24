@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   INestApplication,
   NotFoundException,
+  ValidationPipe,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -37,7 +38,7 @@ describePg('UX-007I cost audit on disposable PostgreSQL 16', () => {
   const history = (companyId: string, purchaseId: string) =>
     service.findCostAudit(companyId, purchaseId, UserRole.ADMIN, false);
 
-  async function fixture() {
+  async function fixture(role: UserRole = UserRole.ADMIN) {
     const company = await db.company.create({
       data: { name: 'QA compras', rfc: randomUUID() },
     });
@@ -59,7 +60,7 @@ describePg('UX-007I cost audit on disposable PostgreSQL 16', () => {
         firstName: 'Ana',
         lastName: 'Compras',
         passwordHash: 'unused-test-value',
-        role: UserRole.ADMIN,
+        role,
       },
     });
     const dto = {
@@ -490,7 +491,7 @@ describePg('UX-007I cost audit on disposable PostgreSQL 16', () => {
     ).toBe(second?.newNetUnitCost.toNumber());
   }, 10_000);
 
-  describe('GET /purchases/:id/cost-audit over HTTP', () => {
+  describe('Purchase cost audit over HTTP', () => {
     let app: INestApplication<App>;
     let order: Awaited<ReturnType<PurchasesService['create']>>;
     let tenant: Awaited<ReturnType<typeof fixture>>;
@@ -525,6 +526,13 @@ describePg('UX-007I cost audit on disposable PostgreSQL 16', () => {
           ],
         }).compile();
         app = moduleRef.createNestApplication();
+        app.useGlobalPipes(
+          new ValidationPipe({
+            whitelist: true,
+            forbidNonWhitelisted: true,
+            transform: true,
+          }),
+        );
         await app.init();
       } finally {
         if (previousJwtSecret === undefined) delete process.env.JWT_SECRET;
@@ -587,6 +595,82 @@ describePg('UX-007I cost audit on disposable PostgreSQL 16', () => {
         }
       },
     );
+
+    it('PATCH rejects missing or blank reasons without persisting changes and audits a justified adjustment', async () => {
+      const { company, product, actor, dto } = await fixture(UserRole.MANAGER);
+      const draft = await service.create(company.id, dto);
+      const readDraft = () =>
+        db.purchase.findUniqueOrThrow({
+          where: { id: draft.id },
+          include: { items: true },
+        });
+      const original = await readDraft();
+      const auditWhere = { companyId: company.id, purchaseId: draft.id };
+      const token = jwt.sign({
+        sub: actor.id,
+        email: actor.email,
+        companyId: company.id,
+        role: actor.role,
+      });
+      const adjustment = {
+        ...dto,
+        items: [{ productId: product.id, quantity: 2, unitCost: 90.125 }],
+      };
+
+      for (const reasonPayload of [
+        {},
+        { costAdjustmentReason: '' },
+        { costAdjustmentReason: '   ' },
+      ]) {
+        const response = await request(app.getHttpServer())
+          .patch('/purchases/' + draft.id)
+          .set('Authorization', 'Bearer ' + token)
+          .send({ ...adjustment, ...reasonPayload })
+          .expect(400);
+        expect(response.body as unknown).toMatchObject({
+          message:
+            'Describe el motivo del ajuste de costo o descuento (8 a 500 caracteres)',
+        });
+        expect(await readDraft()).toEqual(original);
+        expect(await db.purchaseCostAudit.count({ where: auditWhere })).toBe(0);
+      }
+
+      await request(app.getHttpServer())
+        .patch('/purchases/' + draft.id)
+        .set('Authorization', 'Bearer ' + token)
+        .send({ ...adjustment, costAdjustmentReason: reason })
+        .expect(200);
+      expect((await readDraft()).items).toMatchObject([
+        { productId: product.id, price: 90.125, quantity: 2 },
+      ]);
+      const events = await db.purchaseCostAudit.findMany({ where: auditWhere });
+      expect(events).toHaveLength(1);
+      const [event] = events;
+      expect(event).toMatchObject({
+        ...auditWhere,
+        productId: product.id,
+        productDisplayName: product.name,
+        actorUserId: actor.id,
+        actorDisplayName: 'Ana Compras',
+        actorRole: UserRole.MANAGER,
+        reason,
+      });
+      expect({
+        previousGross: event.previousGrossUnitCost.toFixed(4),
+        newGross: event.newGrossUnitCost.toFixed(4),
+        previousDiscount: event.previousDiscountPercent.toFixed(2),
+        newDiscount: event.newDiscountPercent.toFixed(2),
+        previousNet: event.previousNetUnitCost.toFixed(4),
+        newNet: event.newNetUnitCost.toFixed(4),
+      }).toEqual({
+        previousGross: '100.0000',
+        newGross: '90.1250',
+        previousDiscount: '0.00',
+        newDiscount: '0.00',
+        previousNet: '100.0000',
+        newNet: '90.1250',
+      });
+    });
 
     it('returns 404 for another company despite spoofed tenant inputs', async () => {
       const user = legacy.actor;
