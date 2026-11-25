@@ -824,8 +824,8 @@ model HealthcareDoctor {
 
   customer Customer? @relation("CustomerHealthcareDoctor", fields: [customerId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
 
-affiliations HealthcareDoctorHospitalAffiliation[]
-cases        HealthcareCase[] @relation("HealthcareCaseDoctor")
+  affiliations HealthcareDoctorHospitalAffiliation[]
+  cases        HealthcareCase[] @relation("HealthcareCaseDoctor")
 
   @@unique([id, companyId])
   @@index([companyId, isActive, lastName, firstName])
