@@ -1,5 +1,20 @@
 Project Board — Zaping
 
+## Snapshot vigente — UX-007 Compras y Recepciones (24-nov-2026)
+
+**Estado: UX-007 COMPLETE / MERGED / UAT LOCAL ACCEPTED.** El cierre técnico y de pruebas está incorporado en `main@47ad3f298ecf27531ed0ef5ca514504ddbe461c8` (PR #297, #298 y #301). La PR #301 solo añadió dos archivos de pruebas de motivo obligatorio; CI 4/4 PASS (Agents, API, Historical upgrade pre-S1 y Web). **No declara despliegue productivo ni activación general de flags.**
+
+- **Alcance verificado:** flujo de Compras y PDF, autor histórico, costos/descuentos por partida, auditoría de ajustes, Recepciones parciales y trazabilidad a Inventory, roles ADMIN/MANAGER/WAREHOUSE/SALES. UAT manual de empresa A/B y GET de cinco recursos extranjeros con JWT de Company B: 5/5 HTTP 404. Evidencia de cierre adicional: Web 119/119, PostgreSQL/HTTP final 12/12 y hook Web 18/18 (resultados locales reportados).
+- **Motivo obligatorio:** pruebas negativas finales acreditan HTTP 400 al omitir/enviar vacío/solo espacios; cero cambios en la orden y sus partidas, cero eventos de auditoría; con justificación válida se registra un evento. La prueba manual negativa en interfaz no tuvo evidencia concluyente; **no** se declara PASS manual para ese caso.
+- **PR históricas cerradas sin merge adicional:** #290, #291, #293, #294, #295 y #296, tras verificar que sus HEAD estaban contenidos en `main` (0 commits por delante). Comentarios de trazabilidad en las PR. **No se borraron ramas ni worktrees.**
+- **PR pendientes de decisión:** #287 y #292 permanecen DRAFT/OPEN. Sus ramas son divergentes con `main` (10 y 3 commits por delante, respectivamente) y sus cambios principales tienen versiones integradas o evolucionadas; **no fusionar ni cerrar** sin reconciliación final de diferencias.
+- **Gates no acreditados por este cierre:** deployment, migraciones en bases reales, aceptación completa en operación de clientes, activación de funcionalidades con flags, respaldo/rollback en el ambiente de destino y validación de riesgos de índices/migraciones bajo carga.
+- **Siguiente objetivo propuesto (sin sprint/fecha/SP comprometidos):** release-readiness de Compras/Recepciones: revisión de PR divergentes, matriz de gates de despliegue, plan de migraciones/respaldo/rollback y cierre documental. Mantener iniciativas Healthcare e Inventory sujetas a sus propios gates; no inferir cutover real.
+
+Este snapshot prevalece sobre las referencias históricas de Compras/Recepciones anteriores que aparecen debajo. La historia de tickets y milestones existentes permanece intacta.
+
+---
+
 ## Cierre de integración — Compras y Recepciones V1 (27-oct-2026)
 
 **Código de rediseño RR-001–RR-007: INTEGRADO EN main** mediante [PR #176](https://github.com/gclp96/zaping/pull/176), merge `83ce41e799f6b8523adf1f176e57477d43388bc6`. La CI del HEAD final `6e08288a81b25ad1f93870d7cf3cb8d2a7f8315f` completó Web, API e Historical upgrade pre-S1: **3/3 PASS** ([run 40612272176](https://github.com/gclp96/zaping/actions/runs/40612272176)). Los PR #167 y #169–#175 se cerraron como superseded para impedir integración duplicada; #168 aparece fusionado por GitHub al incorporar su rama.
