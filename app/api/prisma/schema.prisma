@@ -351,7 +351,11 @@ model Customer {
   company  Company @relation(fields: [companyId], references: [id])
   quotes   Quote[]
   sales    Sale[]
+  healthcareDoctor    HealthcareDoctor?   @relation("CustomerHealthcareDoctor")
+  healthcareHospitals HealthcareHospital[] @relation("CustomerHealthcareHospitals")
+  healthcareCases     HealthcareCase[]     @relation("HealthcareCaseCustomer")
   isActive Boolean @default(true)
+  @@unique([id, companyId])
 
   @@index([companyId])
   @@index([companyId, state, city])
@@ -800,6 +804,7 @@ model PasswordResetToken {
 model HealthcareDoctor {
   id        String @id @default(uuid())
   companyId String
+  customerId String?
 
   firstName String
   lastName  String
@@ -817,17 +822,21 @@ model HealthcareDoctor {
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
-  affiliations HealthcareDoctorHospitalAffiliation[]
-  cases        HealthcareCase[]                      @relation("HealthcareCaseDoctor")
+  customer Customer? @relation("CustomerHealthcareDoctor", fields: [customerId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
+affiliations HealthcareDoctorHospitalAffiliation[]
+cases        HealthcareCase[] @relation("HealthcareCaseDoctor")
 
   @@unique([id, companyId])
   @@index([companyId, isActive, lastName, firstName])
   @@index([companyId, searchKey])
+  @@unique([customerId, companyId])
 }
 
 model HealthcareHospital {
   id        String @id @default(uuid())
   companyId String
+  customerId String?
 
   name  String
   city  String
@@ -847,6 +856,8 @@ model HealthcareHospital {
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  customer Customer? @relation("CustomerHealthcareHospitals", fields: [customerId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
   affiliations HealthcareDoctorHospitalAffiliation[]
   cases        HealthcareCase[]                      @relation("HealthcareCaseHospital")
 
@@ -854,6 +865,7 @@ model HealthcareHospital {
   @@index([companyId, isActive, name])
   @@index([companyId, state, city])
   @@index([companyId, searchKey])
+  @@index([companyId, customerId])
 }
 
 model HealthcareDoctorHospitalAffiliation {
@@ -888,6 +900,7 @@ model HealthcareCase {
 
   id         String  @id @default(uuid())
   companyId  String
+  customerId String?
   doctorId   String?
   hospitalId String?
 
@@ -914,6 +927,8 @@ model HealthcareCase {
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
+  customer Customer? @relation("HealthcareCaseCustomer", fields: [customerId, companyId], references: [id, companyId],  onDelete: Restrict, onUpdate: Restrict)
+
   healthcareDoctor   HealthcareDoctor?   @relation("HealthcareCaseDoctor", fields: [doctorId, companyId], references: [id, companyId], onDelete: Restrict)
   healthcareHospital HealthcareHospital? @relation("HealthcareCaseHospital", fields: [hospitalId, companyId], references: [id, companyId], onDelete: Restrict)
 
@@ -932,6 +947,7 @@ model HealthcareCase {
   @@index([companyId, responsibleUserId])
   @@index([companyId, doctorId, scheduledStart])
   @@index([companyId, hospitalId, scheduledStart])
+  @@index([companyId, customerId])
 }
 
 model HealthcareCaseRequirement {
