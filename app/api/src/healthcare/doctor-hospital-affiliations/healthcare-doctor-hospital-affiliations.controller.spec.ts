@@ -24,6 +24,7 @@ describe('HealthcareDoctorHospitalAffiliationsController', () => {
     update: jest.fn(),
     deactivate: jest.fn(),
     reactivate: jest.fn(),
+    prefer: jest.fn(),
   };
   const controller = new HealthcareDoctorHospitalAffiliationsController(
     service as never,
@@ -129,4 +130,13 @@ describe('HealthcareDoctorHospitalAffiliationsController', () => {
       );
     },
   );
+
+  it('restricts prefer to ADMIN and MANAGER', () => {
+    const handler = Object.getOwnPropertyDescriptor(
+      HealthcareDoctorHospitalAffiliationsController.prototype,
+      'prefer',
+    )?.value as object;
+
+    expect(Reflect.getMetadata('roles', handler)).toEqual(['ADMIN', 'MANAGER']);
+  });
 });

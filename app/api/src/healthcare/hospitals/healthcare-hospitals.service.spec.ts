@@ -63,6 +63,8 @@ const duplicateCandidate = {
 
 describe('HealthcareHospitalsService', () => {
   let hospital: HospitalModelMock;
+  let clearPreferences: jest.Mock;
+  let transaction: jest.Mock;
   let service: HealthcareHospitalsService;
 
   beforeEach(() => {
@@ -73,8 +75,19 @@ describe('HealthcareHospitalsService', () => {
       create: jest.fn().mockResolvedValue(hospitalRecord),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     };
+    clearPreferences = jest.fn().mockResolvedValue({ count: 1 });
+    const transactionClient = {
+      healthcareHospital: hospital,
+      healthcareDoctorHospitalAffiliation: { updateMany: clearPreferences },
+    };
+    transaction = jest.fn(
+      async (
+        callback: (client: typeof transactionClient) => Promise<unknown>,
+      ) => callback(transactionClient),
+    );
     service = new HealthcareHospitalsService({
       healthcareHospital: hospital,
+      $transaction: transaction,
     } as unknown as PrismaService);
   });
 
@@ -389,28 +402,92 @@ describe('HealthcareHospitalsService', () => {
       });
   });
 
-  it('keeps lifecycle commands idempotent in the requested state', async () => {
-    await service.reactivate('company-a', 'hospital-1');
-
-    expect(hospital.updateMany).not.toHaveBeenCalled();
-  });
-
-  it('uses a tenant/state predicate for lifecycle transitions', async () => {
+  it('clears only the matching tenant preferences on effective deactivation', async () => {
+    const inactive = { ...hospitalRecord, isActive: false };
     hospital.findFirst
       .mockResolvedValueOnce(hospitalRecord)
-      .mockResolvedValueOnce({ ...hospitalRecord, isActive: false });
+      .mockResolvedValue(inactive);
 
     await expect(
       service.deactivate('company-a', 'hospital-1'),
-    ).resolves.toMatchObject({ isActive: false });
+    ).resolves.toMatchObject({
+      isActive: false,
+    });
+    await expect(
+      service.deactivate('company-a', 'hospital-1'),
+    ).resolves.toMatchObject({
+      isActive: false,
+    });
+    expect(transaction).toHaveBeenCalledTimes(2);
+    expect(hospital.updateMany).toHaveBeenCalledTimes(1);
     expect(hospital.updateMany).toHaveBeenCalledWith({
-      where: {
-        id: 'hospital-1',
-        companyId: 'company-a',
-        isActive: true,
-      },
+      where: { id: 'hospital-1', companyId: 'company-a', isActive: true },
       data: { isActive: false },
     });
+    expect(clearPreferences).toHaveBeenCalledTimes(1);
+    expect(clearPreferences).toHaveBeenCalledWith({
+      where: {
+        companyId: 'company-a',
+        hospitalId: 'hospital-1',
+        isPreferred: true,
+      },
+      data: { isPreferred: false },
+    });
+    expect(hospital.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
+      clearPreferences.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('reactivates idempotently without restoring preferences', async () => {
+    hospital.findFirst.mockResolvedValueOnce({
+      ...hospitalRecord,
+      isActive: false,
+    });
+
+    await expect(
+      service.reactivate('company-a', 'hospital-1'),
+    ).resolves.toMatchObject({
+      isActive: true,
+    });
+    await expect(
+      service.reactivate('company-a', 'hospital-1'),
+    ).resolves.toMatchObject({
+      isActive: true,
+    });
+    expect(hospital.updateMany).toHaveBeenCalledTimes(1);
+    expect(clearPreferences).not.toHaveBeenCalled();
+  });
+
+  it('rejects a deactivation in a different tenant before any write', async () => {
+    hospital.findFirst.mockResolvedValueOnce(null);
+
+    await expect(
+      service.deactivate('company-b', 'hospital-1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(hospital.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'hospital-1', companyId: 'company-b' },
+      }),
+    );
+    expect(hospital.updateMany).not.toHaveBeenCalled();
+    expect(clearPreferences).not.toHaveBeenCalled();
+  });
+
+  it('rejects the transaction when preference cleanup fails', async () => {
+    clearPreferences.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('raw cleanup error', {
+        code: 'P2010',
+        clientVersion: '6.19.3',
+      }),
+    );
+
+    await expect(
+      service.deactivate('company-a', 'hospital-1'),
+    ).rejects.toBeInstanceOf(InternalServerErrorException);
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expect(hospital.updateMany).toHaveBeenCalledTimes(1);
+    expect(clearPreferences).toHaveBeenCalledTimes(1);
+    expect(hospital.findFirst).toHaveBeenCalledTimes(1);
   });
 
   it('accepts a concurrently reached lifecycle target state', async () => {
@@ -422,6 +499,7 @@ describe('HealthcareHospitalsService', () => {
     await expect(
       service.deactivate('company-a', 'hospital-1'),
     ).resolves.toMatchObject({ isActive: false });
+    expect(clearPreferences).not.toHaveBeenCalled();
   });
 
   it('maps an unresolved lifecycle race to RESOURCE_STATE_CHANGED', async () => {

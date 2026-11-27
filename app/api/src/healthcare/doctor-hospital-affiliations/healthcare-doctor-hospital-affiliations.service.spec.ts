@@ -21,6 +21,7 @@ type PrismaMock = {
   healthcareHospital: Pick<ModelMock, 'findFirst'>;
   healthcareDoctorHospitalAffiliation: ModelMock;
   $transaction: jest.Mock;
+  $queryRaw: jest.Mock;
 };
 
 function firstCallArgument<T>(mock: jest.Mock): T {
@@ -73,6 +74,7 @@ const affiliationRecord = {
   updatedAt,
   doctor: compactDoctor,
   hospital: compactHospital,
+  isPreferred: false,
 };
 
 const expectedActiveStatusWhere = {
@@ -124,6 +126,7 @@ describe('HealthcareDoctorHospitalAffiliationsService', () => {
       healthcareDoctor: doctor,
       healthcareHospital: hospital,
       healthcareDoctorHospitalAffiliation: affiliation,
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'doctor-a' }]),
       $transaction: jest
         .fn()
         .mockImplementation((callback: (transaction: PrismaMock) => unknown) =>
@@ -133,6 +136,78 @@ describe('HealthcareDoctorHospitalAffiliationsService', () => {
     service = new HealthcareDoctorHospitalAffiliationsService(
       prisma as unknown as PrismaService,
     );
+  });
+
+  it('sets a preferred hospital and clears the previous preference', async () => {
+    affiliation.findFirst
+      .mockResolvedValueOnce(affiliationRecord)
+      .mockResolvedValueOnce(affiliationRecord)
+      .mockResolvedValueOnce({
+        ...affiliationRecord,
+        isPreferred: true,
+      });
+
+    const result = await service.prefer('company-a', 'affiliation-a');
+
+    expect(result.isPreferred).toBe(true);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+
+    expect(affiliation.updateMany).toHaveBeenNthCalledWith(1, {
+      where: {
+        companyId: 'company-a',
+        doctorId: 'doctor-a',
+        isPreferred: true,
+      },
+      data: { isPreferred: false },
+    });
+
+    expect(affiliation.updateMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        id: 'affiliation-a',
+        companyId: 'company-a',
+        doctorId: 'doctor-a',
+        isActive: true,
+      },
+      data: { isPreferred: true },
+    });
+  });
+
+  it('does not write when the affiliation is already preferred', async () => {
+    affiliation.findFirst.mockResolvedValue({
+      ...affiliationRecord,
+      isPreferred: true,
+    });
+
+    const result = await service.prefer('company-a', 'affiliation-a');
+
+    expect(result.isPreferred).toBe(true);
+    expect(affiliation.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects an inactive affiliation without changing preferences', async () => {
+    affiliation.findFirst
+      .mockResolvedValueOnce(affiliationRecord)
+      .mockResolvedValueOnce({
+        ...affiliationRecord,
+        isActive: false,
+      });
+
+    await expect(
+      service.prefer('company-a', 'affiliation-a'),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(affiliation.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects an affiliation belonging to another company', async () => {
+    affiliation.findFirst.mockResolvedValueOnce(null);
+
+    await expect(
+      service.prefer('company-b', 'affiliation-a'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    expect(affiliation.updateMany).not.toHaveBeenCalled();
   });
 
   it('creates one normalized same-tenant link in a transaction', async () => {
@@ -482,7 +557,10 @@ describe('HealthcareDoctorHospitalAffiliationsService', () => {
           companyId: 'company-a',
           isActive: initialState,
         },
-        data: { isActive: targetState },
+        data: {
+          isActive: targetState,
+          ...(!targetState ? { isPreferred: false } : {}),
+        },
       });
     },
   );
@@ -694,13 +772,13 @@ describe('HealthcareDoctorHospitalAffiliationsService', () => {
       expect(affiliation.findMany).not.toHaveBeenCalled();
     },
   );
-
   it('rejects normalized-empty nested search before list queries', async () => {
     await expect(
       service.findHospitalsForDoctor('company-a', 'doctor-a', {
         search: '\u0301',
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
+
     expect(affiliation.count).not.toHaveBeenCalled();
     expect(affiliation.findMany).not.toHaveBeenCalled();
   });

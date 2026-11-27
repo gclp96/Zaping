@@ -79,4 +79,17 @@ export class HealthcareDoctorHospitalAffiliationsController {
       affiliationId,
     );
   }
+
+  @Post(':affiliationId/prefer')
+  @HttpCode(HttpStatus.OK)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  prefer(
+    @Req() request: AuthenticatedRequest,
+    @Param('affiliationId', ParseUUIDPipe) affiliationId: string,
+  ) {
+    return this.healthcareDoctorHospitalAffiliationsService.prefer(
+      request.user.companyId,
+      affiliationId,
+    );
+  }
 }

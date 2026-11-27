@@ -29,6 +29,7 @@ const affiliationCoreSelect = {
   doctorId: true,
   hospitalId: true,
   isActive: true,
+  isPreferred: true,
   notes: true,
   createdAt: true,
   updatedAt: true,
@@ -214,6 +215,97 @@ export class HealthcareDoctorHospitalAffiliationsService {
     return this.setActiveState(companyId, affiliationId, true);
   }
 
+  async prefer(
+    companyId: string,
+    affiliationId: string,
+  ): Promise<AffiliationRecord> {
+    try {
+      return await this.prisma.$transaction(async (transaction) => {
+        const initial = await this.findRecord(
+          transaction,
+          companyId,
+          affiliationId,
+        );
+
+        // Serializa cambios de preferencia del mismo médico.
+        await transaction.$queryRaw<{ id: string }[]>`
+        SELECT "id"
+        FROM "HealthcareDoctor"
+        WHERE "id" = ${initial.doctorId}
+          AND "companyId" = ${companyId}
+        FOR UPDATE
+      `;
+
+        // Impide desactivar el hospital mientras se decide su preferencia.
+        await transaction.$queryRaw<{ id: string }[]>`
+        SELECT "id"
+        FROM "HealthcareHospital"
+        WHERE "id" = ${initial.hospitalId}
+          AND "companyId" = ${companyId}
+        FOR SHARE
+      `;
+
+        // Releer después de adquirir el bloqueo.
+        const current = await this.findRecord(
+          transaction,
+          companyId,
+          affiliationId,
+        );
+
+        if (!current.isActive) {
+          throw affiliationInactiveException(current.id);
+        }
+
+        if (!current.doctor.isActive || !current.hospital.isActive) {
+          throw affiliationEndpointInactiveException();
+        }
+
+        if (current.isPreferred) {
+          return current;
+        }
+
+        await transaction.healthcareDoctorHospitalAffiliation.updateMany({
+          where: {
+            companyId,
+            doctorId: current.doctorId,
+            isPreferred: true,
+          },
+          data: { isPreferred: false },
+        });
+
+        const result =
+          await transaction.healthcareDoctorHospitalAffiliation.updateMany({
+            where: {
+              id: affiliationId,
+              companyId,
+              doctorId: current.doctorId,
+              isActive: true,
+            },
+            data: { isPreferred: true },
+          });
+
+        if (result.count !== 1) {
+          throw resourceStateChangedException();
+        }
+
+        return this.findRecord(transaction, companyId, affiliationId);
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw resourceStateChangedException();
+      }
+
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        this.rethrowWriteError(error);
+      }
+
+      throw error;
+    }
+  }
+
   async findHospitalsForDoctor(
     companyId: string,
     doctorId: string,
@@ -313,6 +405,7 @@ export class HealthcareDoctorHospitalAffiliationsService {
             },
             data: {
               isActive: targetState,
+              ...(!targetState ? { isPreferred: false } : {}),
             },
           });
 
