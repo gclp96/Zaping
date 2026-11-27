@@ -343,40 +343,48 @@ export class HealthcareHospitalsService {
     hospitalId: string,
     targetState: boolean,
   ): Promise<HealthcareHospitalDetail> {
-    const current = await this.findRecord(companyId, hospitalId);
-
-    if (current.isActive === targetState) {
-      return this.mapDetail(current);
-    }
-
-    let result: { count: number };
-
     try {
-      result = await this.prisma.healthcareHospital.updateMany({
-        where: {
-          id: hospitalId,
-          companyId,
-          isActive: !targetState,
+      return await this.prisma.$transaction(
+        async (transaction) => {
+          const current = await this.findRecord(
+            companyId,
+            hospitalId,
+            transaction,
+          );
+
+          if (current.isActive === targetState) {
+            return this.mapDetail(current);
+          }
+
+          // Lock the parent before touching affiliations, matching prefer() lock order.
+          const result = await transaction.healthcareHospital.updateMany({
+            where: { id: hospitalId, companyId, isActive: !targetState },
+            data: { isActive: targetState },
+          });
+
+          if (result.count === 1 && !targetState) {
+            await transaction.healthcareDoctorHospitalAffiliation.updateMany({
+              where: { companyId, hospitalId, isPreferred: true },
+              data: { isPreferred: false },
+            });
+          }
+
+          const latest = await this.findRecord(
+            companyId,
+            hospitalId,
+            transaction,
+          );
+          if (result.count === 1 || latest.isActive === targetState) {
+            return this.mapDetail(latest);
+          }
+
+          throw resourceStateChangedException();
         },
-        data: {
-          isActive: targetState,
-        },
-      });
+        { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
+      );
     } catch (error) {
       this.rethrowWriteError(error);
     }
-
-    if (result.count === 1) {
-      return this.mapDetail(await this.findRecord(companyId, hospitalId));
-    }
-
-    const latest = await this.findRecord(companyId, hospitalId);
-
-    if (latest.isActive === targetState) {
-      return this.mapDetail(latest);
-    }
-
-    throw resourceStateChangedException();
   }
 
   private normalizeCreateInput(
@@ -439,8 +447,9 @@ export class HealthcareHospitalsService {
   private async findRecord(
     companyId: string,
     hospitalId: string,
+    client: Prisma.TransactionClient = this.prisma,
   ): Promise<HospitalDetailRecord> {
-    const hospital = await this.prisma.healthcareHospital.findFirst({
+    const hospital = await client.healthcareHospital.findFirst({
       where: {
         id: hospitalId,
         companyId,
